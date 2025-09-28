@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +6,12 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreditCard, ExternalLink, CheckCircle, AlertTriangle, Calendar, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
 
 const plans = [
   {
-    name: "Starter",
+    name: "starter",
+    displayName: "Starter",
     price: 29,
     description: "Perfect for small businesses",
     features: [
@@ -21,7 +23,8 @@ const plans = [
     popular: false
   },
   {
-    name: "Pro", 
+    name: "pro",
+    displayName: "Pro", 
     price: 49,
     description: "Most popular for growing stores",
     features: [
@@ -35,7 +38,8 @@ const plans = [
     popular: true
   },
   {
-    name: "Plus",
+    name: "plus",
+    displayName: "Plus",
     price: 99,
     description: "For enterprise-scale operations",
     features: [
@@ -79,10 +83,37 @@ const invoiceHistory = [
 ];
 
 export default function Billing() {
-  const [currentPlan] = useState("Pro");
-  const [trialDaysLeft] = useState(7);
-  const [provider] = useState("shopify"); // or "stripe"
+  const [entitlements, setEntitlements] = useState<any>(null);
+  const [storeId, setStoreId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Get store ID from user info
+        const userInfo = await apiClient.getMe();
+        if (userInfo.stores && userInfo.stores.length > 0) {
+          const store_id = userInfo.stores[0].id;
+          setStoreId(store_id);
+          
+          // Get entitlements
+          const entitlementsData = await apiClient.getEntitlements(store_id);
+          setEntitlements(entitlementsData);
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load billing information",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initializeData();
+  }, []);
 
   const handleShopifyBilling = (planName: string) => {
     toast({
@@ -99,11 +130,37 @@ export default function Billing() {
   };
 
   const getPlanBadge = (planName: string) => {
-    if (planName === currentPlan) {
+    if (entitlements && planName.toLowerCase() === entitlements.plan.toLowerCase()) {
       return <Badge className="bg-success text-success-foreground">Current</Badge>;
     }
     return null;
   };
+
+  const getTrialDaysLeft = () => {
+    if (!entitlements?.trial_ends_at) return 0;
+    
+    const trialEnd = new Date(entitlements.trial_ends_at);
+    const now = new Date();
+    const diffTime = trialEnd.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
+  };
+
+  const currentPlan = plans.find(p => p.name === entitlements?.plan) || plans[0];
+  const trialDaysLeft = getTrialDaysLeft();
+  const isTrialing = entitlements?.status === "trialing";
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-6xl">
+        <div>
+          <h1 className="text-3xl font-bold">Billing & Plans</h1>
+          <p className="text-muted-foreground">Loading billing information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -115,7 +172,7 @@ export default function Billing() {
       </div>
 
       {/* Trial Status */}
-      {trialDaysLeft > 0 && (
+      {isTrialing && trialDaysLeft > 0 && (
         <Card className="bg-primary-muted border-primary/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -148,16 +205,16 @@ export default function Billing() {
         <CardContent>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-semibold">{currentPlan} Plan</h3>
+              <h3 className="text-lg font-semibold">{currentPlan.displayName} Plan</h3>
               <p className="text-muted-foreground">
-                Billed via {provider === "shopify" ? "Shopify" : "Stripe"}
+                Billed via {entitlements?.provider === "shopify" ? "Shopify" : "Stripe"}
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold">${plans.find(p => p.name === currentPlan)?.price}/mo</div>
-              <Badge className="bg-success text-success-foreground">
+              <div className="text-2xl font-bold">${currentPlan.price}/mo</div>
+              <Badge className={isTrialing ? "bg-primary text-primary-foreground" : "bg-success text-success-foreground"}>
                 <CheckCircle className="h-3 w-3 mr-1" />
-                Active
+                {isTrialing ? "Trial" : "Active"}
               </Badge>
             </div>
           </div>
@@ -167,7 +224,7 @@ export default function Billing() {
               <div>
                 <h4 className="font-medium mb-2">Billing Method</h4>
                 <p className="text-sm text-muted-foreground">
-                  {provider === "shopify" 
+                  {entitlements?.provider === "shopify" 
                     ? "Charges appear on your monthly Shopify invoice"
                     : "Secure billing via Stripe with VAT handling"
                   }
@@ -175,7 +232,12 @@ export default function Billing() {
               </div>
               <div>
                 <h4 className="font-medium mb-2">Next Billing Date</h4>
-                <p className="text-sm text-muted-foreground">November 1, 2024</p>
+                <p className="text-sm text-muted-foreground">
+                  {isTrialing && entitlements?.trial_ends_at 
+                    ? `Trial ends: ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
+                    : "November 1, 2024"
+                  }
+                </p>
               </div>
             </div>
           </div>
@@ -205,7 +267,7 @@ export default function Billing() {
                 
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
-                    {plan.name}
+                    {plan.displayName}
                     {getPlanBadge(plan.name)}
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
@@ -226,17 +288,17 @@ export default function Billing() {
 
                 <Button 
                   className="w-full"
-                  variant={plan.name === currentPlan ? "outline" : "default"}
-                  disabled={plan.name === currentPlan}
+                  variant={entitlements && plan.name === entitlements.plan ? "outline" : "default"}
+                  disabled={entitlements && plan.name === entitlements.plan}
                   onClick={() => {
-                    if (provider === "shopify") {
-                      handleShopifyBilling(plan.name);
+                    if (entitlements?.provider === "shopify") {
+                      handleShopifyBilling(plan.displayName);
                     } else {
-                      handleStripeBilling(plan.name);
+                      handleStripeBilling(plan.displayName);
                     }
                   }}
                 >
-                  {plan.name === currentPlan ? "Current Plan" : "Select Plan"}
+                  {entitlements && plan.name === entitlements.plan ? "Current Plan" : "Select Plan"}
                 </Button>
               </div>
             ))}

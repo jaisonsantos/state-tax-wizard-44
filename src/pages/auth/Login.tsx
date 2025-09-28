@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -18,23 +19,24 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
-    // Mock authentication - accept any email with valid format
-    setTimeout(() => {
-      if (email.includes("@") && password.length > 0) {
-        toast({
-          title: "Login successful",
-          description: "Welcome to DeliveryFee Router",
-        });
-        navigate("/dashboard");
-      } else {
-        toast({
-          title: "Login failed",
-          description: "Please check your credentials",
-          variant: "destructive",
-        });
-      }
+    try {
+      const response = await apiClient.login({ email, password });
+      
+      toast({
+        title: "Login successful",
+        description: "Welcome to DeliveryFee Router",
+      });
+      
+      navigate("/dashboard");
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "Please check your credentials",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (

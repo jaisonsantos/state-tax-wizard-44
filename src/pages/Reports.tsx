@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Download, Calendar, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient, downloadBlob } from "@/lib/api";
 
 const exportHistory = [
   {
@@ -48,28 +49,70 @@ export default function Reports() {
   const [startDate, setStartDate] = useState("2024-07-01");
   const [endDate, setEndDate] = useState("2024-09-30");
   const [reportFormat, setReportFormat] = useState("csv");
+  const [storeId, setStoreId] = useState<string>("");
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleGenerateReport = (type: string) => {
-    toast({
-      title: `${type} Report Generated`,
-      description: "Your report is being generated and will download shortly",
-    });
+  useEffect(() => {
+    // Get store ID from user info
+    const fetchStoreId = async () => {
+      try {
+        const userInfo = await apiClient.getMe();
+        if (userInfo.stores && userInfo.stores.length > 0) {
+          setStoreId(userInfo.stores[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch store info:", error);
+      }
+    };
+    
+    fetchStoreId();
+  }, []);
 
-    // Mock CSV download
-    setTimeout(() => {
-      const csvContent = type === "CO DR-1786" 
-        ? "Date,Order ID,Fee Amount,Delivery Method,Reason Code\n2024-09-15,12847,$1.00,Standard,CO_HAS_TAXABLE_ITEM\n2024-09-14,12846,$1.00,Standard,CO_HAS_TAXABLE_ITEM"
-        : "Date,Total Fees,Orders Processed,Threshold Met %,Exemptions\n2024-09,125.50,251,68%,12";
-      
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${type.replace(/\s+/g, '_')}_${startDate}_${endDate}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }, 1000);
+  const handleGenerateReport = async (type: string) => {
+    if (!storeId) {
+      toast({
+        title: "Error",
+        description: "No store selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      toast({
+        title: `${type} Report Generation Started`,
+        description: "Your report is being generated and will download shortly",
+      });
+
+      let blob: Blob;
+      let filename: string;
+
+      if (type === "CO DR-1786") {
+        blob = await apiClient.downloadCOReport(storeId, startDate, endDate);
+        filename = `CO_DR1786_${startDate}_${endDate}.csv`;
+      } else {
+        blob = await apiClient.downloadMNReport(storeId, startDate, endDate, reportFormat);
+        filename = `MN_Summary_${startDate}_${endDate}.${reportFormat}`;
+      }
+
+      downloadBlob(blob, filename);
+
+      toast({
+        title: `${type} Report Downloaded`,
+        description: "Your report has been successfully generated and downloaded",
+      });
+    } catch (error) {
+      toast({
+        title: "Report Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate report",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -144,7 +187,11 @@ export default function Reports() {
               </ul>
             </div>
 
-            <Button onClick={() => handleGenerateReport("CO DR-1786")} className="w-full">
+            <Button 
+              onClick={() => handleGenerateReport("CO DR-1786")} 
+              className="w-full"
+              disabled={loading}
+            >
               <Download className="h-4 w-4 mr-2" />
               Generate CO DR-1786 Report
             </Button>
@@ -214,7 +261,12 @@ export default function Reports() {
               </ul>
             </div>
 
-            <Button onClick={() => handleGenerateReport("MN Summary")} className="w-full" variant="outline">
+            <Button 
+              onClick={() => handleGenerateReport("MN Summary")} 
+              className="w-full" 
+              variant="outline"
+              disabled={loading}
+            >
               <Download className="h-4 w-4 mr-2" />
               Generate MN Summary Report
             </Button>

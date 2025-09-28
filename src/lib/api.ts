@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Types
 export interface LoginRequest {
@@ -92,13 +92,13 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
-    const headers: Record<string, string> = {
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers || {}),
     };
 
     if (this.authToken) {
-      headers.Authorization = `Bearer ${this.authToken}`;
+      (headers as Record<string, string>).Authorization = `Bearer ${this.authToken}`;
     }
 
     const response = await fetch(url, {
@@ -165,9 +165,9 @@ class ApiClient {
   async downloadCOReport(storeId: string, fromDate: string, toDate: string): Promise<Blob> {
     const url = `${this.baseURL}/v1/reports/co/dr1786?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}`;
     
-    const headers: Record<string, string> = {};
+    const headers: HeadersInit = {};
     if (this.authToken) {
-      headers.Authorization = `Bearer ${this.authToken}`;
+      (headers as Record<string, string>).Authorization = `Bearer ${this.authToken}`;
     }
 
     const response = await fetch(url, { headers });
@@ -182,9 +182,9 @@ class ApiClient {
   async downloadMNReport(storeId: string, fromDate: string, toDate: string, format: string = 'csv'): Promise<Blob> {
     const url = `${this.baseURL}/v1/reports/mn/summary?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}&format=${format}`;
     
-    const headers: Record<string, string> = {};
+    const headers: HeadersInit = {};
     if (this.authToken) {
-      headers.Authorization = `Bearer ${this.authToken}`;
+      (headers as Record<string, string>).Authorization = `Bearer ${this.authToken}`;
     }
 
     const response = await fetch(url, { headers });
@@ -197,8 +197,9 @@ class ApiClient {
   }
 
   // Audit methods
-  async getAuditLogs(storeId: string, page: number = 1, limit: number = 50): Promise<any[]> {
-    return this.request<any[]>(`/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}`);
+  async getAuditLogs(storeId: string, page: number = 1, limit: number = 50): Promise<{ items: any[]; page: number; total: number }> {
+    const items = await this.request<any[]>(`/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}`);
+    return { items, page, total: items.length };
   }
 }
 

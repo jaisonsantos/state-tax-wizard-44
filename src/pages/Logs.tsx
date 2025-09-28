@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Activity, Search, Filter, Download, RefreshCw } from "lucide-react";
+import { apiClient } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const auditLogs = [
   {
@@ -75,6 +77,66 @@ export default function Logs() {
   const [filterState, setFilterState] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchOrder, setSearchOrder] = useState("");
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [storeId, setStoreId] = useState<string>("");
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Get store ID from user info
+        const userInfo = await apiClient.getMe();
+        if (userInfo.stores && userInfo.stores.length > 0) {
+          setStoreId(userInfo.stores[0].id);
+          await fetchAuditLogs(userInfo.stores[0].id);
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load store information",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    initializeData();
+  }, []);
+
+  const fetchAuditLogs = async (store_id: string) => {
+    setLoading(true);
+    try {
+      const response = await apiClient.getAuditLogs(store_id);
+      
+      // Transform API response to match UI format
+      const transformedLogs = response.items.map((log: any, index: number) => ({
+        id: log.id || index + 1,
+        timestamp: new Date(log.timestamp).toLocaleString(),
+        orderId: log.payload.order_id || `#${Math.floor(Math.random() * 10000)}`,
+        jurisdiction: log.payload.jurisdiction || (log.payload.destination?.state) || "MN",
+        amount: log.payload.amount_cents ? `$${(log.payload.amount_cents / 100).toFixed(2)}` : "$0.00",
+        reasonCode: log.payload.reason_codes?.[0] || log.action.toUpperCase(),
+        deliveryMethod: log.payload.delivery_method || "Standard Delivery",
+        status: log.action === "fee_apply" ? "applied" : (log.payload.amount_cents > 0 ? "applied" : "not_applied")
+      }));
+      
+      setAuditLogs(transformedLogs);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load audit logs",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (storeId) {
+      fetchAuditLogs(storeId);
+    }
+  };
 
   const filteredLogs = auditLogs.filter(log => {
     const matchesState = filterState === "all" || log.jurisdiction === filterState;
@@ -174,7 +236,7 @@ export default function Logs() {
             </div>
 
             <div className="flex items-end gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
@@ -195,7 +257,7 @@ export default function Logs() {
             Audit Trail
           </CardTitle>
           <CardDescription>
-            Showing {filteredLogs.length} of {auditLogs.length} decisions
+            {loading ? "Loading..." : `Showing ${filteredLogs.length} of ${auditLogs.length} decisions`}
           </CardDescription>
         </CardHeader>
         
@@ -247,11 +309,15 @@ export default function Logs() {
             </TableBody>
           </Table>
           
-          {filteredLogs.length === 0 && (
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading audit logs...
+            </div>
+          ) : filteredLogs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No audit logs match the current filters
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </div>

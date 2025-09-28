@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -9,12 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2, Play, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api";
 
 export default function Settings() {
   const [enableMN, setEnableMN] = useState(true);
   const [enableCO, setEnableCO] = useState(true);
   const [absorbFee, setAbsorbFee] = useState(false);
   const [labelOverride, setLabelOverride] = useState("Delivery Fee");
+  const [storeId, setStoreId] = useState<string>("");
+  const [testing, setTesting] = useState(false);
   
   // Playground form state
   const [playgroundData, setPlaygroundData] = useState({
@@ -27,6 +30,22 @@ export default function Settings() {
 
   const { toast } = useToast();
 
+  useEffect(() => {
+    // Get store ID from user info
+    const fetchStoreId = async () => {
+      try {
+        const userInfo = await apiClient.getMe();
+        if (userInfo.stores && userInfo.stores.length > 0) {
+          setStoreId(userInfo.stores[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch store info:", error);
+      }
+    };
+    
+    fetchStoreId();
+  }, []);
+
   const handleSaveSettings = () => {
     toast({
       title: "Settings saved",
@@ -34,36 +53,68 @@ export default function Settings() {
     });
   };
 
-  const handlePlaygroundTest = () => {
-    // Mock fee calculation
-    const orderTotal = parseFloat(playgroundData.orderValue) + parseFloat(playgroundData.shippingCost);
-    let feeResult = {
-      applied: false,
-      amount: 0,
-      reason: "No fee applicable",
-      jurisdiction: null as string | null
-    };
-
-    if (playgroundData.destination.includes("MN") && orderTotal >= 100) {
-      feeResult = {
-        applied: true,
-        amount: 0.50,
-        reason: "MN_THRESHOLD_MET",
-        jurisdiction: "MN"
-      };
-    } else if (playgroundData.destination.includes("CO") && playgroundData.items.length > 0) {
-      feeResult = {
-        applied: true,
-        amount: 1.00,
-        reason: "CO_HAS_TAXABLE_ITEM",
-        jurisdiction: "CO"
-      };
+  const handlePlaygroundTest = async () => {
+    if (!storeId) {
+      toast({
+        title: "Error",
+        description: "No store selected",
+        variant: "destructive",
+      });
+      return;
     }
 
-    toast({
-      title: "Playground Result",
-      description: `${feeResult.applied ? `Fee: $${feeResult.amount} (${feeResult.reason})` : feeResult.reason}`,
-    });
+    setTesting(true);
+    
+    try {
+      // Parse destination to get state
+      const stateMatch = playgroundData.destination.match(/,\s*([A-Z]{2})\s*$/i);
+      const state = stateMatch ? stateMatch[1].toUpperCase() : "MN";
+
+      // Convert order value and shipping to cents
+      const orderValueCents = Math.round(parseFloat(playgroundData.orderValue) * 100);
+      const shippingCents = Math.round(parseFloat(playgroundData.shippingCost) * 100);
+
+      // Create mock items from description
+      const items = [{
+        sku: "TEST-SKU",
+        qty: 1,
+        unit_price_cents: orderValueCents,
+        taxability: "taxable"
+      }];
+
+      const request = {
+        store_id: storeId,
+        destination: { state },
+        delivery_method: playgroundData.deliveryMethod === "standard" ? "ship" : playgroundData.deliveryMethod,
+        items,
+        shipping_amount_cents: shippingCents
+      };
+
+      const response = await apiClient.quoteFees(request);
+
+      if (response.lines && response.lines.length > 0) {
+        const totalFee = response.lines.reduce((sum, line) => sum + line.amount_cents, 0);
+        const reasonCodes = response.lines.flatMap(line => line.reason_codes);
+        
+        toast({
+          title: "Fee Calculation Result",
+          description: `Fee: $${(totalFee / 100).toFixed(2)} | Reasons: ${reasonCodes.join(', ')}`,
+        });
+      } else {
+        toast({
+          title: "Fee Calculation Result",
+          description: "No delivery fee applied for this order",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Calculation Error",
+        description: error instanceof Error ? error.message : "Failed to calculate fee",
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
@@ -249,8 +300,13 @@ export default function Settings() {
               />
             </div>
 
-            <Button onClick={handlePlaygroundTest} className="w-full" variant="outline">
-              Test Fee Calculation
+            <Button 
+              onClick={handlePlaygroundTest} 
+              className="w-full" 
+              variant="outline"
+              disabled={testing}
+            >
+              {testing ? "Testing..." : "Test Fee Calculation"}
             </Button>
           </CardContent>
         </Card>
