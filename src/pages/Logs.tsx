@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,77 +7,25 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Activity, Search, Filter, Download, RefreshCw } from "lucide-react";
-import { apiClient } from "@/lib/api";
+import { apiClient, downloadBlob } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-const auditLogs = [
-  {
-    id: 1,
-    timestamp: "2024-10-01 14:23:15",
-    orderId: "#12847",
-    jurisdiction: "MN",
-    amount: "$0.50",
-    reasonCode: "MN_THRESHOLD_MET", 
-    deliveryMethod: "Standard Delivery",
-    status: "applied"
-  },
-  {
-    id: 2,
-    timestamp: "2024-10-01 14:18:42",
-    orderId: "#12846", 
-    jurisdiction: "CO",
-    amount: "$1.00",
-    reasonCode: "CO_HAS_TAXABLE_ITEM",
-    deliveryMethod: "Standard Delivery",
-    status: "applied"
-  },
-  {
-    id: 3,
-    timestamp: "2024-10-01 14:15:33",
-    orderId: "#12845",
-    jurisdiction: "MN",
-    amount: "$0.00",
-    reasonCode: "MN_BOPIS_EXEMPT",
-    deliveryMethod: "Buy Online, Pick In Store",
-    status: "exempt"
-  },
-  {
-    id: 4,
-    timestamp: "2024-10-01 14:12:18",
-    orderId: "#12844",
-    jurisdiction: "CO", 
-    amount: "$1.00",
-    reasonCode: "CO_SPLIT_SHIPMENT",
-    deliveryMethod: "Standard Delivery",
-    status: "applied"
-  },
-  {
-    id: 5,
-    timestamp: "2024-10-01 14:08:55",
-    orderId: "#12843",
-    jurisdiction: "MN",
-    amount: "$0.00", 
-    reasonCode: "MN_BELOW_THRESHOLD",
-    deliveryMethod: "Standard Delivery",
-    status: "not_applied"
-  },
-  {
-    id: 6,
-    timestamp: "2024-10-01 14:05:12",
-    orderId: "#12842",
-    jurisdiction: "CO",
-    amount: "$0.00",
-    reasonCode: "CO_NO_TAXABLE_ITEMS",
-    deliveryMethod: "Standard Delivery", 
-    status: "not_applied"
-  }
-];
+type AuditRow = {
+  id: string;
+  timestamp: string;
+  orderId: string;
+  jurisdiction: string;
+  amount: string;
+  reasonCode: string;
+  deliveryMethod: string;
+  status: string;
+};
 
 export default function Logs() {
   const [filterState, setFilterState] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchOrder, setSearchOrder] = useState("");
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState<string>("");
   const { toast } = useToast();
@@ -85,11 +33,11 @@ export default function Logs() {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Get store ID from user info
         const userInfo = await apiClient.getMe();
         if (userInfo.stores && userInfo.stores.length > 0) {
-          setStoreId(userInfo.stores[0].id);
-          await fetchAuditLogs(userInfo.stores[0].id);
+          const currentStoreId = userInfo.stores[0].id;
+          setStoreId(currentStoreId);
+          await fetchAuditLogs(currentStoreId);
         }
       } catch (error) {
         toast({
@@ -99,7 +47,7 @@ export default function Logs() {
         });
       }
     };
-    
+
     initializeData();
   }, []);
 
@@ -107,19 +55,25 @@ export default function Logs() {
     setLoading(true);
     try {
       const response = await apiClient.getAuditLogs(store_id);
-      
-      // Transform API response to match UI format
-      const transformedLogs = response.items.map((log: any, index: number) => ({
-        id: log.id || index + 1,
-        timestamp: new Date(log.timestamp).toLocaleString(),
-        orderId: log.payload.order_id || `#${Math.floor(Math.random() * 10000)}`,
-        jurisdiction: log.payload.jurisdiction || (log.payload.destination?.state) || "MN",
-        amount: log.payload.amount_cents ? `$${(log.payload.amount_cents / 100).toFixed(2)}` : "$0.00",
-        reasonCode: log.payload.reason_codes?.[0] || log.action.toUpperCase(),
-        deliveryMethod: log.payload.delivery_method || "Standard Delivery",
-        status: log.action === "fee_apply" ? "applied" : (log.payload.amount_cents > 0 ? "applied" : "not_applied")
-      }));
-      
+
+      const transformedLogs: AuditRow[] = response.items.map((log) => {
+        const firstLine = log.payload.lines?.[0];
+        const amountCents = firstLine?.amount_cents ?? 0;
+        const reasonCodes = firstLine?.reason_codes ?? [];
+        const jurisdiction = firstLine?.jurisdiction || (log.payload as any).jurisdiction || "--";
+
+        return {
+          id: log.id,
+          timestamp: log.timestamp ? new Date(log.timestamp).toLocaleString() : "--",
+          orderId: log.payload.order_id ? `${log.payload.order_id}` : "--",
+          jurisdiction,
+          amount: `$${(amountCents / 100).toFixed(2)}`,
+          reasonCode: reasonCodes[0] || log.action.toUpperCase(),
+          deliveryMethod: log.payload.delivery_method || "Unknown",
+          status: log.payload.status || (log.action === "fee_apply" ? "applied" : "recorded"),
+        };
+      });
+
       setAuditLogs(transformedLogs);
     } catch (error) {
       toast({
@@ -138,19 +92,22 @@ export default function Logs() {
     }
   };
 
-  const filteredLogs = auditLogs.filter(log => {
-    const matchesState = filterState === "all" || log.jurisdiction === filterState;
-    const matchesStatus = filterStatus === "all" || log.status === filterStatus;
-    const matchesSearch = searchOrder === "" || log.orderId.toLowerCase().includes(searchOrder.toLowerCase());
-    
-    return matchesState && matchesStatus && matchesSearch;
-  });
+  const filteredLogs = useMemo(() => {
+    return auditLogs.filter((log) => {
+      const matchesState = filterState === "all" || log.jurisdiction === filterState;
+      const matchesStatus = filterStatus === "all" || log.status === filterStatus;
+      const matchesSearch =
+        searchOrder === "" || log.orderId.toLowerCase().includes(searchOrder.toLowerCase());
+
+      return matchesState && matchesStatus && matchesSearch;
+    });
+  }, [auditLogs, filterState, filterStatus, searchOrder]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "applied":
         return <Badge className="bg-success text-success-foreground">Applied</Badge>;
-      case "exempt": 
+      case "exempt":
         return <Badge variant="outline">Exempt</Badge>;
       case "not_applied":
         return <Badge variant="secondary">Not Applied</Badge>;
@@ -161,15 +118,44 @@ export default function Logs() {
 
   const getJurisdictionBadge = (jurisdiction: string) => {
     return (
-      <Badge 
-        className={jurisdiction === "MN" 
-          ? "bg-minnesota text-minnesota-foreground" 
-          : "bg-colorado text-colorado-foreground"
+      <Badge
+        className={
+          jurisdiction === "MN"
+            ? "bg-minnesota text-minnesota-foreground"
+            : "bg-colorado text-colorado-foreground"
         }
       >
         {jurisdiction}
       </Badge>
     );
+  };
+
+  const exportCsv = () => {
+    if (auditLogs.length === 0) {
+      toast({
+        title: "Nothing to export",
+        description: "No audit logs available",
+      });
+      return;
+    }
+
+    const header = ["timestamp", "orderId", "jurisdiction", "amount", "reasonCode", "deliveryMethod", "status"];
+    const rows = auditLogs.map((log) => [
+      log.timestamp,
+      log.orderId,
+      log.jurisdiction,
+      log.amount,
+      log.reasonCode,
+      log.deliveryMethod,
+      log.status,
+    ]);
+
+    const csvContent = [header, ...rows]
+      .map((row) => row.map((value) => `"${value.replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    downloadBlob(blob, "audit-logs.csv");
   };
 
   return (
@@ -181,7 +167,6 @@ export default function Logs() {
         </p>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -189,7 +174,7 @@ export default function Logs() {
             Filters
           </CardTitle>
         </CardHeader>
-        
+
         <CardContent>
           <div className="grid gap-4 md:grid-cols-4">
             <div className="space-y-2">
@@ -210,7 +195,7 @@ export default function Logs() {
               <Label htmlFor="filter-state">State</Label>
               <Select value={filterState} onValueChange={setFilterState}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="State" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All States</SelectItem>
@@ -224,100 +209,87 @@ export default function Logs() {
               <Label htmlFor="filter-status">Status</Label>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="applied">Applied</SelectItem>
-                  <SelectItem value="exempt">Exempt</SelectItem>
+                  <SelectItem value="recorded">Recorded</SelectItem>
                   <SelectItem value="not_applied">Not Applied</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="flex items-end gap-2">
-              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+              <Button variant="secondary" size="sm" onClick={handleRefresh} disabled={loading || !storeId}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                {loading ? "Refreshing" : "Refresh"}
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={exportCsv} disabled={auditLogs.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                Export CSV
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Audit Log Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Audit Trail
+            Audit Activity
           </CardTitle>
           <CardDescription>
-            {loading ? "Loading..." : `Showing ${filteredLogs.length} of ${auditLogs.length} decisions`}
+            {loading ? "Loading latest decisions..." : `Showing ${filteredLogs.length} of ${auditLogs.length} records`}
           </CardDescription>
         </CardHeader>
-        
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Order ID</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Reason Code</TableHead>
-                <TableHead>Delivery Method</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLogs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="font-mono text-sm">
-                    {log.timestamp}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {log.orderId}
-                  </TableCell>
-                  <TableCell>
-                    {getJurisdictionBadge(log.jurisdiction)}
-                  </TableCell>
-                  <TableCell className={`font-medium ${
-                    parseFloat(log.amount.replace('$', '')) > 0 
-                      ? 'text-primary' 
-                      : 'text-muted-foreground'
-                  }`}>
-                    {log.amount}
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">
-                      {log.reasonCode}
-                    </code>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {log.deliveryMethod}
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(log.status)}
-                  </TableCell>
+
+        <CardContent className="space-y-4">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Reason Code</TableHead>
+                  <TableHead>Delivery Method</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {loading ? (
+              </TableHeader>
+              <TableBody>
+                {filteredLogs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="font-mono text-sm">{log.timestamp}</TableCell>
+                    <TableCell className="font-medium">{log.orderId}</TableCell>
+                    <TableCell>{getJurisdictionBadge(log.jurisdiction)}</TableCell>
+                    <TableCell className={parseFloat(log.amount.replace('$', '')) > 0 ? "text-primary" : "text-muted-foreground"}>
+                      {log.amount}
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{log.reasonCode}</code>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{log.deliveryMethod}</TableCell>
+                    <TableCell>{getStatusBadge(log.status)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {loading && (
             <div className="text-center py-8 text-muted-foreground">
               Loading audit logs...
             </div>
-          ) : filteredLogs.length === 0 ? (
+          )}
+
+          {!loading && filteredLogs.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               No audit logs match the current filters
             </div>
-          ) : null}
+          )}
         </CardContent>
       </Card>
     </div>

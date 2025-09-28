@@ -29,11 +29,12 @@ class FeeCalculationService:
                 # Calculate total eligible amount (items + shipping)
                 total_cents = sum(item.unit_price_cents * item.qty for item in request.items) + request.shipping_amount_cents
                 threshold_cents = mn_rule.params.get("threshold_cents", 10000)
-                
+                fee_cents = mn_rule.params.get("fee_cents", 50)
+
                 if total_cents >= threshold_cents:
                     lines.append(FeeLine(
                         jurisdiction="MN",
-                        amount_cents=50,  # $0.50
+                        amount_cents=fee_cents,
                         display_name="Minnesota Delivery Fee",
                         rule_version=mn_rule.version,
                         reason_codes=["MN_THRESHOLD_MET"]
