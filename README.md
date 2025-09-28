@@ -1,73 +1,99 @@
-# Welcome to your Lovable project
+# State Tax Wizard
 
-## Project info
+State Tax Wizard is a full-stack demo application that showcases a configurable fee engine for U.S. state taxes. It combines a FastAPI backend with a React frontend to simulate fee calculations, audit logging, and observability for demo stores.
 
-**URL**: https://lovable.dev/projects/09f06761-18e8-4bea-b56f-1daff8af75cd
+## Features
+- **FastAPI backend** with JWT authentication, seeded demo data, and idempotent fee application.
+- **Fee rules for Minnesota and Colorado** that persist `OrderFee` records and structured `AuditLog` entries.
+- **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request and store context.
+- **React frontend** with a fee playground, audit log viewer, and CSV export powered by a shared API client.
+- **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/09f06761-18e8-4bea-b56f-1daff8af75cd) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+## Project structure
+```
+backend/                # FastAPI application, Alembic migrations, tests, and seed script
+src/                    # React frontend (Vite + TypeScript + Tailwind)
+docker-compose.yml      # Local development stack (API, Postgres, frontend, Prometheus)
+.github/workflows/      # GitHub Actions pipelines for backend and frontend
 ```
 
-**Edit a file directly in GitHub**
+## Prerequisites
+- Python 3.11+
+- Node.js 18+ and npm
+- Docker & Docker Compose (for the recommended local stack)
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Getting started (Docker Compose)
+1. Copy `.env.example` to `.env` if you need to override defaults.
+2. Start the stack:
+   ```sh
+   make dev
+   ```
+   This launches the API, frontend, and supporting services. The frontend is available at <http://localhost:5173>, and the API at <http://localhost:8000>.
+3. Apply database migrations and seed demo data (the login flow will also ensure the seed store exists):
+   ```sh
+   make migrate
+   make seed
+   ```
+4. Stop the stack when you are done:
+   ```sh
+   make down
+   ```
 
-**Use GitHub Codespaces**
+## Backend development
+1. Create and activate a virtual environment.
+2. Install dependencies:
+   ```sh
+   pip install -r backend/requirements.txt
+   ```
+3. Set `DATABASE_URL` (defaults to PostgreSQL when running via Docker; SQLite is supported for tests):
+   ```sh
+   export DATABASE_URL=sqlite:///./dev.db
+   ```
+4. Run migrations and seed data:
+   ```sh
+   alembic upgrade head
+   python backend/seed_data.py
+   ```
+5. Start the FastAPI server:
+   ```sh
+   uvicorn backend.app.main:app --reload
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Prometheus metrics & logs
+- Prometheus metrics are exposed at `/metrics`.
+- Application logs are JSON-formatted and include fields such as `request_id`, `store_id`, `jurisdiction`, and `reason_codes`.
 
-## What technologies are used for this project?
+## Frontend development
+1. Install dependencies:
+   ```sh
+   npm install
+   ```
+2. Start the development server:
+   ```sh
+   npm run dev
+   ```
+3. The React app consumes the backend API at `VITE_API_URL` (configure via `.env` or defaults to `/api`).
 
-This project is built with:
+## Testing
+- Backend tests:
+  ```sh
+  pytest -q
+  ```
+- Frontend type-check:
+  ```sh
+  npm run typecheck
+  ```
+- Frontend build:
+  ```sh
+  npm run build
+  ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Continuous integration
+GitHub Actions workflows are provided under `.github/workflows/`:
+- `backend.yml` spins up PostgreSQL with Docker Compose, installs backend dependencies, applies migrations, and runs `pytest`.
+- `frontend.yml` installs Node dependencies, runs the TypeScript type-check, and builds the production bundle.
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/09f06761-18e8-4bea-b56f-1daff8af75cd) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Additional resources
+- API reference: visit <http://localhost:8000/docs> for the automatically generated Swagger UI.
+- Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
+- Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.

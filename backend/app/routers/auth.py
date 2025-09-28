@@ -1,10 +1,11 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from ..db.database import get_db
-from ..schema.auth import LoginRequest, LoginResponse, UserInfo, StoreInfo
-from ..core.security import create_access_token, verify_token
-from ..models.models import Store
-from datetime import timedelta
+from ..schema.auth import LoginRequest, LoginResponse, StoreSummary, UserSummary
+from ..core.security import create_access_token
+from ..models.models import Store, StoreSetting, User, UserStore
+import uuid
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -16,28 +17,73 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
         )
-    
+
     # Create JWT token
     access_token = create_access_token(data={"sub": request.email})
-    
-    # Get demo store data
-    stores = db.query(Store).limit(5).all()
+
+    # Ensure seed store exists
+    seed_store = db.query(Store).filter(Store.name == "store_demo_1").first()
+    if not seed_store:
+        seed_store = Store(
+            id=uuid.uuid4(),
+            name="store_demo_1",
+            platform="shopify",
+            domain="store_demo_1.myshopify.com",
+            country="US",
+            state="MN",
+        )
+        db.add(seed_store)
+        db.flush()
+
+        # Ensure the store has default settings
+        setting = StoreSetting(
+            store_id=seed_store.id,
+            enable_mn=True,
+            enable_co=True,
+            absorb_fee=False,
+            label_override="Delivery Fee",
+            plan="starter",
+        )
+        db.add(setting)
+
+    user = db.query(User).filter(User.email == request.email).first()
+
+    created = False
+    if not user:
+        user = User(email=request.email)
+        db.add(user)
+        db.flush()
+        created = True
+
+    if seed_store not in user.stores:
+        link = UserStore(user_id=user.id, store_id=seed_store.id)
+        db.add(link)
+        created = True
+
+    if created:
+        db.commit()
+    else:
+        db.flush()
+
+    db.refresh(user)
+    db.refresh(seed_store)
+
     store_infos = [
-        StoreInfo(
+        StoreSummary(
             id=str(store.id),
-            platform=store.platform,
-            domain=store.domain,
-            country=store.country,
-            state=store.state,
-            created_at=store.created_at
-        ) for store in stores
+            name=store.name,
+        )
+        for store in user.stores
     ]
-    
+
+    user_summary = UserSummary(
+        id=str(user.id),
+        email=user.email,
+        created_at=user.created_at or datetime.utcnow(),
+    )
+
     return LoginResponse(
         token=access_token,
-        user=UserInfo(
-            id="demo-user-123",
-            email=request.email,
-            stores=store_infos
-        )
+        user=user_summary,
+        stores=store_infos,
     )

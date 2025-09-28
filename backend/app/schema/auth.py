@@ -1,25 +1,32 @@
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from __future__ import annotations
+
 from datetime import datetime
-import uuid
+from pydantic import BaseModel, EmailStr
+from typing import List
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+
+class UserSummary(BaseModel):
+    id: str
+    email: EmailStr
+    created_at: datetime
+
+
+class StoreSummary(BaseModel):
+    id: str
+    name: str
+
+
 class LoginResponse(BaseModel):
     token: str
-    user: "UserInfo"
+    user: UserSummary
+    stores: List[StoreSummary]
 
-class UserInfo(BaseModel):
-    id: str
-    email: str
-    stores: List["StoreInfo"] = []
 
-class StoreInfo(BaseModel):
-    id: str
-    platform: str
-    domain: str
-    country: str
-    state: Optional[str] = None
-    created_at: datetime
+class MeResponse(BaseModel):
+    user: UserSummary
+    stores: List[StoreSummary]

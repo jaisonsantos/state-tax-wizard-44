@@ -6,24 +6,26 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface LoginResponse {
-  token: string;
-  user: UserInfo;
-}
-
-export interface UserInfo {
+export interface UserSummary {
   id: string;
   email: string;
-  stores: StoreInfo[];
+  created_at: string;
 }
 
-export interface StoreInfo {
+export interface StoreSummary {
   id: string;
-  platform: string;
-  domain: string;
-  country: string;
-  state: string | null;
-  created_at: string;
+  name: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: UserSummary;
+  stores: StoreSummary[];
+}
+
+export interface MeResponse {
+  user: UserSummary;
+  stores: StoreSummary[];
 }
 
 export interface FeeQuoteRequest {
@@ -42,6 +44,10 @@ export interface FeeQuoteRequest {
   shipping_amount_cents: number;
 }
 
+export interface FeeApplyRequest extends FeeQuoteRequest {
+  order_id: string;
+}
+
 export interface FeeLine {
   jurisdiction: string;
   amount_cents: number;
@@ -53,6 +59,11 @@ export interface FeeLine {
 export interface FeeQuoteResponse {
   lines: FeeLine[];
   decided: boolean;
+}
+
+export interface FeeApplyResponse {
+  success: boolean;
+  lines: FeeLine[];
 }
 
 export interface Entitlements {
@@ -75,6 +86,37 @@ export interface RulesResponse {
   };
 }
 
+export interface AuditLogPayloadLine {
+  jurisdiction: string;
+  amount_cents: number;
+  reason_codes: string[];
+  rule_version: string;
+}
+
+export interface AuditLogPayload {
+  store_id: string;
+  order_id?: string;
+  delivery_method?: string;
+  lines?: AuditLogPayloadLine[];
+  status?: string;
+  [key: string]: unknown;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string | null;
+  actor: string;
+  action: string;
+  payload: AuditLogPayload;
+}
+
+export interface AuditLogResponse {
+  items: AuditLogEntry[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 // API Client class
 class ApiClient {
   private baseURL: string;
@@ -82,23 +124,25 @@ class ApiClient {
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
-    // Load token from localStorage
-    this.authToken = localStorage.getItem('auth_token');
+    this.authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    };
+  private buildHeaders(initial?: HeadersInit): Headers {
+    const headers = new Headers(initial);
 
     if (this.authToken) {
-      (headers as Record<string, string>).Authorization = `Bearer ${this.authToken}`;
+      headers.set('Authorization', `Bearer ${this.authToken}`);
+    }
+
+    return headers;
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = this.buildHeaders(options.headers);
+
+    if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
     }
 
     const response = await fetch(url, {
@@ -107,11 +151,22 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error: ${response.status} - ${error}`);
+      let message: string;
+      try {
+        const data = await response.json();
+        message = typeof data === 'string' ? data : JSON.stringify(data);
+      } catch {
+        message = await response.text();
+      }
+      throw new Error(`API Error: ${response.status} - ${message}`);
     }
 
-    return response.json();
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('application/json')) {
+      return (await response.json()) as T;
+    }
+
+    return undefined as T;
   }
 
   // Auth methods
@@ -120,15 +175,15 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    
+
     this.authToken = response.token;
     localStorage.setItem('auth_token', response.token);
-    
+
     return response;
   }
 
-  async getMe(): Promise<UserInfo> {
-    return this.request<UserInfo>('/me');
+  async getMe(): Promise<MeResponse> {
+    return this.request<MeResponse>('/me');
   }
 
   logout() {
@@ -144,8 +199,8 @@ class ApiClient {
     });
   }
 
-  async applyFees(request: FeeQuoteRequest & { order_id: string }): Promise<FeeQuoteResponse> {
-    return this.request<FeeQuoteResponse>('/v1/fees/apply', {
+  async applyFees(request: FeeApplyRequest): Promise<FeeApplyResponse> {
+    return this.request<FeeApplyResponse>('/v1/fees/apply', {
       method: 'POST',
       body: JSON.stringify(request),
     });
@@ -164,42 +219,33 @@ class ApiClient {
   // Reports methods
   async downloadCOReport(storeId: string, fromDate: string, toDate: string): Promise<Blob> {
     const url = `${this.baseURL}/v1/reports/co/dr1786?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}`;
-    
-    const headers: HeadersInit = {};
-    if (this.authToken) {
-      (headers as Record<string, string>).Authorization = `Bearer ${this.authToken}`;
-    }
+    const headers = this.buildHeaders();
 
     const response = await fetch(url, { headers });
-    
     if (!response.ok) {
-      throw new Error(`Failed to download report: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to download report: ${response.status} - ${errorText}`);
     }
-    
+
     return response.blob();
   }
 
   async downloadMNReport(storeId: string, fromDate: string, toDate: string, format: string = 'csv'): Promise<Blob> {
     const url = `${this.baseURL}/v1/reports/mn/summary?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}&format=${format}`;
-    
-    const headers: HeadersInit = {};
-    if (this.authToken) {
-      (headers as Record<string, string>).Authorization = `Bearer ${this.authToken}`;
-    }
+    const headers = this.buildHeaders();
 
     const response = await fetch(url, { headers });
-    
     if (!response.ok) {
-      throw new Error(`Failed to download report: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Failed to download report: ${response.status} - ${errorText}`);
     }
-    
+
     return response.blob();
   }
 
   // Audit methods
-  async getAuditLogs(storeId: string, page: number = 1, limit: number = 50): Promise<{ items: any[]; page: number; total: number }> {
-    const items = await this.request<any[]>(`/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}`);
-    return { items, page, total: items.length };
+  async getAuditLogs(storeId: string, page: number = 1, limit: number = 50): Promise<AuditLogResponse> {
+    return this.request<AuditLogResponse>(`/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}`);
   }
 }
 

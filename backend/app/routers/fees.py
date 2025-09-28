@@ -1,11 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+import time
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from ..db.database import get_db
 from ..schema.fees import FeeQuoteRequest, FeeQuoteResponse, FeeApplyRequest, FeeApplyResponse
 from ..services.fee_service import FeeCalculationService
 from ..models.models import OrderFee, AuditLog, Store
-from datetime import datetime
-import uuid
+from ..observability import (
+    decision_latency_ms,
+    fees_applied_total,
+    log_fee_event,
+    ensure_request_id,
+)
 
 router = APIRouter(prefix="/v1/fees", tags=["fees"])
 
@@ -43,28 +48,31 @@ async def quote_fees(request: FeeQuoteRequest, db: Session = Depends(get_db)):
     )
 
 @router.post("/apply", response_model=FeeApplyResponse)
-async def apply_fees(request: FeeApplyRequest, db: Session = Depends(get_db)):
+async def apply_fees(
+    request: FeeApplyRequest,
+    db: Session = Depends(get_db),
+    http_request: Request = None,
+):
     """Apply delivery fees to an order (idempotent)"""
-    
-    # Check if already applied (idempotency)
-    existing = db.query(OrderFee).filter(
+
+    existing_lines = db.query(OrderFee).filter(
         OrderFee.store_id == request.store_id,
         OrderFee.order_id == request.order_id
-    ).first()
-    
-    if existing:
-        # Return existing result
-        return FeeApplyResponse(
-            success=True,
-            lines=[{
-                "jurisdiction": existing.jurisdiction,
-                "amount_cents": existing.amount_cents,
+    ).all()
+
+    if existing_lines:
+        lines = [
+            {
+                "jurisdiction": order_fee.jurisdiction,
+                "amount_cents": order_fee.amount_cents,
                 "display_name": "Delivery Fee",
-                "rule_version": existing.rule_version,
-                "reason_codes": existing.reason_codes or []
-            }]
-        )
-    
+                "rule_version": order_fee.rule_version,
+                "reason_codes": order_fee.reason_codes or [],
+            }
+            for order_fee in existing_lines
+        ]
+        return FeeApplyResponse(success=True, lines=lines)
+
     # Calculate fees
     quote_request = FeeQuoteRequest(
         store_id=request.store_id,
@@ -74,8 +82,11 @@ async def apply_fees(request: FeeApplyRequest, db: Session = Depends(get_db)):
         shipping_amount_cents=request.shipping_amount_cents
     )
     
+    started = time.perf_counter()
     lines = FeeCalculationService.calculate_fees(quote_request, db)
-    
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    decision_latency_ms.observe(elapsed_ms)
+
     # Store the applied fees
     for line in lines:
         order_fee = OrderFee(
@@ -86,10 +97,11 @@ async def apply_fees(request: FeeApplyRequest, db: Session = Depends(get_db)):
             delivery_method=request.delivery_method,
             absorbed=False,
             rule_version=line.rule_version,
-            reason_codes=line.reason_codes
+            reason_codes=line.reason_codes,
         )
         db.add(order_fee)
-    
+        fees_applied_total.labels(jurisdiction=line.jurisdiction).inc()
+
     # Log the audit event
     audit_log = AuditLog(
         actor=f"store:{request.store_id}",
@@ -97,13 +109,41 @@ async def apply_fees(request: FeeApplyRequest, db: Session = Depends(get_db)):
         payload={
             "store_id": request.store_id,
             "order_id": request.order_id,
-            "lines_applied": len(lines)
+            "delivery_method": request.delivery_method,
+            "lines": [
+                {
+                    "jurisdiction": line.jurisdiction,
+                    "amount_cents": line.amount_cents,
+                    "reason_codes": line.reason_codes,
+                    "rule_version": line.rule_version,
+                }
+                for line in lines
+            ],
+            "status": "applied",
         }
     )
     db.add(audit_log)
-    
+
     db.commit()
-    
+
+    request_id = ensure_request_id(
+        http_request.headers.get("x-request-id") if http_request else None
+    )
+
+    for line in lines:
+        log_fee_event(
+            {
+                "event": "fee_apply",
+                "request_id": request_id,
+                "store_id": request.store_id,
+                "order_id": request.order_id,
+                "jurisdiction": line.jurisdiction,
+                "amount_cents": line.amount_cents,
+                "reason_codes": line.reason_codes,
+                "delivery_method": request.delivery_method,
+            }
+        )
+
     return FeeApplyResponse(
         success=True,
         lines=lines

@@ -18,6 +18,10 @@ export default function Settings() {
   const [labelOverride, setLabelOverride] = useState("Delivery Fee");
   const [storeId, setStoreId] = useState<string>("");
   const [testing, setTesting] = useState(false);
+  const [applyResult, setApplyResult] = useState<{
+    totalFeeCents: number;
+    reasonCodes: string[];
+  } | null>(null);
   
   // Playground form state
   const [playgroundData, setPlaygroundData] = useState({
@@ -42,7 +46,7 @@ export default function Settings() {
         console.error("Failed to fetch store info:", error);
       }
     };
-    
+
     fetchStoreId();
   }, []);
 
@@ -51,6 +55,36 @@ export default function Settings() {
       title: "Settings saved",
       description: "Your delivery fee rules have been updated",
     });
+  };
+
+  const buildFeeRequest = () => {
+    if (!storeId) {
+      throw new Error("No store selected");
+    }
+
+    const stateMatch = playgroundData.destination.match(/,\s*([A-Z]{2})\s*$/i);
+    const state = stateMatch ? stateMatch[1].toUpperCase() : "MN";
+
+    const normalizedOrderValue = playgroundData.orderValue.replace(',', '.');
+    const normalizedShipping = playgroundData.shippingCost.replace(',', '.');
+
+    const orderValueCents = Math.round((parseFloat(normalizedOrderValue || "0") || 0) * 100);
+    const shippingCents = Math.round((parseFloat(normalizedShipping || "0") || 0) * 100);
+
+    const items = [{
+      sku: "TEST-SKU",
+      qty: 1,
+      unit_price_cents: orderValueCents,
+      taxability: "taxable"
+    }];
+
+    return {
+      store_id: storeId,
+      destination: { state },
+      delivery_method: playgroundData.deliveryMethod === "standard" ? "ship" : playgroundData.deliveryMethod,
+      items,
+      shipping_amount_cents: shippingCents
+    };
   };
 
   const handlePlaygroundTest = async () => {
@@ -66,36 +100,13 @@ export default function Settings() {
     setTesting(true);
     
     try {
-      // Parse destination to get state
-      const stateMatch = playgroundData.destination.match(/,\s*([A-Z]{2})\s*$/i);
-      const state = stateMatch ? stateMatch[1].toUpperCase() : "MN";
-
-      // Convert order value and shipping to cents
-      const orderValueCents = Math.round(parseFloat(playgroundData.orderValue) * 100);
-      const shippingCents = Math.round(parseFloat(playgroundData.shippingCost) * 100);
-
-      // Create mock items from description
-      const items = [{
-        sku: "TEST-SKU",
-        qty: 1,
-        unit_price_cents: orderValueCents,
-        taxability: "taxable"
-      }];
-
-      const request = {
-        store_id: storeId,
-        destination: { state },
-        delivery_method: playgroundData.deliveryMethod === "standard" ? "ship" : playgroundData.deliveryMethod,
-        items,
-        shipping_amount_cents: shippingCents
-      };
-
+      const request = buildFeeRequest();
       const response = await apiClient.quoteFees(request);
 
       if (response.lines && response.lines.length > 0) {
         const totalFee = response.lines.reduce((sum, line) => sum + line.amount_cents, 0);
         const reasonCodes = response.lines.flatMap(line => line.reason_codes);
-        
+
         toast({
           title: "Fee Calculation Result",
           description: `Fee: $${(totalFee / 100).toFixed(2)} | Reasons: ${reasonCodes.join(', ')}`,
@@ -110,6 +121,47 @@ export default function Settings() {
       toast({
         title: "Calculation Error",
         description: error instanceof Error ? error.message : "Failed to calculate fee",
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleApplyDemo = async () => {
+    if (!storeId) {
+      toast({
+        title: "Error",
+        description: "No store selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTesting(true);
+    try {
+      const request = buildFeeRequest();
+      const response = await apiClient.applyFees({
+        ...request,
+        order_id: `demo-order-${Date.now()}`,
+      });
+
+      const totalFeeCents = response.lines.reduce((sum, line) => sum + line.amount_cents, 0);
+      const reasonCodes = response.lines.flatMap(line => line.reason_codes);
+
+      setApplyResult({ totalFeeCents, reasonCodes });
+
+      toast({
+        title: "Fee applied",
+        description: totalFeeCents > 0
+          ? `Fee: $${(totalFeeCents / 100).toFixed(2)} | Reasons: ${reasonCodes.join(', ')}`
+          : "No delivery fee applied for this order",
+      });
+    } catch (error) {
+      setApplyResult(null);
+      toast({
+        title: "Apply Error",
+        description: error instanceof Error ? error.message : "Failed to apply fee",
         variant: "destructive",
       });
     } finally {
@@ -300,14 +352,34 @@ export default function Settings() {
               />
             </div>
 
-            <Button 
-              onClick={handlePlaygroundTest} 
-              className="w-full" 
-              variant="outline"
-              disabled={testing}
-            >
-              {testing ? "Testing..." : "Test Fee Calculation"}
-            </Button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                onClick={handlePlaygroundTest}
+                className="w-full"
+                variant="outline"
+                disabled={testing}
+              >
+                {testing ? "Testing..." : "Test Fee Calculation"}
+              </Button>
+              <Button
+                onClick={handleApplyDemo}
+                className="w-full"
+                disabled={testing}
+              >
+                {testing ? "Applying..." : "Apply Fee (demo)"}
+              </Button>
+            </div>
+
+            {applyResult && (
+              <div className="rounded-md border border-muted p-3 text-sm text-muted-foreground">
+                <p>
+                  Demo fee total: <span className="font-medium text-foreground">${(applyResult.totalFeeCents / 100).toFixed(2)}</span>
+                </p>
+                <p>
+                  Reason codes: {applyResult.reasonCodes.length > 0 ? applyResult.reasonCodes.join(', ') : 'None'}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
