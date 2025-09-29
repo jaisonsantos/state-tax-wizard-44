@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,9 @@ export default function Settings() {
   const [enableCO, setEnableCO] = useState(true);
   const [absorbFee, setAbsorbFee] = useState(false);
   const [labelOverride, setLabelOverride] = useState("Delivery Fee");
+  const [plan, setPlan] = useState<string | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [applyResult, setApplyResult] = useState<{
     totalFeeCents: number;
@@ -40,12 +43,88 @@ export default function Settings() {
     return stores.find((store) => store.id === storeId)?.name ?? "";
   }, [stores, storeId]);
 
-  const handleSaveSettings = () => {
-    toast({
-      title: "Settings saved",
-      description: "Your delivery fee rules have been updated",
-    });
+  useEffect(() => {
+    if (!storeId) {
+      setPlan(null);
+      setEnableMN(true);
+      setEnableCO(true);
+      setAbsorbFee(false);
+      setLabelOverride("Delivery Fee");
+      return;
+    }
+
+    let cancelled = false;
+    setSettingsLoading(true);
+
+    apiClient
+      .getStoreSettings(storeId)
+      .then((settings) => {
+        if (cancelled) return;
+        setEnableMN(settings.enable_mn);
+        setEnableCO(settings.enable_co);
+        setAbsorbFee(settings.absorb_fee);
+        setLabelOverride(settings.label_override);
+        setPlan(settings.plan ?? null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        toast({
+          title: "Failed to load settings",
+          description: error instanceof Error ? error.message : "Unexpected error",
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSettingsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId, toast]);
+
+  const handleSaveSettings = async () => {
+    if (!storeId) {
+      toast({
+        title: "Select a store",
+        description: "Choose a store before saving settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSettingsSaving(true);
+    try {
+      const payload = {
+        enable_mn: enableMN,
+        enable_co: enableCO,
+        absorb_fee: absorbFee,
+        label_override: labelOverride,
+      };
+      const updated = await apiClient.updateStoreSettings(storeId, payload);
+      setEnableMN(updated.enable_mn);
+      setEnableCO(updated.enable_co);
+      setAbsorbFee(updated.absorb_fee);
+      setLabelOverride(updated.label_override);
+      setPlan(updated.plan ?? null);
+
+      toast({
+        title: "Settings saved",
+        description: "Your delivery fee rules have been updated",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to save settings",
+        description: error instanceof Error ? error.message : "Unexpected error",
+        variant: "destructive",
+      });
+    } finally {
+      setSettingsSaving(false);
+    }
   };
+
+  const controlsDisabled = settingsLoading || settingsSaving || !storeId;
 
   const buildFeeRequest = () => {
     if (!storeId) {
@@ -174,6 +253,11 @@ export default function Settings() {
         <p className="text-muted-foreground">
           Configure delivery fee rules for {storeName || "your store"}
         </p>
+        {plan && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Current plan: <span className="font-medium text-foreground">{plan}</span>
+          </p>
+        )}
       </div>
 
       {/* Regulatory Banner */}
@@ -219,6 +303,7 @@ export default function Settings() {
                   id="enable-mn"
                   checked={enableMN}
                   onCheckedChange={setEnableMN}
+                  disabled={controlsDisabled}
                 />
               </div>
             </div>
@@ -237,6 +322,7 @@ export default function Settings() {
                   id="enable-co"
                   checked={enableCO}
                   onCheckedChange={setEnableCO}
+                  disabled={controlsDisabled}
                 />
               </div>
             </div>
@@ -252,6 +338,7 @@ export default function Settings() {
                   id="absorb-fee"
                   checked={absorbFee}
                   onCheckedChange={setAbsorbFee}
+                  disabled={controlsDisabled}
                 />
               </div>
 
@@ -261,6 +348,7 @@ export default function Settings() {
                   id="label-override"
                   value={labelOverride}
                   onChange={(e) => setLabelOverride(e.target.value)}
+                  disabled={controlsDisabled}
                   placeholder="Delivery Fee"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -269,9 +357,12 @@ export default function Settings() {
               </div>
             </div>
 
-            <Button onClick={handleSaveSettings} className="w-full">
-              Save Settings
+            <Button onClick={handleSaveSettings} className="w-full" disabled={controlsDisabled}>
+              {settingsSaving ? "Saving..." : "Save Settings"}
             </Button>
+            {settingsLoading && (
+              <p className="text-xs text-muted-foreground text-center">Loading current settings…</p>
+            )}
           </CardContent>
         </Card>
 
@@ -355,14 +446,14 @@ export default function Settings() {
                 onClick={handlePlaygroundTest}
                 className="w-full"
                 variant="outline"
-                disabled={testing}
+                disabled={testing || !storeId}
               >
                 {testing ? "Testing..." : "Test Fee Calculation"}
               </Button>
               <Button
                 onClick={handleApplyDemo}
                 className="w-full"
-                disabled={testing}
+                disabled={testing || !storeId}
               >
                 {testing ? "Applying..." : "Apply Fee (demo)"}
               </Button>

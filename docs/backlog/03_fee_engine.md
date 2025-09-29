@@ -12,7 +12,7 @@ extensibility.
 - ✅ Audit logs capture fee application events with request payloads.
 - ⚠️ Rule management is manual; no automatic period updates or MN change flags.
 - ⚠️ Reason codes limited (no granular signals for exemptions or edge cases).
-- ❌ No support for absorb fee settings (frontend UI only).
+- ✅ Absorb fee settings persist through store settings endpoints and drive fee absorption.
 - ✅ API honors `store_settings` toggles, returns granular reason codes (including
   exemptions), and surfaces an `absorbed` flag for hidden fees.
 

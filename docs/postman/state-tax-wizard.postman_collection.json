@@ -203,6 +203,99 @@
       ]
     },
     {
+      "name": "Store Settings",
+      "item": [
+        {
+          "name": "Get store settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores/{{store_id}}/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores",
+                "{{store_id}}",
+                "settings"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "StoreSettingsResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"store_id\": \"{{store_id}}\",\n  \"enable_mn\": true,\n  \"enable_co\": true,\n  \"absorb_fee\": false,\n  \"label_override\": \"Delivery Fee\",\n  \"plan\": \"starter\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update store settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enable_mn\": false,\n  \"enable_co\": true,\n  \"absorb_fee\": true,\n  \"label_override\": \"Handling Surcharge\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores/{{store_id}}/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores",
+                "{{store_id}}",
+                "settings"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "StoreSettingsUpdated",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"store_id\": \"{{store_id}}\",\n  \"enable_mn\": false,\n  \"enable_co\": true,\n  \"absorb_fee\": true,\n  \"label_override\": \"Handling Surcharge\",\n  \"plan\": \"starter\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Fees",
       "item": [
         {
