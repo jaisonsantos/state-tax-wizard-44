@@ -1,0 +1,3 @@
+Transaction Date,Order ID,Fee Amount,Delivery Method,Reason Codes
+2024-07-01,CO-001,$0.28,ship,CO_HAS_TAXABLE_ITEM
+2024-07-02,CO-002,$-0.28,ship,"CO_HAS_TAXABLE_ITEM,REVERSAL_DELIVERY_CANCELLED"

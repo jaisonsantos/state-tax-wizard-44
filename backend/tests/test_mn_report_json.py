@@ -59,13 +59,12 @@ def test_mn_summary_json_empty_dataset(client: TestClient, db_session: Session):
     assert response.status_code == 200
     payload = response.json()
 
-    assert payload["store_id"] == store_id
-    assert payload["fee_total_cents"] == 0
-    assert payload["tx_count_threshold_met"] == 0
-    assert payload["absorbed_count"] == 0
-    assert payload["shown_count"] == 0
-    assert payload["period"]["from"]
-    assert payload["period"]["to"]
+    assert payload == {
+        "tx_count_threshold_met": 0,
+        "fee_total_cents": 0,
+        "absorbed_count": 0,
+        "shown_count": 0,
+    }
 
 
 def test_mn_summary_json_with_data(client: TestClient, db_session: Session):

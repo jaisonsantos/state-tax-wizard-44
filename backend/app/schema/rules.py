@@ -1,18 +1,17 @@
-from pydantic import BaseModel
-from typing import List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-class RateScheduleItem(BaseModel):
-    start: datetime
-    end: datetime
-    rate_cents: int
+from pydantic import BaseModel
 
-class CORule(BaseModel):
-    rate_schedule: List[RateScheduleItem]
 
-class MNRule(BaseModel):
-    threshold_cents: int
+class RuleVersionResponse(BaseModel):
+    jurisdiction: str
+    version: str
+    effective_from: datetime
+    effective_to: Optional[datetime] = None
+    params: Dict[str, Any]
+    is_latest: bool
+
 
 class RulesResponse(BaseModel):
-    mn: MNRule
-    co: CORule
+    rules: List[RuleVersionResponse]
