@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, cast, Text
 from sqlalchemy.orm import Session
 
 from ..core.deps import AuthContext, assert_store_access, get_auth_context
@@ -20,43 +20,34 @@ async def get_audit_logs(
     auth: AuthContext = Depends(get_auth_context),
 ):
     """Get paginated audit logs for a store"""
-
     assert_store_access(db, auth, store_id)
 
     offset = (page - 1) * limit
 
     total = (
         db.query(func.count(AuditLog.id))
-        .filter(AuditLog.payload["store_id"].astext == store_id)
+        .filter(cast(AuditLog.payload["store_id"], Text) == str(store_id))
         .scalar()
-        or 0
-    )
+    ) or 0
 
     logs = (
         db.query(AuditLog)
-        .filter(AuditLog.payload["store_id"].astext == store_id)
+        .filter(cast(AuditLog.payload["store_id"], Text) == store_id)
         .order_by(AuditLog.ts.desc())
         .offset(offset)
         .limit(limit)
         .all()
     )
 
-    # Convert to response format
-    items: List[Dict[str, Any]] = []
-    for log in logs:
-        items.append(
-            {
-                "id": str(log.id),
-                "timestamp": log.ts.isoformat() if log.ts else None,
-                "actor": log.actor,
-                "action": log.action,
-                "payload": log.payload,
-            }
-        )
+    items: List[Dict[str, Any]] = [
+        {
+            "id": str(log.id),
+            "timestamp": log.ts.isoformat() if log.ts else None,
+            "actor": log.actor,
+            "action": log.action,
+            "payload": log.payload,
+        }
+        for log in logs
+    ]
 
-    return {
-        "items": items,
-        "page": page,
-        "limit": limit,
-        "total": total,
-    }
+    return {"items": items, "page": page, "limit": limit, "total": total}
