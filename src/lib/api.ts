@@ -17,6 +17,22 @@ export interface StoreSummary {
   name: string;
 }
 
+export interface StoreSettings {
+  store_id: string;
+  enable_mn: boolean;
+  enable_co: boolean;
+  absorb_fee: boolean;
+  label_override: string;
+  plan?: string | null;
+}
+
+export interface UpdateStoreSettingsPayload {
+  enable_mn: boolean;
+  enable_co: boolean;
+  absorb_fee: boolean;
+  label_override: string;
+}
+
 export interface LoginResponse {
   token: string;
   user: UserSummary;
@@ -199,6 +215,21 @@ class ApiClient {
 
   async getMe(): Promise<MeResponse> {
     return this.request<MeResponse>('/me');
+  }
+
+  // Store settings methods
+  async getStoreSettings(storeId: string): Promise<StoreSettings> {
+    return this.request<StoreSettings>(`/v1/stores/${storeId}/settings`);
+  }
+
+  async updateStoreSettings(
+    storeId: string,
+    payload: UpdateStoreSettingsPayload,
+  ): Promise<StoreSettings> {
+    return this.request<StoreSettings>(`/v1/stores/${storeId}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   }
 
   logout() {

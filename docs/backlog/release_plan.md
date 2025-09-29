@@ -12,7 +12,7 @@ closing.
 
 ## Milestone 1 — Secure Core APIs (Weeks 1–2)
 - Deliver Epic 02 (auth/tenant enforcement).
-- Start Epic 03 focusing on settings integration and reason code expansion.
+- ✅ Store settings integration (Epic 03) live via `/v1/stores/{id}/settings`; reason code expansion remains.
 - Update frontend (Epic 05) for store selector to leverage new auth claims.
 
 ## Milestone 2 — Reporting Confidence (Weeks 3–4)

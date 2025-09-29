@@ -9,9 +9,9 @@ and polished for GA.
 - ✅ Pages scaffolded: Dashboard, Onboarding, Settings/Playground, Reports,
   Logs, Billing, Help.
 - ✅ Settings page can trigger quote/apply demos using seeded store.
-- ⚠️ Settings toggles and labels are UI-only (no persistence).
+- ✅ Settings toggles and labels persist via `/v1/stores/{id}/settings` API.
 - ⚠️ Dashboard metrics are static placeholders.
-- ❌ No global store selector; assumes single seeded store.
+- ✅ Global store selector persists across sessions via AuthContext/localStorage.
 - ❌ Reports and Logs lack loading/error states and success notifications.
 
 ## Acceptance Criteria
