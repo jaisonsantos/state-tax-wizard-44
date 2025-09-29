@@ -12,8 +12,10 @@ stack and inspect system health.
   users, rules, and subscriptions.
 - ✅ `/healthz` and `/metrics` endpoints with Prometheus counters/histograms.
 - ✅ Structured logging helper in `observability.py`.
-- ⚠️ No consolidated documentation describing environment setup, seed
-  expectations, or metric catalog.
+- ✅ Consolidated environment, data model, and observability documentation under
+  `docs/`.
+- ✅ `make smoke` runbook and automation validating login, quote, apply, audit,
+  and report flows.
 
 ## Acceptance Criteria
 1. **Environment Guide**: `docs/environment.md` (or equivalent) explains how to
