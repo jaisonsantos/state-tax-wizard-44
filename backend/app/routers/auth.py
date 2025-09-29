@@ -1,13 +1,16 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from ..db.database import get_db
-from ..schema.auth import LoginRequest, LoginResponse, StoreSummary, UserSummary
-from ..core.security import create_access_token
-from ..models.models import Store, StoreSetting, User, UserStore
 import uuid
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from ..core.security import create_access_token
+from ..db.database import get_db
+from ..models.models import Store, StoreSetting, User, UserStore
+from ..schema.auth import LoginRequest, LoginResponse, StoreSummary, UserSummary
+
 router = APIRouter(prefix="/auth", tags=["auth"])
+
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
@@ -15,11 +18,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     if "@" not in request.email or len(request.password) == 0:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Invalid credentials",
         )
-
-    # Create JWT token
-    access_token = create_access_token(data={"sub": request.email})
 
     # Ensure seed store exists
     seed_store = db.query(Store).filter(Store.name == "store_demo_1").first()
@@ -76,10 +76,17 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         for store in user.stores
     ]
 
+    store_ids = [str(store.id) for store in user.stores]
+
     user_summary = UserSummary(
         id=str(user.id),
         email=user.email,
         created_at=user.created_at or datetime.utcnow(),
+    )
+
+    access_token = create_access_token(
+        email=user.email,
+        stores=store_ids,
     )
 
     return LoginResponse(

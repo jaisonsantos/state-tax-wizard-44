@@ -47,4 +47,4 @@ shell-api:
 
 # Database shell
 shell-db:
-	docker-compose exec postgres psql -U user -d rdf
+	docker compose exec db psql -U user -d rdf

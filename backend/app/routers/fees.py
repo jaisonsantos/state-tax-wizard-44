@@ -1,31 +1,41 @@
 import time
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+
+from ..core.deps import assert_store_access, get_current_user_email
 from ..db.database import get_db
-from ..schema.fees import FeeQuoteRequest, FeeQuoteResponse, FeeApplyRequest, FeeApplyResponse
-from ..services.fee_service import FeeCalculationService
-from ..models.models import OrderFee, AuditLog, Store
+from ..models.models import AuditLog, OrderFee, Store
 from ..observability import (
     decision_latency_ms,
+    ensure_request_id,
     fees_applied_total,
     log_fee_event,
-    ensure_request_id,
 )
+from ..schema.fees import FeeApplyRequest, FeeApplyResponse, FeeQuoteRequest, FeeQuoteResponse
+from ..services.fee_service import FeeCalculationService
 
 router = APIRouter(prefix="/v1/fees", tags=["fees"])
 
+
 @router.post("/quote", response_model=FeeQuoteResponse)
-async def quote_fees(request: FeeQuoteRequest, db: Session = Depends(get_db)):
+async def quote_fees(
+    request: FeeQuoteRequest,
+    db: Session = Depends(get_db),
+    current_user_email: str = Depends(get_current_user_email),
+):
     """Calculate delivery fees for a given order"""
-    
+
+    assert_store_access(db, current_user_email, request.store_id)
+
     # Verify store exists
     store = db.query(Store).filter(Store.id == request.store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    
+
     # Calculate fees using the service
     lines = FeeCalculationService.calculate_fees(request, db)
-    
+
     # Log the audit event
     audit_log = AuditLog(
         actor=f"store:{request.store_id}",
@@ -36,28 +46,32 @@ async def quote_fees(request: FeeQuoteRequest, db: Session = Depends(get_db)):
             "delivery_method": request.delivery_method,
             "item_count": len(request.items),
             "shipping_amount_cents": request.shipping_amount_cents,
-            "lines_count": len(lines)
-        }
+            "lines_count": len(lines),
+        },
     )
     db.add(audit_log)
     db.commit()
-    
+
     return FeeQuoteResponse(
         lines=lines,
-        decided=True
+        decided=True,
     )
+
 
 @router.post("/apply", response_model=FeeApplyResponse)
 async def apply_fees(
     request: FeeApplyRequest,
     db: Session = Depends(get_db),
+    current_user_email: str = Depends(get_current_user_email),
     http_request: Request = None,
 ):
     """Apply delivery fees to an order (idempotent)"""
 
+    assert_store_access(db, current_user_email, request.store_id)
+
     existing_lines = db.query(OrderFee).filter(
         OrderFee.store_id == request.store_id,
-        OrderFee.order_id == request.order_id
+        OrderFee.order_id == request.order_id,
     ).all()
 
     if existing_lines:
@@ -79,9 +93,9 @@ async def apply_fees(
         destination=request.destination,
         delivery_method=request.delivery_method,
         items=request.items,
-        shipping_amount_cents=request.shipping_amount_cents
+        shipping_amount_cents=request.shipping_amount_cents,
     )
-    
+
     started = time.perf_counter()
     lines = FeeCalculationService.calculate_fees(quote_request, db)
     elapsed_ms = (time.perf_counter() - started) * 1000
@@ -120,7 +134,7 @@ async def apply_fees(
                 for line in lines
             ],
             "status": "applied",
-        }
+        },
     )
     db.add(audit_log)
 
@@ -146,5 +160,5 @@ async def apply_fees(
 
     return FeeApplyResponse(
         success=True,
-        lines=lines
+        lines=lines,
     )
