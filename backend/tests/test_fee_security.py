@@ -91,6 +91,14 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
     assert response_body["success"] is True
     assert db_session.query(OrderFee).filter(OrderFee.order_id == "hmac-test").count() == 1
 
+    # Prefix format is also accepted
+    prefixed_headers = dict(valid_headers)
+    prefixed_headers["x-rdf-signature"] = (
+        "sha256=" + hmac.new(settings.hmac_secret.encode(), body, hashlib.sha256).hexdigest()
+    )
+    replay = client.post("/api/v1/fees/apply", data=body, headers=prefixed_headers)
+    assert replay.status_code == 200
+
 
 def test_rate_limit_per_token_route(client: TestClient, db_session: Session) -> None:
     token, store_id = _login(client)

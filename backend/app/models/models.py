@@ -7,7 +7,8 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     JSON,
-    UniqueConstraint,
+    Index,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.sql import func
@@ -104,7 +105,14 @@ class OrderFee(Base):
     store = relationship("Store", back_populates="order_fees")
 
     __table_args__ = (
-        UniqueConstraint("store_id", "order_id", "jurisdiction", name="uq_order_fee_store_order_jurisdiction"),
+        Index(
+            "uq_order_fee_store_order_jurisdiction_applied",
+            "store_id",
+            "order_id",
+            "jurisdiction",
+            unique=True,
+            postgresql_where=text("status = 'applied'"),
+        ),
     )
 
 class AuditLog(Base):
@@ -147,7 +155,3 @@ class UserStore(Base):
     user_id = Column(GUID(), ForeignKey("users.id"), primary_key=True)
     store_id = Column(GUID(), ForeignKey("stores.id"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "store_id", name="uq_user_store"),
-    )

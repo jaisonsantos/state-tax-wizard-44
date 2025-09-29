@@ -27,13 +27,14 @@ running locally.
 
 Structured logs are emitted via `observability.log_fee_event` as JSON messages to
 the `fee` logger. Each invocation includes contextual fields useful for tracing
-user behavior.
+user behavior. Both fee application and reversal flows publish events through
+this helper so downstream systems can reconcile adjustments.
 
 ### Schema
 
 | Field | Example | Notes |
 | ----- | ------- | ----- |
-| `event` | `"fee_apply"` | Event type (currently only `fee_apply`). |
+| `event` | `"fee_apply"` | Event type (`fee_apply` or `fee_reverse`). |
 | `request_id` | `"5bf08d4d-a121-4b47-a81b-6cde5b0c33af"` | Propagated from `X-Request-ID` header if provided; otherwise generated per request. |
 | `store_id` | `"1cc66e24-4e93-4c9e-bebd-8ff9690e33cd"` | UUID of the merchant store associated with the fee. |
 | `order_id` | `"smoke-order-mn"` | Checkout order identifier supplied by the client. |
@@ -43,8 +44,10 @@ user behavior.
 | `delivery_method` | `"ship"` | Delivery method from the request payload. |
 | `subject` | `"ops@example.com"` | Authenticated user (JWT subject) performing the action. |
 | `absorbed` | `false` | Indicates whether the fee is hidden from the shopper. |
+| `status` | `"reversed"` | Present on reversal events to capture the persisted order fee status. |
+| `reversal_reason` | `"DELIVERY_CANCELLED"` | Present on reversal events describing why the refund occurred. |
 
-### Sample payload
+### Sample payloads
 
 ```json
 {
@@ -58,6 +61,20 @@ user behavior.
   "delivery_method": "ship",
   "subject": "ops@example.com",
   "absorbed": false
+}
+```
+
+```json
+{
+  "event": "fee_reverse",
+  "request_id": "2a5803f5-f8b7-4db8-8a2e-4db8e6db1f5f",
+  "store_id": "1cc66e24-4e93-4c9e-bebd-8ff9690e33cd",
+  "order_id": "demo-123",
+  "jurisdiction": "CO",
+  "amount_cents": 29,
+  "status": "reversed",
+  "reversal_reason": "DELIVERY_CANCELLED",
+  "subject": "ops@example.com"
 }
 ```
 
