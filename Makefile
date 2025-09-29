@@ -1,4 +1,4 @@
-.PHONY: dev up down build clean logs migrate seed
+.PHONY: dev up down build clean logs migrate seed smoke
 
 # Development - run all services
 dev:
@@ -48,3 +48,7 @@ shell-api:
 # Database shell
 shell-db:
 	docker compose exec db psql -U user -d rdf
+
+# End-to-end smoke test across login, fees, audit, and reports
+smoke: up migrate seed
+	docker-compose exec api python smoke_test.py

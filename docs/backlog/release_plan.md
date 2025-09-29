@@ -6,7 +6,8 @@ must satisfy the Definition of Done outlined in `iteration_checklist.md` before
 closing.
 
 ## Milestone 0 — Foundations (Week 0)
-- Complete Epic 01 (documentation, smoke automation).
+- ✅ Epic 01 complete (`docs/environment.md`, `docs/data-model.md`,
+  `docs/observability.md`, and `make smoke`).
 - Establish engineering rituals (code review checklist referencing backlog).
 
 ## Milestone 1 — Secure Core APIs (Weeks 1–2)
