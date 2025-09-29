@@ -46,22 +46,39 @@ def login(client: httpx.Client) -> Dict[str, Any]:
     return data
 
 
-def quote_fees(client: httpx.Client, headers: Dict[str, str], store_id: str) -> Dict[str, Any]:
+def update_settings(
+    client: httpx.Client,
+    headers: Dict[str, str],
+    store_id: str,
+    *,
+    enable_mn: bool,
+    enable_co: bool,
+    absorb_fee: bool,
+) -> Dict[str, Any]:
     payload = {
-        "store_id": store_id,
-        "destination": {"state": "MN"},
-        "delivery_method": "ship",
-        "items": [
-            {"sku": "SMOKE-MN-1", "qty": 1, "unit_price_cents": 12500, "taxability": "taxable"}
-        ],
-        "shipping_amount_cents": 500,
+        "enable_mn": enable_mn,
+        "enable_co": enable_co,
+        "absorb_fee": absorb_fee,
+        "label_override": "Delivery Fee",
     }
-    response = client.post(f"{API_BASE_URL}/v1/fees/quote", json=payload, headers=headers, timeout=20.0)
+    response = client.put(
+        f"{API_BASE_URL}/v1/stores/{store_id}/settings",
+        json=payload,
+        headers=headers,
+        timeout=20.0,
+    )
+    _raise_for_status(response, "settings update")
+    return response.json()
+
+
+def quote_fees(
+    client: httpx.Client, headers: Dict[str, str], payload: Dict[str, Any]
+) -> Dict[str, Any]:
+    response = client.post(
+        f"{API_BASE_URL}/v1/fees/quote", json=payload, headers=headers, timeout=20.0
+    )
     _raise_for_status(response, "quote")
-    data = response.json()
-    if not data.get("lines"):
-        raise SmokeFailure("quote returned no fee lines")
-    return data
+    return response.json()
 
 
 def apply_fees(
@@ -124,8 +141,9 @@ def fetch_reports(client: httpx.Client, headers: Dict[str, str], store_id: str) 
     )
     _raise_for_status(response, "mn report")
     summary = response.json()
-    if "fee_total_cents" not in summary:
-        raise SmokeFailure("mn summary missing totals")
+    for key in ("tx_count_threshold_met", "fee_total_cents", "absorbed_count", "shown_count"):
+        if key not in summary:
+            raise SmokeFailure(f"mn summary missing {key}")
 
     # Colorado DR-1786 CSV
     response = client.get(
@@ -139,23 +157,66 @@ def fetch_reports(client: httpx.Client, headers: Dict[str, str], store_id: str) 
         raise SmokeFailure("co report missing CSV header")
 
 
+def fetch_metrics(client: httpx.Client) -> str:
+    response = client.get(f"{API_BASE_URL}/../metrics", timeout=20.0)
+    _raise_for_status(response, "metrics")
+    text = response.text
+    if "decision_latency_ms" not in text:
+        raise SmokeFailure("metrics missing decision_latency_ms")
+    return text
+
+
 def main() -> None:
     with httpx.Client() as client:
         login_payload = login(client)
         store_id = login_payload["stores"][0]["id"]
         headers = {"Authorization": f"Bearer {login_payload['token']}"}
 
-        quote_result = quote_fees(client, headers, store_id)
+        update_settings(client, headers, store_id, enable_mn=False, enable_co=True, absorb_fee=False)
+
+        mn_payload = {
+            "store_id": store_id,
+            "destination": {"state": "MN"},
+            "delivery_method": "ship",
+            "items": [
+                {"sku": "SMOKE-MN-1", "qty": 1, "unit_price_cents": 12500, "taxability": "taxable"}
+            ],
+            "shipping_amount_cents": 500,
+        }
+        mn_quote = quote_fees(client, headers, mn_payload)
+        if mn_quote.get("lines"):
+            raise SmokeFailure("MN quote returned fee lines while disabled")
+
+        update_settings(client, headers, store_id, enable_mn=True, enable_co=True, absorb_fee=True)
+
+        co_payload = {
+            "store_id": store_id,
+            "destination": {"state": "CO"},
+            "delivery_method": "ship",
+            "items": [
+                {"sku": "SMOKE-CO-1", "qty": 1, "unit_price_cents": 1000, "taxability": "taxable"}
+            ],
+            "shipping_amount_cents": 0,
+            "source_of_remittance": "merchant",
+        }
+        quote_result = quote_fees(client, headers, co_payload)
+        if not quote_result.get("lines"):
+            raise SmokeFailure("CO quote returned no lines when enabled")
+        if not all(line.get("absorbed") for line in quote_result["lines"]):
+            raise SmokeFailure("CO quote lines not marked absorbed")
+
         apply_mn = apply_fees(client, headers, store_id, "smoke-order-mn", "MN")
         apply_co = apply_fees(client, headers, store_id, "smoke-order-co", "CO")
         audit_result = fetch_audit(client, headers, store_id)
         fetch_reports(client, headers, store_id)
+        metrics_text = fetch_metrics(client)
 
     print("Smoke test completed successfully.")
-    print(f"MN quote lines: {len(quote_result['lines'])}")
+    print(f"MN quote lines (disabled): {len(mn_quote['lines'])}")
     print(f"MN apply lines: {len(apply_mn['lines'])}")
     print(f"CO apply lines: {len(apply_co['lines'])}")
     print(f"Audit events fetched: {len(audit_result['items'])}")
+    print(f"Metrics sample: {metrics_text.splitlines()[0]}")
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

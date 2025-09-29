@@ -151,6 +151,7 @@ def test_quote_reflects_store_settings_and_absorb(client: TestClient, db_session
     assert response.status_code == 200
     body = response.json()
     assert body["absorbed"] is True
+    assert all(line["absorbed"] is True for line in body["lines"])
     mn_decision = next(d for d in body["decisions"] if d["jurisdiction"] == "MN")
     assert mn_decision["outcome"] == "applied"
     co_decision = next(d for d in body["decisions"] if d["jurisdiction"] == "CO")

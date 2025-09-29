@@ -58,6 +58,7 @@ export interface FeeQuoteRequest {
     taxability: string;
   }>;
   shipping_amount_cents: number;
+  source_of_remittance?: 'merchant' | 'marketplace';
 }
 
 export interface FeeApplyRequest extends FeeQuoteRequest {
@@ -70,6 +71,7 @@ export interface FeeLine {
   display_name: string;
   rule_version: string;
   reason_codes: string[];
+  absorbed: boolean;
 }
 
 export interface FeeDecision {
@@ -100,17 +102,17 @@ export interface Entitlements {
   status: string;
 }
 
+export interface RuleVersionResponse {
+  jurisdiction: string;
+  version: string;
+  effective_from: string;
+  effective_to: string | null;
+  params: Record<string, unknown>;
+  is_latest: boolean;
+}
+
 export interface RulesResponse {
-  mn: {
-    threshold_cents: number;
-  };
-  co: {
-    rate_schedule: Array<{
-      start: string;
-      end: string;
-      rate_cents: number;
-    }>;
-  };
+  rules: RuleVersionResponse[];
 }
 
 export interface AuditLogPayloadLine {

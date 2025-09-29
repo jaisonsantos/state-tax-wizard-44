@@ -36,12 +36,20 @@ class ReportService:
         ])
 
         for fee in fees:
+            amount_cents = fee.amount_cents
+            reasons = list(fee.reason_codes or [])
+            if fee.status == "reversed":
+                amount_cents = -amount_cents
+                if fee.reversal_reason:
+                    tag = f"REVERSAL_{fee.reversal_reason}"
+                    if tag not in reasons:
+                        reasons.append(tag)
             writer.writerow([
                 fee.applied_at.strftime("%Y-%m-%d"),
                 fee.order_id,
-                f"${fee.amount_cents / 100:.2f}",
+                f"${amount_cents / 100:.2f}",
                 fee.delivery_method,
-                ",".join(fee.reason_codes or []),
+                ",".join(reasons),
             ])
 
         # Add demo data if no real data
@@ -94,12 +102,20 @@ class ReportService:
             ])
 
             for fee in fees:
+                amount_cents = fee.amount_cents
+                reasons = list(fee.reason_codes or [])
+                if fee.status == "reversed":
+                    amount_cents = -amount_cents
+                    if fee.reversal_reason:
+                        tag = f"REVERSAL_{fee.reversal_reason}"
+                        if tag not in reasons:
+                            reasons.append(tag)
                 writer.writerow([
                     fee.applied_at.strftime("%Y-%m-%d"),
                     fee.order_id,
-                    f"${fee.amount_cents / 100:.2f}",
+                    f"${amount_cents / 100:.2f}",
                     fee.delivery_method,
-                    ",".join(fee.reason_codes or []),
+                    ",".join(reasons),
                 ])
 
             # Add demo data if no real data
@@ -122,18 +138,22 @@ class ReportService:
             return output.getvalue()
 
         # JSON format for MN summary
-        fee_total_cents = sum(fee.amount_cents for fee in fees)
-        absorbed_count = sum(1 for fee in fees if getattr(fee, "absorbed", False))
-        shown_count = len(fees) - absorbed_count
+        applied_fees = [fee for fee in fees if fee.status == "applied"]
+        reversed_fees = [fee for fee in fees if fee.status == "reversed"]
+
+        fee_total_cents = sum(fee.amount_cents for fee in applied_fees) - sum(
+            fee.amount_cents for fee in reversed_fees
+        )
+        absorbed_count = sum(1 for fee in applied_fees if getattr(fee, "absorbed", False)) - sum(
+            1 for fee in reversed_fees if getattr(fee, "absorbed", False)
+        )
+        shown_count = (len(applied_fees) - absorbed_count) - (
+            sum(1 for fee in reversed_fees if not getattr(fee, "absorbed", False))
+        )
 
         return {
-            "store_id": str(store_id),
-            "period": {
-                "from": from_date.isoformat(),
-                "to": to_date.isoformat(),
-            },
-            "tx_count_threshold_met": len(fees),
+            "tx_count_threshold_met": max(len(applied_fees) - len(reversed_fees), 0),
             "fee_total_cents": fee_total_cents,
-            "absorbed_count": absorbed_count,
-            "shown_count": shown_count,
+            "absorbed_count": max(absorbed_count, 0),
+            "shown_count": max(shown_count, 0),
         }

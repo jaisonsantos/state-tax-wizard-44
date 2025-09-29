@@ -1,4 +1,15 @@
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, Text, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    String,
+    Boolean,
+    Integer,
+    DateTime,
+    Text,
+    ForeignKey,
+    JSON,
+    Index,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -49,14 +60,15 @@ class Store(Base):
 
 class StoreSetting(Base):
     __tablename__ = "store_settings"
-    
+
     store_id = Column(GUID(), ForeignKey("stores.id"), primary_key=True)
     enable_mn = Column(Boolean, default=True)
     enable_co = Column(Boolean, default=True)
     absorb_fee = Column(Boolean, default=False)
     label_override = Column(Text, default="Delivery Fee")
     plan = Column(String(20), default="starter")  # "starter", "pro", "plus"
-    
+    hmac_secret = Column(Text, nullable=True)
+
     # Relationships
     store = relationship("Store", back_populates="settings")
 
@@ -83,12 +95,24 @@ class OrderFee(Base):
     absorbed = Column(Boolean, default=False)
     rule_version = Column(String(50), nullable=False)
     reason_codes = Column(JSON, nullable=False)
+    display_name = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="applied")
+    reversal_reason = Column(String(50), nullable=True)
+    reversed_at = Column(DateTime(timezone=True), nullable=True)
+    source_of_remittance = Column(String(20), nullable=True)
 
     # Relationships
     store = relationship("Store", back_populates="order_fees")
 
     __table_args__ = (
-        UniqueConstraint("store_id", "order_id", "jurisdiction", name="uq_order_fee_store_order_jurisdiction"),
+        Index(
+            "uq_order_fee_store_order_jurisdiction_applied",
+            "store_id",
+            "order_id",
+            "jurisdiction",
+            unique=True,
+            postgresql_where=text("status = 'applied'"),
+        ),
     )
 
 class AuditLog(Base):
@@ -131,7 +155,3 @@ class UserStore(Base):
     user_id = Column(GUID(), ForeignKey("users.id"), primary_key=True)
     store_id = Column(GUID(), ForeignKey("stores.id"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "store_id", name="uq_user_store"),
-    )
