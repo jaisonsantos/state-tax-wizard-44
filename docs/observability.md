@@ -17,7 +17,8 @@ All metrics are defined in `backend/app/observability.py`.
 | Metric | Type | Labels | Description |
 | ------ | ---- | ------ | ----------- |
 | `fees_applied_total` | Counter | `jurisdiction` | Counts the number of successful fee application events per jurisdiction. Incremented for each `order_fee` row created. |
-| `decision_latency_ms` | Histogram | `operation`, `jurisdiction`, `outcome` | Measures time spent calculating quote/apply decisions per jurisdiction and outcome (applied vs skipped). |
+| `fees_absorbed_total` | Counter | `jurisdiction` | Tracks how often fees are marked as absorbed (hidden from the shopper) and increments whenever an absorbed line is persisted. |
+| `decision_latency_ms` | Histogram | `route`, `jurisdiction`, `outcome` | Measures time spent calculating quote/apply decisions per API route (`quote` or `apply`), jurisdiction, and outcome (applied vs skipped). |
 
 Scrape `/metrics` from the API container or <http://localhost:8000/metrics> when
 running locally.

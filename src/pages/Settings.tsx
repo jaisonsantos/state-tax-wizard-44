@@ -24,6 +24,7 @@ export default function Settings() {
   const [applyResult, setApplyResult] = useState<{
     totalFeeCents: number;
     reasonCodes: string[];
+    absorbed: boolean;
   } | null>(null);
   
   // Playground form state
@@ -222,7 +223,7 @@ export default function Settings() {
       const totalFeeCents = response.lines.reduce((sum, line) => sum + line.amount_cents, 0);
       const reasonCodes = response.lines.flatMap((line) => line.reason_codes);
 
-      setApplyResult({ totalFeeCents, reasonCodes });
+      setApplyResult({ totalFeeCents, reasonCodes, absorbed: response.absorbed });
 
       toast({
         title: response.absorbed ? "Fee absorbed" : "Fee applied",
@@ -460,12 +461,19 @@ export default function Settings() {
             </div>
 
             {applyResult && (
-              <div className="rounded-md border border-muted p-3 text-sm text-muted-foreground">
+              <div className="rounded-md border border-muted p-3 text-sm text-muted-foreground space-y-1">
                 <p>
                   Demo fee total: <span className="font-medium text-foreground">${(applyResult.totalFeeCents / 100).toFixed(2)}</span>
                 </p>
                 <p>
                   Reason codes: {applyResult.reasonCodes.length > 0 ? applyResult.reasonCodes.join(', ') : 'None'}
+                </p>
+                <p>
+                  Status: {applyResult.absorbed ? (
+                    <span className="font-medium text-foreground">Absorbed</span>
+                  ) : (
+                    <span className="font-medium text-foreground">Shown</span>
+                  )}
                 </p>
               </div>
             )}

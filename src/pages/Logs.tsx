@@ -20,6 +20,7 @@ type AuditRow = {
   reasonCode: string;
   deliveryMethod: string;
   status: string;
+  absorbed: boolean;
 };
 
 export default function Logs() {
@@ -72,6 +73,7 @@ export default function Logs() {
           reasonCode: reasonCodes[0] || log.action.toUpperCase(),
           deliveryMethod: log.payload.delivery_method || "Unknown",
           status: log.payload.status || (log.action === "fee_apply" ? "applied" : "recorded"),
+          absorbed: firstLine?.absorbed ?? Boolean(log.payload.absorbed),
         };
       });
 
@@ -113,6 +115,8 @@ export default function Logs() {
     switch (status) {
       case "applied":
         return <Badge className="bg-success text-success-foreground">Applied</Badge>;
+      case "reversed":
+        return <Badge className="bg-destructive text-destructive-foreground">Reversed</Badge>;
       case "exempt":
         return <Badge variant="outline">Exempt</Badge>;
       case "not_applied":
@@ -145,7 +149,16 @@ export default function Logs() {
       return;
     }
 
-    const header = ["timestamp", "orderId", "jurisdiction", "amount", "reasonCode", "deliveryMethod", "status"];
+    const header = [
+      "timestamp",
+      "orderId",
+      "jurisdiction",
+      "amount",
+      "reasonCode",
+      "deliveryMethod",
+      "status",
+      "absorbed",
+    ];
     const rows = auditLogs.map((log) => [
       log.timestamp,
       log.orderId,
@@ -154,6 +167,7 @@ export default function Logs() {
       log.reasonCode,
       log.deliveryMethod,
       log.status,
+      log.absorbed ? "true" : "false",
     ]);
 
     const csvContent = [header, ...rows]
@@ -273,6 +287,7 @@ export default function Logs() {
                   <TableHead>State</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Reason Code</TableHead>
+                  <TableHead>Absorbed</TableHead>
                   <TableHead>Delivery Method</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -288,6 +303,15 @@ export default function Logs() {
                     </TableCell>
                     <TableCell>
                       <code className="text-xs bg-muted px-2 py-1 rounded">{log.reasonCode}</code>
+                    </TableCell>
+                    <TableCell>
+                      {log.absorbed ? (
+                        <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                          Absorbed
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Shown</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{log.deliveryMethod}</TableCell>
                     <TableCell>{getStatusBadge(log.status)}</TableCell>

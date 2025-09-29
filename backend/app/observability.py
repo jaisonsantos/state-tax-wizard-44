@@ -14,11 +14,17 @@ fees_applied_total = Counter(
     ["jurisdiction"],
 )
 
+fees_absorbed_total = Counter(
+    "fees_absorbed_total",
+    "Count of fees absorbed instead of shown to shoppers",
+    ["jurisdiction"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",
     "Time spent deciding fees in milliseconds",
-    ["operation", "jurisdiction", "outcome"],
+    ["route", "jurisdiction", "outcome"],
 )
 
 

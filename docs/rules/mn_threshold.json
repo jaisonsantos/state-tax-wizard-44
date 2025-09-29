@@ -1,0 +1,8 @@
+{
+  "version": "MN-2024",
+  "effective_from": "2024-01-01T00:00:00Z",
+  "effective_to": null,
+  "threshold_cents": 10000,
+  "fee_cents": 50,
+  "active": true
+}

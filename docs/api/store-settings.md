@@ -3,7 +3,10 @@
 The store settings endpoints manage delivery fee configuration flags for each
 merchant store. They back the React settings page and the fee engine, enabling
 merchants to toggle state-specific fees, absorb delivery charges, and customize
-checkout labels.
+checkout labels. When a custom label is omitted the engine now falls back to the
+jurisdiction defaults – **Road Improvement and Food Delivery Fee (MN)** and
+**Retail Delivery Fee (CO)** – ensuring quotes and persisted order fees stay in
+sync with the latest regulatory copy.
 
 ## Authentication
 
@@ -73,4 +76,6 @@ rules and when.
 - Frontend integration lives in `src/pages/Settings.tsx`.
 - Postman collection requests are stored under the **Store Settings** folder in
   `docs/postman/state-tax-wizard.postman_collection.json`.
-- Fee calculation honors these toggles via `backend/app/services/fee_service.py`.
+- Fee calculation honors these toggles via `backend/app/services/fee_service.py` and
+  propagates `absorb_fee` to `FeeLine.absorbed` / `order_fees.absorbed` for audit and
+  reporting.

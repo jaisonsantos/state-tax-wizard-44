@@ -21,6 +21,7 @@ class FeeQuoteRequest(BaseModel):
     delivery_method: str  # "ship", "pickup", "curbside"
     items: List[FeeItem]
     shipping_amount_cents: int
+    source_of_remittance: Optional[Literal["merchant", "marketplace"]] = None
 
 
 class FeeLine(BaseModel):
@@ -29,6 +30,7 @@ class FeeLine(BaseModel):
     display_name: str
     rule_version: str
     reason_codes: List[str]
+    absorbed: bool = False
 
 
 class FeeDecision(BaseModel):
@@ -52,6 +54,7 @@ class FeeApplyRequest(BaseModel):
     delivery_method: str
     items: List[FeeItem]
     shipping_amount_cents: int
+    source_of_remittance: Optional[Literal["merchant", "marketplace"]] = None
 
 
 class FeeApplyResponse(BaseModel):
@@ -59,3 +62,16 @@ class FeeApplyResponse(BaseModel):
     lines: List[FeeLine]
     decisions: List[FeeDecision]
     absorbed: bool
+
+
+class FeeReversalRequest(BaseModel):
+    store_id: str
+    order_id: str
+    reason: Literal["DELIVERY_CANCELLED", "RETURN_POST_DELIVERY"]
+
+
+class FeeReversalResponse(BaseModel):
+    success: bool
+    refunded_amount_cents: int
+    reversed_jurisdictions: List[str]
+    reason: str
