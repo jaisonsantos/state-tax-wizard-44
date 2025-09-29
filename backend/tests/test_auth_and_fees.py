@@ -70,6 +70,7 @@ def test_fee_apply_idempotent(client: TestClient, db_session: Session):
         json={"email": "apply@example.com", "password": "secret"},
     ).json()
     store_id = login["stores"][0]["id"]
+    auth_header = {"Authorization": f"Bearer {login['token']}"}
 
     _create_rule_versions(db_session)
 
@@ -84,7 +85,7 @@ def test_fee_apply_idempotent(client: TestClient, db_session: Session):
         "shipping_amount_cents": 500,
     }
 
-    first = client.post("/api/v1/fees/apply", json=payload)
+    first = client.post("/api/v1/fees/apply", json=payload, headers=auth_header)
     assert first.status_code == 200
     first_body = first.json()
     assert first_body["success"] is True
@@ -96,7 +97,7 @@ def test_fee_apply_idempotent(client: TestClient, db_session: Session):
     assert order_fee_count == len(first_body["lines"])
     assert audit_count == 1
 
-    second = client.post("/api/v1/fees/apply", json=payload)
+    second = client.post("/api/v1/fees/apply", json=payload, headers=auth_header)
     assert second.status_code == 200
     second_body = second.json()
     assert second_body["success"] is True
