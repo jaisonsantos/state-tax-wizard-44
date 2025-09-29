@@ -56,14 +56,25 @@ export interface FeeLine {
   reason_codes: string[];
 }
 
+export interface FeeDecision {
+  jurisdiction: string;
+  outcome: "applied" | "skipped";
+  reason_codes: string[];
+  amount_cents: number;
+}
+
 export interface FeeQuoteResponse {
   lines: FeeLine[];
+  decisions: FeeDecision[];
   decided: boolean;
+  absorbed: boolean;
 }
 
 export interface FeeApplyResponse {
   success: boolean;
   lines: FeeLine[];
+  decisions: FeeDecision[];
+  absorbed: boolean;
 }
 
 export interface Entitlements {
@@ -125,6 +136,10 @@ class ApiClient {
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     this.authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  }
+
+  hasToken(): boolean {
+    return !!this.authToken;
   }
 
   private buildHeaders(initial?: HeadersInit): Headers {

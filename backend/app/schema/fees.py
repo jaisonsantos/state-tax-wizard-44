@@ -1,6 +1,7 @@
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel
-from typing import List, Optional
-import uuid
+
 
 class FeeItem(BaseModel):
     sku: str
@@ -8,9 +9,11 @@ class FeeItem(BaseModel):
     unit_price_cents: int
     taxability: str  # "taxable", "exempt", "clothing"
 
+
 class FeeDestination(BaseModel):
     state: str
     zip: Optional[str] = None
+
 
 class FeeQuoteRequest(BaseModel):
     store_id: str
@@ -19,6 +22,7 @@ class FeeQuoteRequest(BaseModel):
     items: List[FeeItem]
     shipping_amount_cents: int
 
+
 class FeeLine(BaseModel):
     jurisdiction: str  # "MN" or "CO"
     amount_cents: int
@@ -26,9 +30,20 @@ class FeeLine(BaseModel):
     rule_version: str
     reason_codes: List[str]
 
+
+class FeeDecision(BaseModel):
+    jurisdiction: str
+    outcome: Literal["applied", "skipped"]
+    reason_codes: List[str]
+    amount_cents: int
+
+
 class FeeQuoteResponse(BaseModel):
     lines: List[FeeLine]
+    decisions: List[FeeDecision]
     decided: bool
+    absorbed: bool
+
 
 class FeeApplyRequest(BaseModel):
     store_id: str
@@ -38,6 +53,9 @@ class FeeApplyRequest(BaseModel):
     items: List[FeeItem]
     shipping_amount_cents: int
 
+
 class FeeApplyResponse(BaseModel):
     success: bool
     lines: List[FeeLine]
+    decisions: List[FeeDecision]
+    absorbed: bool

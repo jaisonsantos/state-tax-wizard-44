@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..core.deps import assert_store_access, get_current_user_email
+from ..core.deps import AuthContext, assert_store_access, get_auth_context
 from ..db.database import get_db
 from ..models.models import AuditLog
 
@@ -17,11 +17,11 @@ async def get_audit_logs(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user_email: str = Depends(get_current_user_email),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     """Get paginated audit logs for a store"""
 
-    assert_store_access(db, current_user_email, store_id)
+    assert_store_access(db, auth, store_id)
 
     offset = (page - 1) * limit
 

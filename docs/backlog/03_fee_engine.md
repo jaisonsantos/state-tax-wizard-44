@@ -13,6 +13,8 @@ extensibility.
 - ⚠️ Rule management is manual; no automatic period updates or MN change flags.
 - ⚠️ Reason codes limited (no granular signals for exemptions or edge cases).
 - ❌ No support for absorb fee settings (frontend UI only).
+- ✅ API honors `store_settings` toggles, returns granular reason codes (including
+  exemptions), and surfaces an `absorbed` flag for hidden fees.
 
 ## Acceptance Criteria
 1. **Rule Version Service**: Background job or CLI to ingest new CO periods and

@@ -1,9 +1,18 @@
 from datetime import datetime, timedelta
+import uuid
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.models import AuditLog, OrderFee, RuleVersion, Store, User
+from app.core.security import create_access_token
+from app.models.models import (
+    AuditLog,
+    OrderFee,
+    RuleVersion,
+    Store,
+    StoreSetting,
+    User,
+)
 from seed_data import seed_database
 
 
@@ -64,13 +73,17 @@ def _create_rule_versions(db_session: Session):
     db_session.commit()
 
 
-def test_fee_apply_idempotent(client: TestClient, db_session: Session):
+def _login_and_get_store(client: TestClient):
     login = client.post(
         "/api/auth/login",
-        json={"email": "apply@example.com", "password": "secret"},
+        json={"email": f"store-user-{uuid.uuid4()}@example.com", "password": "secret"},
     ).json()
-    store_id = login["stores"][0]["id"]
-    auth_header = {"Authorization": f"Bearer {login['token']}"}
+    return login["token"], login["stores"][0]["id"]
+
+
+def test_fee_apply_idempotent(client: TestClient, db_session: Session):
+    token, store_id = _login_and_get_store(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
 
     _create_rule_versions(db_session)
 
@@ -91,6 +104,8 @@ def test_fee_apply_idempotent(client: TestClient, db_session: Session):
     assert first_body["success"] is True
     assert first_body["lines"]
     assert first_body["lines"][0]["jurisdiction"] == "MN"
+    assert first_body["absorbed"] is False
+    assert any(decision["outcome"] == "applied" for decision in first_body["decisions"])
 
     order_fee_count = db_session.query(OrderFee).count()
     audit_count = db_session.query(AuditLog).count()
@@ -102,13 +117,100 @@ def test_fee_apply_idempotent(client: TestClient, db_session: Session):
     second_body = second.json()
     assert second_body["success"] is True
     assert len(second_body["lines"]) == len(first_body["lines"])
-    for returned, initial in zip(second_body["lines"], first_body["lines"]):
-        assert returned["jurisdiction"] == initial["jurisdiction"]
-        assert returned["amount_cents"] == initial["amount_cents"]
-        assert returned["rule_version"] == initial["rule_version"]
-        assert returned["reason_codes"] == initial["reason_codes"]
+    assert second_body["decisions"] == first_body["decisions"]
     assert db_session.query(OrderFee).count() == order_fee_count
     assert db_session.query(AuditLog).count() == audit_count
+
+
+def test_quote_reflects_store_settings_and_absorb(client: TestClient, db_session: Session):
+    token, store_id = _login_and_get_store(client)
+    _create_rule_versions(db_session)
+
+    setting = db_session.query(StoreSetting).filter(StoreSetting.store_id == store_id).first()
+    setting.absorb_fee = True
+    setting.enable_co = False
+    db_session.add(setting)
+    db_session.commit()
+
+    payload = {
+        "store_id": store_id,
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU-apply", "qty": 1, "unit_price_cents": 12000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    response = client.post(
+        "/api/v1/fees/quote",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["absorbed"] is True
+    mn_decision = next(d for d in body["decisions"] if d["jurisdiction"] == "MN")
+    assert mn_decision["outcome"] == "applied"
+    co_decision = next(d for d in body["decisions"] if d["jurisdiction"] == "CO")
+    assert "CO_DISABLED" in co_decision["reason_codes"]
+
+
+def test_quote_reason_codes_for_exemptions(client: TestClient, db_session: Session):
+    token, store_id = _login_and_get_store(client)
+    _create_rule_versions(db_session)
+
+    payload = {
+        "store_id": store_id,
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU-small", "qty": 1, "unit_price_cents": 1000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    response = client.post(
+        "/api/v1/fees/quote",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    mn_decision = next(d for d in body["decisions"] if d["jurisdiction"] == "MN")
+    assert mn_decision["outcome"] == "skipped"
+    assert "MN_UNDER_THRESHOLD" in mn_decision["reason_codes"]
+
+
+def test_expired_token_rejected(client: TestClient, db_session: Session):
+    _, store_id = _login_and_get_store(client)
+    _create_rule_versions(db_session)
+
+    expired_token = create_access_token(
+        email="expired@example.com",
+        stores=[store_id],
+        expires_delta=timedelta(seconds=-1),
+    )
+
+    payload = {
+        "store_id": store_id,
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU-expired", "qty": 1, "unit_price_cents": 12000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    response = client.post(
+        "/api/v1/fees/quote",
+        json=payload,
+        headers={"Authorization": f"Bearer {expired_token}"},
+    )
+
+    assert response.status_code == 401
 
 
 def test_seed_script_creates_store_and_rules(db_session: Session):

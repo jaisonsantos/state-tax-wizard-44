@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { CreditCard, ExternalLink, CheckCircle, AlertTriangle, Calendar, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const plans = [
   {
@@ -84,36 +85,36 @@ const invoiceHistory = [
 
 export default function Billing() {
   const [entitlements, setEntitlements] = useState<any>(null);
-  const [storeId, setStoreId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { selectedStoreId: storeId } = useAuth();
 
   useEffect(() => {
     const initializeData = async () => {
+      if (!storeId) {
+        setEntitlements(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
-        // Get store ID from user info
-        const userInfo = await apiClient.getMe();
-        if (userInfo.stores && userInfo.stores.length > 0) {
-          const store_id = userInfo.stores[0].id;
-          setStoreId(store_id);
-          
-          // Get entitlements
-          const entitlementsData = await apiClient.getEntitlements(store_id);
-          setEntitlements(entitlementsData);
-        }
+        const entitlementsData = await apiClient.getEntitlements(storeId);
+        setEntitlements(entitlementsData);
       } catch (error) {
         toast({
           title: "Error",
           description: "Failed to load billing information",
           variant: "destructive",
         });
+        setEntitlements(null);
       } finally {
         setLoading(false);
       }
     };
-    
+
     initializeData();
-  }, []);
+  }, [storeId, toast]);
 
   const handleShopifyBilling = (planName: string) => {
     toast({
@@ -147,7 +148,10 @@ export default function Billing() {
     return Math.max(0, diffDays);
   };
 
-  const currentPlan = plans.find(p => p.name === entitlements?.plan) || plans[0];
+  const currentPlan = useMemo(
+    () => plans.find((p) => p.name === entitlements?.plan) || plans[0],
+    [entitlements],
+  );
   const trialDaysLeft = getTrialDaysLeft();
   const isTrialing = entitlements?.status === "trialing";
 
@@ -167,12 +171,27 @@ export default function Billing() {
       <div>
         <h1 className="text-3xl font-bold">Billing & Plans</h1>
         <p className="text-muted-foreground">
-          Manage your subscription and billing preferences
+          {storeId
+            ? "Manage your subscription and billing preferences"
+            : "Select a store to view subscription details"}
         </p>
       </div>
 
+      {!storeId && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              <p className="text-sm text-muted-foreground">
+                Choose a store from the selector above to load billing information.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Trial Status */}
-      {isTrialing && trialDaysLeft > 0 && (
+      {storeId && isTrialing && trialDaysLeft > 0 && (
         <Card className="bg-primary-muted border-primary/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -194,7 +213,8 @@ export default function Billing() {
       )}
 
       {/* Current Subscription */}
-      <Card>
+      {storeId && (
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
@@ -242,7 +262,8 @@ export default function Billing() {
             </div>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Plan Selection */}
       <Card>
@@ -286,11 +307,19 @@ export default function Billing() {
                   ))}
                 </ul>
 
-                <Button 
+                <Button
                   className="w-full"
                   variant={entitlements && plan.name === entitlements.plan ? "outline" : "default"}
                   disabled={entitlements && plan.name === entitlements.plan}
                   onClick={() => {
+                    if (!storeId) {
+                      toast({
+                        title: "Select a store",
+                        description: "Choose a store before updating plan details.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
                     if (entitlements?.provider === "shopify") {
                       handleShopifyBilling(plan.displayName);
                     } else {
@@ -323,7 +352,8 @@ export default function Billing() {
       </Card>
 
       {/* Invoice History */}
-      <Card>
+      {storeId && (
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
@@ -364,7 +394,8 @@ export default function Billing() {
             </TableBody>
           </Table>
         </CardContent>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }

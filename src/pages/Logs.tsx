@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Activity, Search, Filter, Download, RefreshCw } from "lucide-react";
 import { apiClient, downloadBlob } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 type AuditRow = {
   id: string;
@@ -27,18 +28,18 @@ export default function Logs() {
   const [searchOrder, setSearchOrder] = useState("");
   const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [storeId, setStoreId] = useState<string>("");
   const { toast } = useToast();
+  const { selectedStoreId: storeId } = useAuth();
 
   useEffect(() => {
     const initializeData = async () => {
+      if (!storeId) {
+        setAuditLogs([]);
+        return;
+      }
+
       try {
-        const userInfo = await apiClient.getMe();
-        if (userInfo.stores && userInfo.stores.length > 0) {
-          const currentStoreId = userInfo.stores[0].id;
-          setStoreId(currentStoreId);
-          await fetchAuditLogs(currentStoreId);
-        }
+        await fetchAuditLogs(storeId);
       } catch (error) {
         toast({
           title: "Error",
@@ -49,7 +50,7 @@ export default function Logs() {
     };
 
     initializeData();
-  }, []);
+  }, [storeId, toast]);
 
   const fetchAuditLogs = async (store_id: string) => {
     setLoading(true);
@@ -89,6 +90,11 @@ export default function Logs() {
   const handleRefresh = () => {
     if (storeId) {
       fetchAuditLogs(storeId);
+    } else {
+      toast({
+        title: "Select a store",
+        description: "Choose a store to refresh audit logs.",
+      });
     }
   };
 
@@ -163,9 +169,21 @@ export default function Logs() {
       <div>
         <h1 className="text-3xl font-bold">Logs & Audit</h1>
         <p className="text-muted-foreground">
-          Comprehensive audit trail of all delivery fee decisions
+          {storeId
+            ? "Comprehensive audit trail of all delivery fee decisions"
+            : "Select a store to review audit events"}
         </p>
       </div>
+
+      {!storeId && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">
+              Choose a store from the selector above to load audit activity.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

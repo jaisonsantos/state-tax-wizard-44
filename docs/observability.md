@@ -17,7 +17,7 @@ All metrics are defined in `backend/app/observability.py`.
 | Metric | Type | Labels | Description |
 | ------ | ---- | ------ | ----------- |
 | `fees_applied_total` | Counter | `jurisdiction` | Counts the number of successful fee application events per jurisdiction. Incremented for each `order_fee` row created. |
-| `decision_latency_ms` | Histogram | _none_ | Measures time spent calculating fees in the `/v1/fees/apply` route. Buckets are Prometheus defaults for histograms. |
+| `decision_latency_ms` | Histogram | `operation`, `jurisdiction`, `outcome` | Measures time spent calculating quote/apply decisions per jurisdiction and outcome (applied vs skipped). |
 
 Scrape `/metrics` from the API container or <http://localhost:8000/metrics> when
 running locally.
@@ -40,6 +40,8 @@ user behavior.
 | `amount_cents` | `50` | Fee amount stored in cents. |
 | `reason_codes` | `["MN_THRESHOLD_MET"]` | Decision codes associated with the fee line. |
 | `delivery_method` | `"ship"` | Delivery method from the request payload. |
+| `subject` | `"ops@example.com"` | Authenticated user (JWT subject) performing the action. |
+| `absorbed` | `false` | Indicates whether the fee is hidden from the shopper. |
 
 ### Sample payload
 
@@ -52,7 +54,9 @@ user behavior.
   "jurisdiction": "MN",
   "amount_cents": 50,
   "reason_codes": ["MN_THRESHOLD_MET"],
-  "delivery_method": "ship"
+  "delivery_method": "ship",
+  "subject": "ops@example.com",
+  "absorbed": false
 }
 ```
 

@@ -8,10 +8,9 @@ store-level claims, leaving critical security gaps.
 ## Current Status
 - ✅ `POST /api/auth/login` creates/retrieves a user and returns JWT + stores.
 - ✅ `GET /api/me` returns the authenticated user and linked stores.
-- ❌ Other endpoints do not enforce `Authorization` headers or verify store
-  access; they rely on client discipline.
-- ❌ JWT payload does not encode store scopes or expiration details needed for
-  production.
+- ✅ All `/api/v1/**` endpoints require bearer tokens and verify store access
+  against both JWT claims and persisted relationships.
+- ✅ JWT payload encodes `sub`, `exp`, and `stores` scopes with configurable TTL.
 
 ## Acceptance Criteria
 1. **Secure JWTs**: Tokens include `sub`, `exp`, and `stores` claim (array of
@@ -32,6 +31,7 @@ store-level claims, leaving critical security gaps.
 - Tests ensuring unauthorized access is rejected (pytest) and token expiry is
   respected.
 - Updated documentation with diagrams (`docs/diagrams/auth_flow.mermaid`).
+  - Sequence: [Auth Flow](../diagrams/auth_flow.mermaid)
 
 ## Validation
 - Backend pytest suite passes with new authorization tests.

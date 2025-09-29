@@ -97,3 +97,4 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - API reference: visit <http://localhost:8000/docs> for the automatically generated Swagger UI.
 - Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
+- Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute a request de login para preencher automaticamente `token` e `store_id` antes de testar as demais rotas protegidas.

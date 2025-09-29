@@ -18,6 +18,7 @@ fees_applied_total = Counter(
 decision_latency_ms = Histogram(
     "decision_latency_ms",
     "Time spent deciding fees in milliseconds",
+    ["operation", "jurisdiction", "outcome"],
 )
 
 

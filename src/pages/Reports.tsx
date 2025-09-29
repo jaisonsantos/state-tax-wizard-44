@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, Download, Calendar, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, downloadBlob } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const exportHistory = [
   {
@@ -49,25 +50,9 @@ export default function Reports() {
   const [startDate, setStartDate] = useState("2024-07-01");
   const [endDate, setEndDate] = useState("2024-09-30");
   const [reportFormat, setReportFormat] = useState("csv");
-  const [storeId, setStoreId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Get store ID from user info
-    const fetchStoreId = async () => {
-      try {
-        const userInfo = await apiClient.getMe();
-        if (userInfo.stores && userInfo.stores.length > 0) {
-          setStoreId(userInfo.stores[0].id);
-        }
-      } catch (error) {
-        console.error("Failed to fetch store info:", error);
-      }
-    };
-    
-    fetchStoreId();
-  }, []);
+  const { selectedStoreId: storeId } = useAuth();
 
   const handleGenerateReport = async (type: string) => {
     if (!storeId) {
@@ -120,9 +105,21 @@ export default function Reports() {
       <div>
         <h1 className="text-3xl font-bold">Reports</h1>
         <p className="text-muted-foreground">
-          Generate and download compliance reports for tax filing
+          {storeId
+            ? "Generate and download compliance reports for tax filing"
+            : "Select a store to access compliance reports"}
         </p>
       </div>
+
+      {!storeId && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">
+              Choose a store from the selector above to enable report exports.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Colorado DR-1786 Report */}
@@ -187,10 +184,10 @@ export default function Reports() {
               </ul>
             </div>
 
-            <Button 
-              onClick={() => handleGenerateReport("CO DR-1786")} 
+            <Button
+              onClick={() => handleGenerateReport("CO DR-1786")}
               className="w-full"
-              disabled={loading}
+              disabled={loading || !storeId}
             >
               <Download className="h-4 w-4 mr-2" />
               Generate CO DR-1786 Report
@@ -261,11 +258,11 @@ export default function Reports() {
               </ul>
             </div>
 
-            <Button 
-              onClick={() => handleGenerateReport("MN Summary")} 
-              className="w-full" 
+            <Button
+              onClick={() => handleGenerateReport("MN Summary")}
+              className="w-full"
               variant="outline"
-              disabled={loading}
+              disabled={loading || !storeId}
             >
               <Download className="h-4 w-4 mr-2" />
               Generate MN Summary Report
