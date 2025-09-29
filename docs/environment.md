@@ -31,7 +31,8 @@ configuration. The key variables are:
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `DATABASE_URL` | `postgresql+psycopg://user:pass@db:5432/rdf` | SQLAlchemy connection string for the API. |
-| `JWT_SECRET` | `development-secret-key-change-in-production` | Secret used to sign session tokens. Override in non-dev envs. |
+| `JWT_SECRET` | `change-me-in-production` | Secret used to sign session tokens. Override in non-dev envs. |
+| `JWT_EXPIRE_MINUTES` | `1440` | Lifetime (in minutes) for issued JWT access tokens. |
 | `APP_ENV` | `dev` | Used by the backend to toggle development behaviors. |
 | `VITE_API_BASE_URL` | `http://localhost:8000/api` | Frontend base URL for the API. |
 | `SMOKE_API_BASE_URL` | `http://localhost:8000/api` | Optional override for `make smoke` when running outside Docker. |

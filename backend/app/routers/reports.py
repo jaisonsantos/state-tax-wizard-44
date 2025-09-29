@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from ..core.deps import assert_store_access, get_current_user_email
+from ..core.deps import AuthContext, assert_store_access, get_auth_context
 from ..db.database import get_db
 from ..services.report_service import ReportService
 
@@ -18,11 +18,11 @@ async def generate_co_dr1786(
     from_date: str = Query(...),
     to_date: str = Query(...),
     db: Session = Depends(get_db),
-    current_user_email: str = Depends(get_current_user_email),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     """Generate Colorado DR-1786 CSV report"""
 
-    assert_store_access(db, current_user_email, store_id)
+    assert_store_access(db, auth, store_id)
 
     # Parse dates
     from_dt = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
@@ -46,11 +46,11 @@ async def generate_mn_summary(
     to_date: str = Query(...),
     format: str = Query(default="csv"),
     db: Session = Depends(get_db),
-    current_user_email: str = Depends(get_current_user_email),
+    auth: AuthContext = Depends(get_auth_context),
 ):
     """Generate Minnesota Summary report"""
 
-    assert_store_access(db, current_user_email, store_id)
+    assert_store_access(db, auth, store_id)
 
     # Parse dates
     from_dt = datetime.fromisoformat(from_date.replace("Z", "+00:00"))

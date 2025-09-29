@@ -1,0 +1,578 @@
+{
+  "info": {
+    "_postman_id": "d8df6d4f-b89f-4ecf-8dc2-99e6043d55b3",
+    "name": "State Tax Wizard API",
+    "description": "## Como usar\n1. Defina a variável `base_url` para apontar para sua instância do backend (por padrão \"http://localhost:8000\").\n2. Execute a requisição **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como variáveis de coleção.\n3. As demais requisições usam `{{token}}` no cabeçalho `Authorization` e `{{store_id}}` como parâmetro ou campo do corpo quando necessário.\n4. Ajuste payloads e parâmetros conforme seu cenário e utilize os exemplos de resposta como referência para os esquemas retornados pelo FastAPI.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "store_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Monitoring",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/healthz",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 Healthy",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ok\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Prometheus metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "metrics"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 Metrics",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain; version=0.0.4"
+                }
+              ],
+              "body": "# HELP http_requests_total Total HTTP requests\n# TYPE http_requests_total counter\nhttp_requests_total{path='/metrics'} 1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login succeeded', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "}",
+                  "if (json.stores && json.stores.length > 0) {",
+                  "    pm.collectionVariables.set('store_id', json.stores[0].id);",
+                  "}",
+                  "pm.test('Token captured', function () {",
+                  "    pm.expect(pm.collectionVariables.get('token')).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo.user@example.com\",\n  \"password\": \"demo123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "LoginResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"token\": \"eyJhbGciOi...\",\n  \"user\": {\n    \"id\": \"e2d8dbf6-3a68-4a33-8f4a-7fd6b2c5e6a4\",\n    \"email\": \"demo.user@example.com\",\n    \"created_at\": \"2024-01-10T15:04:05.123456\"\n  },\n  \"stores\": [\n    {\n      \"id\": \"{{store_id}}\",\n      \"name\": \"store_demo_1\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "MeResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"e2d8dbf6-3a68-4a33-8f4a-7fd6b2c5e6a4\",\n  \"email\": \"demo.user@example.com\",\n  \"stores\": [\n    {\n      \"id\": \"{{store_id}}\",\n      \"name\": \"store_demo_1\"\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fees",
+      "item": [
+        {
+          "name": "Quote fees",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"destination\": {\n    \"state\": \"MN\",\n    \"zip\": \"55401\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-DELIVERY\",\n      \"qty\": 2,\n      \"unit_price_cents\": 7500,\n      \"taxability\": \"taxable\"\n    },\n    {\n      \"sku\": \"SKU-EXEMPT\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1200,\n      \"taxability\": \"exempt\"\n    }\n  ],\n  \"shipping_amount_cents\": 500\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/quote",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "quote"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "FeeQuoteResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"lines\": [\n    {\n      \"jurisdiction\": \"MN\",\n      \"amount_cents\": 50,\n      \"display_name\": \"Delivery Fee\",\n      \"rule_version\": \"MN-2024\",\n      \"reason_codes\": [\n        \"MN_THRESHOLD_MET\"\n      ]\n    }\n  ],\n  \"decisions\": [\n    {\n      \"jurisdiction\": \"MN\",\n      \"outcome\": \"applied\",\n      \"reason_codes\": [\n        \"MN_THRESHOLD_MET\"\n      ],\n      \"amount_cents\": 50\n    },\n    {\n      \"jurisdiction\": \"CO\",\n      \"outcome\": \"skipped\",\n      \"reason_codes\": [\n        \"CO_DESTINATION_NOT_CO\"\n      ],\n      \"amount_cents\": 0\n    }\n  ],\n  \"decided\": true,\n  \"absorbed\": false\n}"
+            }
+          ]
+        },
+        {
+          "name": "Apply fees",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"ORDER-123\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/apply",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "apply"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "FeeApplyResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"lines\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"amount_cents\": 28,\n      \"display_name\": \"Colorado Delivery Fee\",\n      \"rule_version\": \"CO-2025H1\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\"\n      ]\n    }\n  ],\n  \"decisions\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"outcome\": \"applied\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\"\n      ],\n      \"amount_cents\": 28\n    },\n    {\n      \"jurisdiction\": \"MN\",\n      \"outcome\": \"skipped\",\n      \"reason_codes\": [\n        \"MN_DESTINATION_NOT_MN\"\n      ],\n      \"amount_cents\": 0\n    }\n  ],\n  \"absorbed\": false\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "Entitlements",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/entitlements?store_id={{store_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "entitlements"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Entitlements",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"plan\": \"starter\",\n  \"trial_ends_at\": \"2024-02-01T00:00:00\",\n  \"provider\": \"stripe\",\n  \"status\": \"trialing\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "item": [
+        {
+          "name": "List audit logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/audit?store_id={{store_id}}&page=1&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Audit list",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"id\": \"c4e6fa0a-6329-4c61-ae37-37f87b7fe6a7\",\n      \"timestamp\": \"2024-01-15T18:32:10.000000\",\n      \"actor\": \"demo.user@example.com\",\n      \"action\": \"fee.apply\",\n      \"payload\": {\n        \"store_id\": \"{{store_id}}\",\n        \"order_id\": \"ORDER-123\",\n        \"amount_cents\": 28,\n        \"jurisdiction\": \"CO\",\n        \"reason_codes\": [\n          \"CO_HAS_TAXABLE_ITEM\"\n        ]\n      }\n    }\n  ],\n  \"page\": 1,\n  \"limit\": 10,\n  \"total\": 1\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Colorado DR-1786 CSV",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/reports/co/dr1786?store_id={{store_id}}&from_date=2024-01-01T00:00:00Z&to_date=2024-01-31T23:59:59Z",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "co",
+                "dr1786"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                },
+                {
+                  "key": "from_date",
+                  "value": "2024-01-01T00:00:00Z"
+                },
+                {
+                  "key": "to_date",
+                  "value": "2024-01-31T23:59:59Z"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "CSV demo",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/csv"
+                }
+              ],
+              "body": "Transaction Date,Order ID,Fee Amount,Delivery Method,Reason Codes\n2024-01-15,CO-DEMO-001,$0.28,ship,CO_HAS_TAXABLE_ITEM\n2024-01-16,CO-DEMO-002,$0.28,ship,CO_HAS_TAXABLE_ITEM"
+            }
+          ]
+        },
+        {
+          "name": "Minnesota summary (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/reports/mn/summary?store_id={{store_id}}&from_date=2024-01-01T00:00:00Z&to_date=2024-01-31T23:59:59Z&format=json",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "mn",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                },
+                {
+                  "key": "from_date",
+                  "value": "2024-01-01T00:00:00Z"
+                },
+                {
+                  "key": "to_date",
+                  "value": "2024-01-31T23:59:59Z"
+                },
+                {
+                  "key": "format",
+                  "value": "json"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "JSON summary",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"store_id\": \"{{store_id}}\",\n  \"period\": {\n    \"from\": \"2024-01-01T00:00:00+00:00\",\n    \"to\": \"2024-01-31T23:59:59+00:00\"\n  },\n  \"tx_count_threshold_met\": 2,\n  \"fee_total_cents\": 100,\n  \"absorbed_count\": 0,\n  \"shown_count\": 2\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rules",
+      "item": [
+        {
+          "name": "List rules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/rules?store_id={{store_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rules"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Rules list",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"items\": [\n    {\n      \"jurisdiction\": \"MN\",\n      \"version\": \"MN-2024\",\n      \"effective_from\": \"2024-01-01T00:00:00\",\n      \"effective_to\": null,\n      \"params\": {\n        \"threshold_cents\": 10000,\n        \"fee_cents\": 50,\n        \"applies_to\": [\n          \"delivery\"\n        ],\n        \"exemptions\": [\n          \"pickup\",\n          \"curbside\"\n        ]\n      }\n    },\n    {\n      \"jurisdiction\": \"CO\",\n      \"version\": \"CO-2025H1\",\n      \"effective_from\": \"2024-07-01T00:00:00\",\n      \"effective_to\": null,\n      \"params\": {\n        \"rate_cents\": 28,\n        \"applies_to\": [\n          \"delivery_with_taxable\"\n        ],\n        \"exemptions\": [\n          \"pickup\",\n          \"curbside\"\n        ]\n      }\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -10,13 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Settings2, Play, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Settings() {
   const [enableMN, setEnableMN] = useState(true);
   const [enableCO, setEnableCO] = useState(true);
   const [absorbFee, setAbsorbFee] = useState(false);
   const [labelOverride, setLabelOverride] = useState("Delivery Fee");
-  const [storeId, setStoreId] = useState<string>("");
   const [testing, setTesting] = useState(false);
   const [applyResult, setApplyResult] = useState<{
     totalFeeCents: number;
@@ -34,21 +34,11 @@ export default function Settings() {
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Get store ID from user info
-    const fetchStoreId = async () => {
-      try {
-        const userInfo = await apiClient.getMe();
-        if (userInfo.stores && userInfo.stores.length > 0) {
-          setStoreId(userInfo.stores[0].id);
-        }
-      } catch (error) {
-        console.error("Failed to fetch store info:", error);
-      }
-    };
+  const { selectedStoreId: storeId, stores } = useAuth();
 
-    fetchStoreId();
-  }, []);
+  const storeName = useMemo(() => {
+    return stores.find((store) => store.id === storeId)?.name ?? "";
+  }, [stores, storeId]);
 
   const handleSaveSettings = () => {
     toast({
@@ -105,16 +95,20 @@ export default function Settings() {
 
       if (response.lines && response.lines.length > 0) {
         const totalFee = response.lines.reduce((sum, line) => sum + line.amount_cents, 0);
-        const reasonCodes = response.lines.flatMap(line => line.reason_codes);
+        const reasonCodes = response.lines.flatMap((line) => line.reason_codes);
 
         toast({
           title: "Fee Calculation Result",
-          description: `Fee: $${(totalFee / 100).toFixed(2)} | Reasons: ${reasonCodes.join(', ')}`,
+          description: `Fee: $${(totalFee / 100).toFixed(2)} | Reasons: ${reasonCodes.join(", ")}`,
         });
       } else {
         toast({
           title: "Fee Calculation Result",
-          description: "No delivery fee applied for this order",
+          description:
+            response.decisions
+              .filter((decision) => decision.outcome === "skipped")
+              .map((decision) => `${decision.jurisdiction}: ${decision.reason_codes.join(", ")}`)
+              .join(" | ") || "No delivery fee applied for this order",
         });
       }
     } catch (error) {
@@ -147,15 +141,19 @@ export default function Settings() {
       });
 
       const totalFeeCents = response.lines.reduce((sum, line) => sum + line.amount_cents, 0);
-      const reasonCodes = response.lines.flatMap(line => line.reason_codes);
+      const reasonCodes = response.lines.flatMap((line) => line.reason_codes);
 
       setApplyResult({ totalFeeCents, reasonCodes });
 
       toast({
-        title: "Fee applied",
-        description: totalFeeCents > 0
-          ? `Fee: $${(totalFeeCents / 100).toFixed(2)} | Reasons: ${reasonCodes.join(', ')}`
-          : "No delivery fee applied for this order",
+        title: response.absorbed ? "Fee absorbed" : "Fee applied",
+        description:
+          totalFeeCents > 0
+            ? `Fee: $${(totalFeeCents / 100).toFixed(2)} | Reasons: ${reasonCodes.join(", ")}`
+            : response.decisions
+                .filter((decision) => decision.outcome === "skipped")
+                .map((decision) => `${decision.jurisdiction}: ${decision.reason_codes.join(", ")}`)
+                .join(" | ") || "No delivery fee applied for this order",
       });
     } catch (error) {
       setApplyResult(null);
@@ -174,7 +172,7 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold">Rules & Settings</h1>
         <p className="text-muted-foreground">
-          Configure delivery fee rules for your store
+          Configure delivery fee rules for {storeName || "your store"}
         </p>
       </div>
 

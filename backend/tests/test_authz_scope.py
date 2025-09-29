@@ -1,5 +1,7 @@
 import uuid
 
+import uuid
+
 from fastapi.testclient import TestClient
 
 
@@ -77,3 +79,5 @@ def test_fee_quote_succeeds_for_linked_store(client: TestClient):
     body = response.json()
     assert body["decided"] is True
     assert isinstance(body.get("lines"), list)
+    assert "decisions" in body
+    assert isinstance(body["decisions"], list)

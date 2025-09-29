@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant Browser
+    participant Frontend
+    participant API
+    participant Database
+
+    Browser->>Frontend: Submit credentials
+    Frontend->>API: POST /api/auth/login
+    API->>Database: Lookup or create user & store links
+    Database-->>API: User + stores
+    API-->>Frontend: JWT (sub, exp, stores[])
+    Frontend->>Browser: Persist token & selected store
+    Browser->>Frontend: Trigger protected request
+    Frontend->>API: /api/v1/* with Authorization + store_id
+    API->>API: Decode JWT and verify expiry/claims
+    API->>Database: Ensure subject has store access
+    Database-->>API: Authorized store ids
+    API-->>Frontend: Authorized response + audit event
