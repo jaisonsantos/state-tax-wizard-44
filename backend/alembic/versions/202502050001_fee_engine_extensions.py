@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.Column("source_of_remittance", sa.String(length=20), nullable=True),
     )
 
+    # Replace the strict unique constraint with a partial unique index for applied rows
     op.drop_constraint(
         "uq_order_fee_store_order_jurisdiction",
         "order_fees",
@@ -51,7 +52,7 @@ def upgrade() -> None:
         sa.Column("hmac_secret", sa.Text(), nullable=True),
     )
 
-    # Ensure existing rows adopt the new defaults
+    # Ensure existing rows adopt the new defaults (safety, even with server_default)
     op.execute("UPDATE order_fees SET status='applied' WHERE status IS NULL")
 
 
@@ -65,6 +66,7 @@ def downgrade() -> None:
         "order_fees",
         ["store_id", "order_id", "jurisdiction"],
     )
+
     op.drop_column("store_settings", "hmac_secret")
     op.drop_column("order_fees", "source_of_remittance")
     op.drop_column("order_fees", "reversed_at")

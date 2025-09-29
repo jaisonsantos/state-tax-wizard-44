@@ -66,7 +66,8 @@ def _enforce_hmac(signature: str | None, body: bytes, settings: StoreSetting | N
     provided = signature.strip()
     lowered = provided.lower()
     if lowered.startswith("sha256="):
-        provided = provided.split("=", 1)[1]
+        # aceita tanto "sha256=<hex>" quanto apenas "<hex>"
+        provided = provided.split("=", 1)[1].strip()
         lowered = provided.lower()
 
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()

@@ -19,10 +19,10 @@ settings. The API also returns `absorbed` at the top level and persists
 ## Optional HMAC signatures
 
 `POST /api/v1/fees/apply` supports optional request signing to protect against
-payload tampering. When a store setting includes an `hmac_secret`, clients
-should send an `X-RDF-Signature` header containing a lowercase hexadecimal
-SHA-256 digest of the raw request body using that secret as the key. The API
-accepts the bare digest or an explicit algorithm prefix:
+payload tampering. When a store setting includes an `hmac_secret`, clients **must**
+send an `X-RDF-Signature` header containing a lowercase hexadecimal SHA-256 digest
+of the raw request body using that secret as the key. The API accepts either the
+bare digest or an explicit algorithm prefix:
 
 ```
 X-RDF-Signature: <hex digest>
@@ -30,8 +30,9 @@ X-RDF-Signature: <hex digest>
 X-RDF-Signature: sha256=<hex digest>
 ```
 
-Requests missing the header are accepted when no secret is configured. If the
-header is present but invalid, the API responds with `403 Forbidden`.
+If a secret is configured and the header is **missing**, the API responds with
+`401 Unauthorized`. If the header is present but **invalid**, the API responds
+with `403 Forbidden`.
 
 The quote endpoint does not require HMAC, and the reversal endpoint intentionally
 leaves HMAC optional for MVP to simplify back-office tooling.
@@ -48,3 +49,4 @@ reasons `DELIVERY_CANCELLED` or `RETURN_POST_DELIVERY`.
 
 Each call writes an audit log (`action="fee_reverse"`) and emits structured log
 entries so downstream systems can reconcile refunds.
+
