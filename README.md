@@ -106,7 +106,7 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - `frontend.yml` installs Node dependencies, runs the TypeScript type-check, and builds the production bundle.
 
 ## Additional resources
-- API reference: visit <http://localhost:8000/docs> for the automatically generated Swagger UI.
+- API reference: visit <http://localhost:8000/api/docs> for the automatically generated Swagger UI (the legacy `/docs` path now redirects here).
 - Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
 - Postman collection: follow [`docs/postman/README.md`](docs/postman/README.md) for setup, execution order, and Newman automation tips when importing `docs/postman/state-tax-wizard.postman_collection.json`.

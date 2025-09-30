@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Response
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from .routers import (
@@ -25,7 +26,9 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Retail Delivery Fee Router API",
     description="SaaS for automated MN & CO delivery fee compliance",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
 )
 
 # CORS middleware
@@ -48,6 +51,13 @@ app.add_middleware(
 @app.get("/healthz")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/docs", include_in_schema=False)
+async def redirect_docs() -> RedirectResponse:
+    """Preserve the legacy /docs URL by redirecting to /api/docs."""
+
+    return RedirectResponse(url="/api/docs")
 
 # Include routers
 app.include_router(auth.router, prefix="/api")

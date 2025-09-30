@@ -1,8 +1,32 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const rawBaseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+const normalisedBaseURL = (() => {
+  if (!rawBaseURL) {
+    return '/api';
+  }
 
-export const API_DOCS_URL = API_BASE_URL.endsWith('/api')
-  ? `${API_BASE_URL.slice(0, -4)}/docs`
-  : `${API_BASE_URL}/docs`;
+  if (rawBaseURL === '/') {
+    return '/';
+  }
+
+  const trimmed = rawBaseURL.replace(/\/+$/, '');
+  return trimmed.length > 0 ? trimmed : '/api';
+})();
+
+const appendPath = (base: string, path: string): string => {
+  if (!path.startsWith('/')) {
+    path = `/${path}`;
+  }
+
+  if (!base || base === '/') {
+    return path;
+  }
+
+  return `${base}${path}`;
+};
+
+export const API_BASE_URL = normalisedBaseURL;
+
+export const API_DOCS_URL = appendPath(API_BASE_URL, '/docs');
 
 // Types
 export interface LoginRequest {
