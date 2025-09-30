@@ -7,9 +7,9 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
 ## Current Status
 - ✅ `/api/v1/reports/co/dr1786` returns CSV aggregations.
 - ✅ `/api/v1/reports/mn/summary` returns CSV.
-- ❌ MN JSON format returns an empty string.
-- ❌ No schema definitions or contract tests for CSV/JSON shapes.
-- ⚠️ Frontend report downloads rely on manual testing (no automated checks).
+- ✅ MN JSON format now returns structured output with parity checks captured in [`backend/tests/test_mn_report_json.py`](../../backend/tests/test_mn_report_json.py) and aligned to the documented schema in [`docs/reports/mn_summary.md`](../reports/mn_summary.md).
+- ✅ CSV/JSON contract coverage is enforced via [`backend/tests/test_report_contracts.py`](../../backend/tests/test_report_contracts.py), which exercises the published schema references in [`docs/reports/mn_summary.md`](../reports/mn_summary.md).
+- ⚠️ Frontend report downloads still rely on manual testing (no automated checks), and audit log instrumentation for export events remains outstanding.
 
 ## Acceptance Criteria
 1. **JSON Output**: `/reports/mn/summary?format=json` returns structured JSON
@@ -25,7 +25,8 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
 
 ## Deliverables
 - Backend schema updates in `schemas/reports.py`.
-- Documentation: `docs/reports/mn_summary.md`, `docs/reports/co_dr1786.md`.
+- Documentation: [`docs/reports/mn_summary.md`](../reports/mn_summary.md),
+  [`docs/reports/co_dr1786.md`](../reports/co_dr1786.md).
 - Playwright (or Vitest) test to ensure download button triggers API call.
 
 ## Validation

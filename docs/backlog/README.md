@@ -11,7 +11,7 @@ acceptance criteria so that work can be planned and delivered in iterations.
 | `01_foundation.md` | Cross-cutting foundations: environment, data model, observability |
 | `02_auth_and_tenant.md` | Authentication, authorization, and tenant scoping |
 | `03_fee_engine.md` | Rule engine, quote/apply APIs, and audit logging |
-| `04_reporting.md` | CSV/JSON report generation and validation tooling |
+| `04_reporting.md` | CSV/JSON report generation and validation tooling (see [`docs/reports/co_dr1786.md`](../reports/co_dr1786.md)) |
 | `05_frontend.md` | React front-end experiences (dashboard, settings, reports, etc.) |
 | `06_integrations.md` | Shopify and WooCommerce integrations |
 | `07_billing.md` | Billing and entitlements (Stripe roadmap) |

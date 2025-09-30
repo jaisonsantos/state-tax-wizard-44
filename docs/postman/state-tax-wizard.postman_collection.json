@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d8df6d4f-b89f-4ecf-8dc2-99e6043d55b3",
     "name": "State Tax Wizard API",
-    "description": "## Como usar\n1. Defina a vari\u00e1vel `base_url` para apontar para sua inst\u00e2ncia do backend (por padr\u00e3o \"http://localhost:8000\").\n2. Execute a requisi\u00e7\u00e3o **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como vari\u00e1veis de cole\u00e7\u00e3o.\n3. As demais requisi\u00e7\u00f5es usam `{{token}}` no cabe\u00e7alho `Authorization` e `{{store_id}}` como par\u00e2metro ou campo do corpo quando necess\u00e1rio.\n4. Ajuste payloads e par\u00e2metros conforme seu cen\u00e1rio e utilize os exemplos de resposta como refer\u00eancia para os esquemas retornados pelo FastAPI.",
+    "description": "## Como usar\n1. Defina a variável `base_url` para apontar para sua instância do backend (por padrão \"http://localhost:8000\").\n2. Execute a requisição **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como variáveis de coleção.\n3. As demais requisições usam `{{token}}` no cabeçalho `Authorization` e `{{store_id}}` como parâmetro ou campo do corpo quando necessário.\n4. Ajuste payloads e parâmetros conforme seu cenário e utilize os exemplos de resposta como referência para os esquemas retornados pelo FastAPI.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,6 +18,16 @@
     },
     {
       "key": "store_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "hmac_secret",
+      "value": "demo-shared-secret",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
       "value": "",
       "type": "string"
     }
@@ -346,7 +356,7 @@
           ]
         },
         {
-          "name": "Apply fees",
+          "name": "Apply fees (HMAC)",
           "request": {
             "method": "POST",
             "header": [
@@ -361,7 +371,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"ORDER-123\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0,\n  \"source_of_remittance\": \"merchant\"\n}"
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0,\n  \"source_of_remittance\": \"merchant\"\n}\n"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/fees/apply",
@@ -390,7 +400,178 @@
               ],
               "body": "{\n  \"success\": true,\n  \"lines\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"amount_cents\": 28,\n      \"display_name\": \"Retail Delivery Fee (CO)\",\n      \"rule_version\": \"CO-2025H1\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\",\n        \"CO_MARKETPLACE_SOR\"\n      ],\n      \"absorbed\": false\n    }\n  ],\n  \"decisions\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"outcome\": \"applied\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\"\n      ],\n      \"amount_cents\": 28\n    },\n    {\n      \"jurisdiction\": \"MN\",\n      \"outcome\": \"skipped\",\n      \"reason_codes\": [\n        \"MN_DEST_OUT_OF_STATE\"\n      ],\n      \"amount_cents\": 0\n    }\n  ],\n  \"absorbed\": false\n}"
             }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Fee application succeeded', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Order ID cached for reversals', function () {",
+                  "    pm.expect(pm.collectionVariables.get('order_id')).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
           ]
+        },
+        {
+          "name": "Reverse fees",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('order_id')) {",
+                  "    throw new Error('order_id not set. Run the HMAC apply request first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Fee reversal succeeded', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"reason\": \"customer_cancelled\"\n}\n"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/reverse",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "reverse"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Apply fees (missing HMAC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.headers.remove('x-rdf-signature');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing HMAC rejected with 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0,\n  \"source_of_remittance\": \"merchant\"\n}\n"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/apply",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "apply"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Apply fees (invalid HMAC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.request.headers.upsert({ key: 'x-rdf-signature', value: 'sha256=badsignature' });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid HMAC rejected with 403', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0,\n  \"source_of_remittance\": \"merchant\"\n}\n"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/apply",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "apply"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -666,6 +847,35 @@
           ]
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const token = pm.collectionVariables.get('token');",
+          "if (token) {",
+          "    pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${token}` });",
+          "} else {",
+          "    pm.request.headers.remove('Authorization');",
+          "}",
+          "const secret = pm.collectionVariables.get('hmac_secret');",
+          "const pathSegments = pm.request.url && pm.request.url.path ? pm.request.url.path : [];",
+          "const isApply = Array.isArray(pathSegments) && pathSegments.includes('fees') && pathSegments.includes('apply');",
+          "if (isApply) {",
+          "    const generated = `ORDER-${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+          "    pm.collectionVariables.set('order_id', generated);",
+          "}",
+          "if (isApply && secret) {",
+          "    const rawBody = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+          "    const resolvedBody = pm.variables.replaceIn(rawBody);",
+          "    const signature = CryptoJS.HmacSHA256(resolvedBody, secret).toString();",
+          "    pm.request.headers.upsert({ key: 'x-rdf-signature', value: `sha256=${signature}` });",
+          "}"
+        ]
+      }
     }
   ]
 }

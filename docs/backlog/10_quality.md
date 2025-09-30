@@ -7,10 +7,11 @@ confidence tooling.
 
 ## Current Status
 - ✅ GitHub Actions run backend pytest and frontend build/typecheck.
+- ✅ Report CSV contracts covered via `backend/tests/test_report_contracts.py` and golden fixtures in `backend/tests/fixtures/reports/`.
 - ⚠️ No Playwright/Cypress end-to-end coverage.
-- ⚠️ No contract tests for CSV/JSON reports or plugin payloads.
+- ⚠️ Plugin payload schemas and JSON responses still lack contract validation; UI flows rely on manual QA until e2e tests land.
 - ❌ No QA checklist document beyond the briefed matrices.
-- ❌ No automated dependency vulnerability scanning.
+- ❌ No automated dependency vulnerability scanning or supply-chain monitoring.
 
 ## Acceptance Criteria
 1. **Automated QA Checklist**: Convert the QA matrices into actionable test
