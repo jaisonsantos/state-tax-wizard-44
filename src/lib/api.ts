@@ -1,5 +1,9 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+export const API_DOCS_URL = API_BASE_URL.endsWith('/api')
+  ? `${API_BASE_URL.slice(0, -4)}/docs`
+  : `${API_BASE_URL}/docs`;
+
 // Types
 export interface LoginRequest {
   email: string;
@@ -39,9 +43,20 @@ export interface LoginResponse {
   stores: StoreSummary[];
 }
 
+export interface SessionMetadata {
+  id: string;
+  issued_at: string;
+  expires_at: string;
+  last_activity_at?: string | null;
+  store_scope: string[];
+  ip_address?: string | null;
+  user_agent?: string | null;
+}
+
 export interface MeResponse {
   user: UserSummary;
   stores: StoreSummary[];
+  session?: SessionMetadata | null;
 }
 
 export interface FeeQuoteRequest {
@@ -141,9 +156,52 @@ export interface AuditLogEntry {
 
 export interface AuditLogResponse {
   items: AuditLogEntry[];
-  page: number;
+  page: number | null;
   limit: number;
-  total: number;
+  total: number | null;
+  next_cursor?: string | null;
+}
+
+export type AnalyticsTrend = 'up' | 'down' | 'flat';
+
+export interface AnalyticsMetricCard {
+  id: string;
+  title: string;
+  value: number;
+  formatted_value: string;
+  delta: number;
+  delta_percentage: number;
+  trend: AnalyticsTrend;
+  unit: string;
+  jurisdiction?: string | null;
+  insight?: string | null;
+}
+
+export interface AnalyticsRecentDecision {
+  id: string;
+  occurred_at: string;
+  order_id?: string | null;
+  jurisdiction?: string | null;
+  amount_cents?: number | null;
+  outcome?: string | null;
+  reason_codes: string[];
+}
+
+export interface AnalyticsOverviewResponse {
+  store_id: string;
+  generated_at: string;
+  window_start: string;
+  window_end: string;
+  metric_cards: AnalyticsMetricCard[];
+  recent_decisions: {
+    items: AnalyticsRecentDecision[];
+    next_cursor: string | null;
+  };
+  counters: {
+    fees_applied_total: number;
+    fees_absorbed_total: number;
+    report_exports_total: number;
+  };
 }
 
 export interface DownloadResult {
@@ -328,10 +386,31 @@ class ApiClient {
     page: number = 1,
     limit: number = 50,
     action?: string,
+    cursor?: string,
   ): Promise<AuditLogResponse> {
-    const actionQuery = action ? `&action=${encodeURIComponent(action)}` : '';
-    return this.request<AuditLogResponse>(
-      `/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}${actionQuery}`,
+    const params = new URLSearchParams({ store_id: storeId, limit: String(limit) });
+    if (cursor) {
+      params.set('cursor', cursor);
+    } else {
+      params.set('page', String(page));
+    }
+    if (action) {
+      params.set('action', action);
+    }
+    return this.request<AuditLogResponse>(`/v1/audit?${params.toString()}`);
+  }
+
+  async getAnalyticsOverview(
+    storeId: string,
+    limit: number = 5,
+    cursor?: string,
+  ): Promise<AnalyticsOverviewResponse> {
+    const params = new URLSearchParams({ store_id: storeId, limit: String(limit) });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+    return this.request<AnalyticsOverviewResponse>(
+      `/v1/analytics/overview?${params.toString()}`,
     );
   }
 }

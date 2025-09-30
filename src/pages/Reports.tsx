@@ -49,6 +49,7 @@ export default function Reports() {
     if (!storeId) {
       setHistory([]);
       setHistoryError(null);
+      setNextCursor(null);
       return;
     }
 
@@ -82,10 +83,12 @@ export default function Reports() {
           });
 
         setHistory(rows);
+        setNextCursor(response.next_cursor ?? null);
       } catch (error) {
         if (!active) return;
         setHistory([]);
         setHistoryError(error instanceof Error ? error.message : "Unable to load export history");
+        setNextCursor(null);
       } finally {
         if (active) {
           setHistoryLoading(false);
@@ -115,6 +118,40 @@ export default function Reports() {
       };
     });
   }, [history]);
+
+  const handleLoadMoreHistory = async () => {
+    if (!storeId || !nextCursor) return;
+    setLoadingMore(true);
+    try {
+      const response = await apiClient.getAuditLogs(storeId, 1, 25, "report_export", nextCursor);
+      const rows: ReportHistoryRow[] = response.items
+        .filter((item) => item.action === "report_export")
+        .map((item) => {
+          const payload = item.payload ?? {};
+          const rowCount = typeof payload.row_count === "number" ? payload.row_count : undefined;
+
+          return {
+            id: item.id,
+            report: (payload.report ?? item.action ?? "report_export") as string,
+            format: (payload.format ?? "csv") as string,
+            fromDate: payload.from_date,
+            toDate: payload.to_date,
+            generatedAt: item.timestamp,
+            outcome: (payload.outcome ?? "unknown") as string,
+            rowCount,
+            mimeType: payload.mime_type,
+          };
+        });
+
+      setHistory((current) => [...current, ...rows]);
+      setNextCursor(response.next_cursor ?? null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to load additional exports";
+      setHistoryError(message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleGenerateReport = async (target: ReportKey) => {
     if (!storeId) {
@@ -469,6 +506,22 @@ export default function Reports() {
                   )}
             </TableBody>
           </Table>
+          {nextCursor && storeId && historyRows.length > 0 && (
+            <Button
+              variant="outline"
+              className="mt-4 w-full"
+              onClick={handleLoadMoreHistory}
+              disabled={loadingMore}
+            >
+              {loadingMore ? (
+                <span className="flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading more history
+                </span>
+              ) : (
+                "Load more history"
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

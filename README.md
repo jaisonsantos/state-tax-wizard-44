@@ -113,3 +113,12 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
 - Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token` e `store_id` antes de testar as demais rotas protegidas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
 - Guia de interface: consulte [`docs/ui-guide.md`](docs/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
+
+## Roadmap status
+- **Current stage**: Milestone 3 — Frontend Polish & Analytics is underway. The
+  `/v1/analytics/overview` endpoint, dynamic dashboard cards, session metadata,
+  and analytics automation (Postman, Playwright, `make analytics-smoke`) are live.
+- **Next focus**: Continue iterating on Milestone 3 by layering in trend
+  visualizations and alerting. See
+  [`docs/backlog/milestone_03_frontend_polish.md`](docs/backlog/milestone_03_frontend_polish.md)
+  for the latest status and remaining enhancements.

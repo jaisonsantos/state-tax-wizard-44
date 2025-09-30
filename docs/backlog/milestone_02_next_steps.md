@@ -10,7 +10,7 @@
 - Smoke and Postman suites gained guards for metrics URLs, attachment headers, and 422 scenarios, ensuring CI and manual evidence cover the new telemetry surface.
 
 ## Next Iteration Goal — Milestone 3 Kickoff
-Deliver the first slice of **Milestone 3 — Frontend Polish & Analytics** by wiring dashboard telemetry, extending report history usability, and tightening automation to cover the richer UI states.
+Deliver the first slice of **Milestone 3 — Frontend Polish & Analytics** by wiring dashboard telemetry, extending report history usability, and tightening automation to cover the richer UI states. The detailed kickoff plan lives in [`milestone_03_frontend_polish.md`](./milestone_03_frontend_polish.md).
 
 ## Planned Changes
 ### Frontend

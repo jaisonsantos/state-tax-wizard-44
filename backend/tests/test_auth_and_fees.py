@@ -60,6 +60,9 @@ def test_me_returns_user_profile(client: TestClient):
     assert data["user"]["email"] == "profile@example.com"
     assert isinstance(data["stores"], list)
     assert len(data["stores"]) >= 1
+    assert "session" in data
+    if data["session"]:
+        assert data["session"]["store_scope"]
 
 
 def _create_rule_versions(db_session: Session):

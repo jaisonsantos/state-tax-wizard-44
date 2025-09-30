@@ -204,6 +204,24 @@ def fetch_metrics(client: httpx.Client) -> str:
     return text
 
 
+def fetch_analytics(
+    client: httpx.Client, headers: Dict[str, str], store_id: str
+) -> Dict[str, Any]:
+    response = client.get(
+        f"{API_BASE_URL}/v1/analytics/overview",
+        params={"store_id": store_id, "limit": 5},
+        headers=headers,
+        timeout=20.0,
+    )
+    _raise_for_status(response, "analytics overview")
+    data = response.json()
+    if not data.get("metric_cards"):
+        raise SmokeFailure("analytics overview returned no metric cards")
+    if "recent_decisions" not in data:
+        raise SmokeFailure("analytics overview missing recent_decisions feed")
+    return data
+
+
 def run_full_smoke() -> Dict[str, Any]:
     with httpx.Client() as client:
         login_payload = login(client)
@@ -247,6 +265,7 @@ def run_full_smoke() -> Dict[str, Any]:
         apply_co = apply_fees(client, headers, store_id, "smoke-order-co", "CO")
         audit_result = fetch_audit(client, headers, store_id)
         report_audit = fetch_reports(client, headers, store_id, verify_audit=True)
+        analytics_snapshot = fetch_analytics(client, headers, store_id)
         metrics_text = fetch_metrics(client)
 
     print("Smoke test completed successfully.")
@@ -255,6 +274,10 @@ def run_full_smoke() -> Dict[str, Any]:
     print(f"CO apply lines: {len(apply_co['lines'])}")
     print(f"Audit events fetched: {len(audit_result['items'])}")
     print(f"Report export audits: {len(report_audit.get('items', []))}")
+    print(
+        "Analytics cards: "
+        f"{', '.join(card['id'] for card in analytics_snapshot.get('metric_cards', [])[:3])}"
+    )
     print(f"Metrics sample: {metrics_text.splitlines()[0]}")
 
     return {
@@ -263,6 +286,7 @@ def run_full_smoke() -> Dict[str, Any]:
         "co_apply": apply_co,
         "audit": audit_result,
         "report_audit": report_audit,
+        "analytics": analytics_snapshot,
         "metrics": metrics_text,
     }
 
@@ -281,6 +305,24 @@ def run_reports_only_smoke() -> Dict[str, Any]:
     return {"report_audit": audit_snapshot}
 
 
+def run_analytics_only_smoke() -> Dict[str, Any]:
+    with httpx.Client() as client:
+        login_payload = login(client)
+        store_id = login_payload["stores"][0]["id"]
+        headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        overview = fetch_analytics(client, headers, store_id)
+
+    print("Analytics overview smoke completed successfully.")
+    print(f"Metric cards returned: {len(overview.get('metric_cards', []))}")
+    print(
+        "Recent decisions fetched: "
+        f"{len(overview.get('recent_decisions', {}).get('items', []))}"
+    )
+
+    return {"analytics": overview}
+
+
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
     parser = argparse.ArgumentParser(description="State Tax Wizard smoke tests")
     parser.add_argument(
@@ -288,10 +330,19 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
         action="store_true",
         help="Only execute report export validations",
     )
+    parser.add_argument(
+        "--analytics-only",
+        action="store_true",
+        help="Only execute analytics overview validation",
+    )
     parsed_args = parser.parse_args()
 
     try:
-        if parsed_args.reports_only:
+        if parsed_args.analytics_only and parsed_args.reports_only:
+            raise SmokeFailure("Choose either --reports-only or --analytics-only")
+        if parsed_args.analytics_only:
+            run_analytics_only_smoke()
+        elif parsed_args.reports_only:
             run_reports_only_smoke()
         else:
             run_full_smoke()
