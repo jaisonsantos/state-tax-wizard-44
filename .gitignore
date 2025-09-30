@@ -22,5 +22,32 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env
 .env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
 **/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+build/
+pip-wheel-metadata/
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Test / Tools
+.pytest_cache/
+.mypy_cache/
+.cache/
+.coverage
+coverage.xml
+htmlcov/
