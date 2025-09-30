@@ -29,7 +29,7 @@ async def get_audit_logs(
     if dialect_name == "sqlite":
         store_filter = func.json_extract(AuditLog.payload, "$.store_id") == str(store_id)
     elif dialect_name == "postgresql":
-        store_filter = AuditLog.payload["store_id"].astext == str(store_id)
+        store_filter = func.json_extract_path_text(AuditLog.payload, "store_id") == str(store_id)
     else:
         store_filter = cast(AuditLog.payload["store_id"], Text) == str(store_id)
 
