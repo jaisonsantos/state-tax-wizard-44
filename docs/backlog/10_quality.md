@@ -28,6 +28,7 @@ confidence tooling.
 - New tests under `backend/tests/` and `src/tests/` (or `tests/e2e/`).
 - CI workflow updates adding e2e job and security scanning.
 - Documentation for QA processes.
+- Postman/Newman execution guidance captured in [`docs/postman/README.md`](../postman/README.md) and referenced from release evidence.
 
 ## Validation
 - CI must pass with new jobs enabled.
