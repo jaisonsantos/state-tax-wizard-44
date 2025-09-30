@@ -146,6 +146,11 @@ export interface AuditLogResponse {
   total: number;
 }
 
+export interface DownloadResult {
+  blob: Blob;
+  filename: string | null;
+}
+
 // API Client class
 class ApiClient {
   private baseURL: string;
@@ -210,13 +215,31 @@ class ApiClient {
     });
 
     this.authToken = response.token;
-    localStorage.setItem('auth_token', response.token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', response.token);
+    }
 
     return response;
   }
 
   async getMe(): Promise<MeResponse> {
     return this.request<MeResponse>('/me');
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await this.request<void>('/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      // Swallow network/auth errors so UI can still clear local state.
+      console.error('Failed to revoke session', error);
+    } finally {
+      this.authToken = null;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
+    }
   }
 
   // Store settings methods
@@ -232,11 +255,6 @@ class ApiClient {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
-  }
-
-  logout() {
-    this.authToken = null;
-    localStorage.removeItem('auth_token');
   }
 
   // Fee methods
@@ -265,9 +283,10 @@ class ApiClient {
   }
 
   // Reports methods
-  async downloadCOReport(storeId: string, fromDate: string, toDate: string): Promise<Blob> {
+  async downloadCOReport(storeId: string, fromDate: string, toDate: string): Promise<DownloadResult> {
     const url = `${this.baseURL}/v1/reports/co/dr1786?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}`;
     const headers = this.buildHeaders();
+    headers.set('Accept', 'text/csv');
 
     const response = await fetch(url, { headers });
     if (!response.ok) {
@@ -275,12 +294,21 @@ class ApiClient {
       throw new Error(`Failed to download report: ${response.status} - ${errorText}`);
     }
 
-    return response.blob();
+    const blob = await response.blob();
+    const filename = extractFilename(response.headers.get('Content-Disposition'));
+
+    return { blob, filename };
   }
 
-  async downloadMNReport(storeId: string, fromDate: string, toDate: string, format: string = 'csv'): Promise<Blob> {
+  async downloadMNReport(
+    storeId: string,
+    fromDate: string,
+    toDate: string,
+    format: string = 'csv',
+  ): Promise<DownloadResult> {
     const url = `${this.baseURL}/v1/reports/mn/summary?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}&format=${format}`;
     const headers = this.buildHeaders();
+    headers.set('Accept', format === 'json' ? 'application/json' : 'text/csv');
 
     const response = await fetch(url, { headers });
     if (!response.ok) {
@@ -288,12 +316,23 @@ class ApiClient {
       throw new Error(`Failed to download report: ${response.status} - ${errorText}`);
     }
 
-    return response.blob();
+    const blob = await response.blob();
+    const filename = extractFilename(response.headers.get('Content-Disposition'));
+
+    return { blob, filename };
   }
 
   // Audit methods
-  async getAuditLogs(storeId: string, page: number = 1, limit: number = 50): Promise<AuditLogResponse> {
-    return this.request<AuditLogResponse>(`/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}`);
+  async getAuditLogs(
+    storeId: string,
+    page: number = 1,
+    limit: number = 50,
+    action?: string,
+  ): Promise<AuditLogResponse> {
+    const actionQuery = action ? `&action=${encodeURIComponent(action)}` : '';
+    return this.request<AuditLogResponse>(
+      `/v1/audit?store_id=${storeId}&page=${page}&limit=${limit}${actionQuery}`,
+    );
   }
 }
 
@@ -301,11 +340,29 @@ class ApiClient {
 export const apiClient = new ApiClient(API_BASE_URL);
 
 // Helper function to download blob as file
-export const downloadBlob = (blob: Blob, filename: string) => {
+const extractFilename = (contentDisposition: string | null): string | null => {
+  if (!contentDisposition) {
+    return null;
+  }
+
+  const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (filenameStarMatch && filenameStarMatch[1]) {
+    return decodeURIComponent(filenameStarMatch[1]);
+  }
+
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  if (filenameMatch && filenameMatch[1]) {
+    return filenameMatch[1];
+  }
+
+  return null;
+};
+
+export const downloadBlob = (blob: Blob, filename?: string) => {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = filename && filename.trim().length > 0 ? filename : 'download';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

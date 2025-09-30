@@ -6,7 +6,7 @@ State Tax Wizard is a full-stack demo application that showcases a configurable 
 - **FastAPI backend** with JWT authentication, seeded demo data, and idempotent fee application.
 - **Fee rules for Minnesota and Colorado** that persist `OrderFee` records and structured `AuditLog` entries.
 - **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request and store context.
-- **React frontend** with a fee playground, audit log viewer, and CSV export powered by a shared API client.
+- **React frontend** with a fee playground, audit log viewer, CSV export powered by a shared API client, and a persistent header menu for store switching and logout.
 - **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
 
 ## Project structure
@@ -87,6 +87,18 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```sh
   npm run build
   ```
+- Report export smoke (requires Docker services running):
+  ```sh
+  make reports-smoke
+  ```
+  Set `SMOKE_METRICS_URL` when the Prometheus endpoint is exposed on a separate
+  host; otherwise the smoke test derives `/metrics` from `SMOKE_API_BASE_URL`.
+- Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
+  ```sh
+  ENABLE_REPORT_DOWNLOAD_TEST=1 npm run test:e2e
+  ```
+
+The Playwright script is disabled by default so CI pipelines can opt in once headless downloads are stable. When the environment variable is not set the command exits early after printing a skip message.
 
 ## Continuous integration
 GitHub Actions workflows are provided under `.github/workflows/`:
@@ -99,4 +111,5 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
 - Postman collection: follow [`docs/postman/README.md`](docs/postman/README.md) for setup, execution order, and Newman automation tips when importing `docs/postman/state-tax-wizard.postman_collection.json`.
 - Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
-- Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute a request de login para preencher automaticamente `token` e `store_id` antes de testar as demais rotas protegidas.
+- Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token` e `store_id` antes de testar as demais rotas protegidas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
+- Guia de interface: consulte [`docs/ui-guide.md`](docs/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.

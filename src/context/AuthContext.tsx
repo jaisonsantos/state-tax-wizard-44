@@ -17,6 +17,7 @@ interface AuthContextValue {
   loading: boolean;
   refresh: () => Promise<void>;
   selectStore: (storeId: string) => void;
+  logout: () => Promise<void>;
 }
 
 const STORAGE_KEY = "selected_store_id";
@@ -97,13 +98,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  const logout = useCallback(async () => {
+    setLoading(true);
+    try {
+      await apiClient.logout();
+    } finally {
+      setUser(null);
+      setStores([]);
+      setSelectedStoreId(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, stores, selectedStoreId, loading, refresh, selectStore }),
-    [user, stores, selectedStoreId, loading, refresh, selectStore],
+    () => ({ user, stores, selectedStoreId, loading, refresh, selectStore, logout }),
+    [user, stores, selectedStoreId, loading, refresh, selectStore, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

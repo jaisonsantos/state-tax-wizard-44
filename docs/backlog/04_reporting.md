@@ -9,7 +9,9 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
 - ✅ `/api/v1/reports/mn/summary` returns CSV.
 - ✅ MN JSON format now returns structured output with parity checks captured in [`backend/tests/test_mn_report_json.py`](../../backend/tests/test_mn_report_json.py) and aligned to the documented schema in [`docs/reports/mn_summary.md`](../reports/mn_summary.md).
 - ✅ CSV/JSON contract coverage is enforced via [`backend/tests/test_report_contracts.py`](../../backend/tests/test_report_contracts.py), which exercises the published schema references in [`docs/reports/mn_summary.md`](../reports/mn_summary.md).
-- ⚠️ Frontend report downloads still rely on manual testing (no automated checks), and audit log instrumentation for export events remains outstanding.
+- ✅ Frontend downloads now wire the export history table to live `/v1/audit` data, drop unsupported XLSX options, and surface inline loading/error states alongside toast notifications. A Playwright smoke test triggers CSV and JSON downloads when enabled.
+- ✅ Audit trail coverage: every export persists a `report_export` audit row, emits a structured log via `observability.log_report_event`, and increments the `report_exports_total{jurisdiction,format}` counter. Invalid formats return a `422` with validation-style details.
+- ✅ Invalid-format attempts now emit failure telemetry/audit rows, and JSON downloads ship with `Content-Disposition` filenames so browsers store them consistently.
 
 ## Acceptance Criteria
 1. **JSON Output**: `/reports/mn/summary?format=json` returns structured JSON

@@ -32,10 +32,14 @@ A backlog item is “done” only if all points below are satisfied:
   release notes). Inline code comments explain non-obvious logic.
 - **Observability**: Metrics/logs updated, alert thresholds reviewed when
   applicable. New metrics added to `docs/observability.md`.
-- **Validation**: `make smoke` (or epic-specific script) runs clean against a
+- **Validation**: `make smoke` (or epic-specific script such as `make reports-smoke`)
+  runs clean against a
   fresh seed database and captures test evidence in the PR description.
 - **Security & Compliance**: Secrets handled via env vars, authz enforced,
   PII redacted from logs, rate limits or HMAC in place where required.
+- **Session Management**: Login/logout flows persist sessions server-side,
+  revoke tokens when sign-out occurs, and automated coverage proves the
+  dependency rejects revoked tokens.
 - **Backlog Sync**: Epic document updated with current status ✅/⚠️/❌, release
   plan milestone annotated if scope moved.
 - **Rollout**: Feature toggles, migration steps, and rollback plans documented

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Sequence
+import uuid
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -16,12 +17,14 @@ class TokenPayload(BaseModel):
     sub: str
     exp: int
     stores: list[str] = []
+    jti: str
 
 
 def create_access_token(
     email: str,
     stores: Optional[Sequence[str]] = None,
     expires_delta: Optional[timedelta] = None,
+    jti: Optional[str] = None,
 ) -> str:
     """Encode an access token with the configured expiry window."""
 
@@ -32,6 +35,7 @@ def create_access_token(
         "sub": email,
         "stores": list(stores) if stores is not None else [],
         "exp": expire_at,
+        "jti": jti or str(uuid.uuid4()),
     }
 
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)

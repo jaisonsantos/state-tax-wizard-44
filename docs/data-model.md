@@ -16,17 +16,26 @@ schema.
 | `subscriptions` | Billing/subscription metadata for stores. | `id` (`UUID`) | `provider`, `plan`, `status`, `trial_end`, `current_period_end` | Many-to-one with `stores`. |
 | `users` | Authenticated operators of the SaaS product. | `id` (`UUID`) | `email`, `created_at` | Many-to-many with `stores` via `user_stores`. |
 | `user_stores` | Join table linking users to stores they can manage. | Composite (`user_id`, `store_id`) | `created_at` | Foreign keys to `users.id` and `stores.id`; uniqueness enforced by PK. |
+| `session_tokens` | Persisted JWT session metadata for logout and auditing. | `id` (`UUID`) | `jti`, `issued_at`, `expires_at`, `revoked_at`, `revoked_reason`, `user_agent`, `ip_address` | Many-to-one with `users`; indexed by `user_id` and unique `jti` for fast revocation lookups. |
 
 ## Relationships
 
 - **Stores ↔ Users**: Each user can access multiple stores and vice versa via
   `user_stores`. The login flow automatically ensures a demo store link exists.
+- **Users ↔ Sessions**: Every login creates a `session_tokens` row with a unique
+  JWT identifier (`jti`). Calling `/api/auth/logout` sets `revoked_at`, allowing
+  the API dependency to reject tokens that have been explicitly signed out or
+  have expired.
 - **Stores ↔ Settings/Subscriptions**: `store_settings` and `subscriptions`
   capture configuration and plan metadata for each store. They cascade on store
   creation.
 - **Stores ↔ Order Fees/Audit Logs**: Orders applied through the API generate
   `order_fees` rows (enforced to one per jurisdiction) and corresponding
   `audit_logs` events with payload context.
+- **Audit log filtering**: PostgreSQL environments create an index on
+  `((payload->>'store_id'), action, ts DESC)` so `/v1/audit` pagination stays
+  efficient as history grows. SQLite test databases fall back to a simpler
+  `(action, ts)` index.
 - **Rule versions**: Queried during quote/apply to determine fee amounts. The
   `params` JSON stores jurisdiction-specific thresholds, rate cents, and
   exemptions to avoid schema churn.
@@ -39,6 +48,8 @@ Running `make seed` guarantees:
   settings and subscription rows.
 - Current rule versions for Minnesota (`MN-2024`) and Colorado (`CO-2025H1`).
 - Sample subscriptions to exercise billing reports.
+- Representative MN and CO order fees so CSV/JSON exports and audit trails have
+  non-empty datasets out of the box.
 
 These records enable the smoke test and manual QA scenarios without additional
 setup.

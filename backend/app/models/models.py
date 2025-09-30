@@ -147,6 +147,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     stores = relationship("Store", secondary="user_stores", back_populates="users")
+    sessions = relationship("SessionToken", back_populates="user")
 
 
 class UserStore(Base):
@@ -155,3 +156,21 @@ class UserStore(Base):
     user_id = Column(GUID(), ForeignKey("users.id"), primary_key=True)
     store_id = Column(GUID(), ForeignKey("stores.id"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SessionToken(Base):
+    __tablename__ = "session_tokens"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    jti = Column(String(36), nullable=False, unique=True)
+    issued_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_reason = Column(String(100), nullable=True)
+    user_agent = Column(String(255), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+
+    user = relationship("User", back_populates="sessions")
+
+    __table_args__ = (Index("uq_session_tokens_jti", "jti", unique=True),)
