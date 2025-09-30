@@ -12,11 +12,11 @@ closing.
 
 ## Milestone 1 — Secure Core APIs (Weeks 1–2)
 - Deliver Epic 02 (auth/tenant enforcement).
-- ✅ Store settings integration (Epic 03) live via `/v1/stores/{id}/settings`; reason code expansion remains.
+- ✅ Store settings integration (Epic 03) live via `/v1/stores/{id}/settings`, and MN/CO reason codes expanded in July 2024 rollout.
 - Update frontend (Epic 05) for store selector to leverage new auth claims.
 
 ## Milestone 2 — Reporting Confidence (Weeks 3–4)
-- Finish Epic 03 remaining scope (rule updater, metrics).
+- ✅ Finish Epic 03 remaining scope (rule updater, metrics, docs) — delivered via `scripts/update_rules.py`, latency histogram labels, and updated MN/CO tables.
 - Complete Epic 04 (JSON output, contract tests, documentation).
 - Update QA checklist (Epic 10 partial) to cover reporting cases.
 

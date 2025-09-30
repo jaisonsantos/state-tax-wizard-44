@@ -201,6 +201,7 @@ def test_reason_codes_for_threshold_and_taxability(
     mn_decision = next(d for d in mn_body["decisions"] if d["jurisdiction"] == "MN")
     assert mn_decision["outcome"] == "skipped"
     assert "MN_UNDER_THRESHOLD" in mn_decision["reason_codes"]
+    assert "MN_TAXABLE_SUBTOTAL_UNDER_THRESHOLD" in mn_decision["reason_codes"]
 
     co_payload = {
         "store_id": store_id,
@@ -218,6 +219,50 @@ def test_reason_codes_for_threshold_and_taxability(
     assert co_body["lines"] == []
     co_decision = next(d for d in co_body["decisions"] if d["jurisdiction"] == "CO")
     assert co_decision["outcome"] == "skipped"
+    assert "CO_NO_TAXABLE_ITEMS" in co_decision["reason_codes"]
+    assert "CO_ITEMS_EXEMPT" in co_decision["reason_codes"]
+
+
+def test_reason_codes_for_exempt_edge_cases(
+    client: TestClient, db_session: Session
+) -> None:
+    token, store_id = _login(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
+    _create_rule_versions(db_session)
+
+    clothing_payload = {
+        "store_id": store_id,
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "CLOTH-1", "qty": 1, "unit_price_cents": 2000, "taxability": "clothing"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+    mn_quote = client.post("/api/v1/fees/quote", json=clothing_payload, headers=auth_header)
+    assert mn_quote.status_code == 200
+    mn_decision = next(
+        d for d in mn_quote.json()["decisions"] if d["jurisdiction"] == "MN"
+    )
+    assert mn_decision["outcome"] == "skipped"
+    assert "MN_CLOTHING_ONLY" in mn_decision["reason_codes"]
+    assert "MN_NO_TAXABLE_ITEMS" in mn_decision["reason_codes"]
+
+    co_shipping_only = {
+        "store_id": store_id,
+        "destination": {"state": "CO"},
+        "delivery_method": "ship",
+        "items": [],
+        "shipping_amount_cents": 500,
+    }
+
+    co_quote = client.post("/api/v1/fees/quote", json=co_shipping_only, headers=auth_header)
+    assert co_quote.status_code == 200
+    co_decision = next(
+        d for d in co_quote.json()["decisions"] if d["jurisdiction"] == "CO"
+    )
+    assert co_decision["outcome"] == "skipped"
+    assert "CO_SHIPPING_ONLY" in co_decision["reason_codes"]
     assert "CO_NO_TAXABLE_ITEMS" in co_decision["reason_codes"]
 
 
