@@ -21,6 +21,7 @@ All metrics are defined in `backend/app/observability.py`.
 | `decision_latency_ms` | Histogram | `route`, `jurisdiction`, `outcome` | Measures time spent calculating quote/apply decisions per API route (`quote` or `apply`), jurisdiction, and outcome (applied vs skipped). |
 | `report_exports_total` | Counter | `jurisdiction`, `format` | Counts report exports emitted by `ReportService` so dashboards can trend CSV vs JSON demand per jurisdiction. |
 | `auth_events_total` | Counter | `event` | Tracks authentication lifecycle activity (`login`, `logout`) to confirm session churn and spot unexpected spikes. |
+| `analytics_dashboard_loaded_total` | Counter | `store_id` | Increments when `/v1/analytics/overview` responds successfully so ops teams can monitor dashboard traffic by store. |
 
 Scrape `/metrics` from the API container or <http://localhost:8000/metrics> when
 running locally.
@@ -32,7 +33,7 @@ entries and audit rows so compliance teams can trace every attempt.
 ## Structured application logs
 
 Structured logs are emitted via `observability.log_fee_event`,
-`observability.log_report_event`, and `observability.log_auth_event` as JSON
+`observability.log_report_event`, `observability.log_analytics_event`, and `observability.log_auth_event` as JSON
 messages to dedicated loggers. Each invocation includes contextual fields useful
 for tracing user behavior. Fee
 application and reversal flows publish events through the `fee` logger so
@@ -112,6 +113,18 @@ jurisdictions and formats operators are downloading.
 | `session_id` | `"5f3f5d3c-3d81-4a20-8a6c-5f7b2b2c871e"` | Identifier of the `session_tokens` row tied to the token. |
 | `jti` | `"a3c45846-31d0-47a8-bc47-542d68c30cb8"` | Present on login events to mirror the JWT claim. |
 
+### Analytics dashboard schema
+
+| Field | Example | Notes |
+| ----- | ------- | ----- |
+| `event` | `"analytics_dashboard_loaded"` | Identifies the log as an analytics dashboard response. |
+| `store_id` | `"1cc66e24-4e93-4c9e-bebd-8ff9690e33cd"` | UUID associated with the analytics snapshot. |
+| `metric_cards` | `5` | Number of KPI cards returned in the payload. |
+| `feed_length` | `6` | Count of recent fee decisions included in the feed. |
+| `next_cursor` | `null` | Cursor token when more audit rows are available. |
+| `duration_ms` | `42.8` | Response time in milliseconds for generating the overview. |
+| `request_id` | `"8df6bf0a-d3f4-4ba5-b2cf-e2f02f3af0a0"` | Request correlation identifier used across the stack. |
+
 Logs stream to STDOUT from the API container and can be tailed with
 `make logs-api`. Use a log aggregation tool (e.g., CloudWatch, Loki) in hosted
 environments to ingest these JSON lines. Filter on the `report` logger or the
@@ -122,5 +135,6 @@ environments to ingest these JSON lines. Filter on the `report` logger or the
 In addition to streaming logs, each quote/apply operation persists an
 `audit_logs` row containing the full request context. Access the audit history
 through `GET /api/v1/audit?store_id=<uuid>` or directly from the `audit_logs`
-table for compliance reviews. The smoke test ensures at least one audit event is
-present after setup.
+table for compliance reviews. The smoke tests now cover `/v1/analytics/overview`
+via `make analytics-smoke` so counter snapshots are validated alongside the
+reporting flows.

@@ -138,6 +138,7 @@ def test_audit_endpoint_filters_report_exports(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["total"] >= 2
+    assert "next_cursor" in data
     assert all(item["action"] == "report_export" for item in data["items"])
     assert {item["payload"]["format"] for item in data["items"]} >= {"csv", "json"}
 
@@ -194,3 +195,4 @@ def test_audit_endpoint_excludes_other_store_logs(
     assert data["total"] == 1
     assert len(data["items"]) == 1
     assert data["items"][0]["payload"]["store_id"] == store_id
+    assert data["next_cursor"] is None

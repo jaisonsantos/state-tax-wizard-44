@@ -8,13 +8,20 @@ import {
   type ReactNode,
 } from "react";
 
-import { apiClient, type MeResponse, type StoreSummary, type UserSummary } from "@/lib/api";
+import {
+  apiClient,
+  type MeResponse,
+  type SessionMetadata,
+  type StoreSummary,
+  type UserSummary,
+} from "@/lib/api";
 
 interface AuthContextValue {
   user: UserSummary | null;
   stores: StoreSummary[];
   selectedStoreId: string | null;
   loading: boolean;
+  session: SessionMetadata | null;
   refresh: () => Promise<void>;
   selectStore: (storeId: string) => void;
   logout: () => Promise<void>;
@@ -36,6 +43,7 @@ async function fetchMe(): Promise<MeResponse | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserSummary | null>(null);
   const [stores, setStores] = useState<StoreSummary[]>([]);
+  const [session, setSession] = useState<SessionMetadata | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(() => {
     if (typeof window === "undefined") {
       return null;
@@ -55,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!apiClient.hasToken()) {
       setUser(null);
       setStores([]);
+      setSession(null);
       setSelectedStoreId(null);
       if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEY);
@@ -77,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(profile.user);
     setStores(profile.stores);
+    setSession(profile.session ?? null);
 
     if (profile.stores.length === 0) {
       setSelectedStoreId(null);
@@ -105,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setStores([]);
+      setSession(null);
       setSelectedStoreId(null);
       if (typeof window !== "undefined") {
         localStorage.removeItem(STORAGE_KEY);
@@ -118,8 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, stores, selectedStoreId, loading, refresh, selectStore, logout }),
-    [user, stores, selectedStoreId, loading, refresh, selectStore, logout],
+    () => ({ user, stores, selectedStoreId, loading, session, refresh, selectStore, logout }),
+    [user, stores, selectedStoreId, loading, session, refresh, selectStore, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

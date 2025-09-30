@@ -10,9 +10,17 @@ and polished for GA.
   Logs, Billing, Help.
 - ✅ Settings page can trigger quote/apply demos using seeded store.
 - ✅ Settings toggles and labels persist via `/v1/stores/{id}/settings` API.
-- ⚠️ Dashboard metrics are static placeholders.
-- ✅ Global store selector persists across sessions via AuthContext/localStorage.
-- ❌ Reports and Logs lack loading/error states and success notifications.
+- ✅ Dashboard metrics hydrate from `/v1/analytics/overview` using React Query in
+  [`src/pages/Dashboard.tsx`](../../src/pages/Dashboard.tsx). KPI cards, trends,
+  and Prometheus snapshots now reflect real data.
+- ✅ Global store selector persists across sessions via AuthContext/localStorage
+  and wires the dropdown + logout flow in [`src/components/layout/AppLayout.tsx`](../../src/components/layout/AppLayout.tsx).
+- ✅ Reports and Logs surfaces now hydrate from live `/v1/audit` data with
+  loading skeletons, empty-state copy, toast notifications, and export
+  re-run actions (see [`src/pages/Reports.tsx`](../../src/pages/Reports.tsx) and
+  [`src/pages/Logs.tsx`](../../src/pages/Logs.tsx)).
+- ✅ Account menu surfaces session metadata (active session ID, issued/expiry,
+  last activity, store scope) returned by the enriched `GET /api/me` endpoint.
 
 ## Acceptance Criteria
 1. **Store Context**: Implement global store selector (header or modal) that

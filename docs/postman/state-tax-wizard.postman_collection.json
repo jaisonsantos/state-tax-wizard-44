@@ -1001,6 +1001,71 @@
       ]
     },
     {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/overview?store_id={{store_id}}&limit=5",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "analytics",
+                "overview"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test('analytics overview includes metric cards', function () {",
+                  "  pm.expect(body.metric_cards).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "pm.test('analytics overview includes recent decisions', function () {",
+                  "  pm.expect(body.recent_decisions).to.be.an('object');",
+                  "  pm.expect(body.recent_decisions.items).to.be.an('array');",
+                  "});",
+                  "if (body.recent_decisions && body.recent_decisions.next_cursor) {",
+                  "  pm.collectionVariables.set('analytics_next_cursor', body.recent_decisions.next_cursor);",
+                  "}",
+                  "const evidenceDir = pm.collectionVariables.get('evidence_dir');",
+                  "if (evidenceDir) {",
+                  "  console.log(`evidence_path=${evidenceDir}/analytics-overview.json`);",
+                  "}",
+                  "pm.collectionVariables.set('analytics_overview_snapshot', JSON.stringify(body));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Rules",
       "item": [
         {

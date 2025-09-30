@@ -32,6 +32,9 @@ A backlog item is “done” only if all points below are satisfied:
   release notes). Inline code comments explain non-obvious logic.
 - **Observability**: Metrics/logs updated, alert thresholds reviewed when
   applicable. New metrics added to `docs/observability.md`.
+- **Analytics Evidence**: Dashboard or analytics stories must attach `/v1/analytics/overview`
+  payload samples (Postman/Newman output) so KPI calculations and cursors can be
+  audited alongside UI changes.
 - **Validation**: `make smoke` (or epic-specific script such as `make reports-smoke`)
   runs clean against a
   fresh seed database and captures test evidence in the PR description.

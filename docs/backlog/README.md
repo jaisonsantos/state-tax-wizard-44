@@ -21,6 +21,7 @@ acceptance criteria so that work can be planned and delivered in iterations.
 | `iteration_checklist.md` | Incremental delivery guidelines & Definition of Done |
 | `release_plan.md` | Suggested milestone sequencing and dependencies |
 | `milestone_02_next_steps.md` | Milestone 2 closure summary plus the entry plan for Milestone 3 (Frontend polish & analytics) |
+| `milestone_03_frontend_polish.md` | Milestone 3 kickoff plan covering analytics endpoints, dashboard polish, and supporting checklists |
 
 Each epic file contains:
 

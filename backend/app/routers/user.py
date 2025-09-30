@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from ..core.deps import get_current_user_email
 from ..db.database import get_db
-from ..models.models import User
-from ..schema.auth import MeResponse, StoreSummary, UserSummary
+from ..models.models import AuditLog, SessionToken, User
+from ..schema.auth import MeResponse, SessionMetadata, StoreSummary, UserSummary
 
 router = APIRouter(tags=["user"])
 
@@ -36,4 +36,30 @@ async def get_me(
         created_at=user.created_at or datetime.utcnow(),
     )
 
-    return MeResponse(user=user_summary, stores=store_infos)
+    session: SessionMetadata | None = None
+    active_session = (
+        db.query(SessionToken)
+        .filter(SessionToken.user_id == user.id, SessionToken.revoked_at.is_(None))
+        .order_by(SessionToken.issued_at.desc())
+        .first()
+    )
+
+    if active_session:
+        last_activity = (
+            db.query(AuditLog)
+            .filter(AuditLog.actor == f"user:{user.email}")
+            .order_by(AuditLog.ts.desc())
+            .first()
+        )
+
+        session = SessionMetadata(
+            id=str(active_session.id),
+            issued_at=active_session.issued_at,
+            expires_at=active_session.expires_at,
+            last_activity_at=last_activity.ts if last_activity else None,
+            store_scope=[store.name for store in user.stores],
+            ip_address=active_session.ip_address,
+            user_agent=active_session.user_agent,
+        )
+
+    return MeResponse(user=user_summary, stores=store_infos, session=session)

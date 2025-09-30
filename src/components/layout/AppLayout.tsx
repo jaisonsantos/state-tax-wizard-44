@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
+import { formatDistanceToNow } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -25,7 +26,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut } from "lucide-react";
 
 export function AppLayout() {
-  const { stores, selectedStoreId, selectStore, loading, user, logout } = useAuth();
+  const { stores, selectedStoreId, selectStore, loading, user, logout, session } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
   const navigate = useNavigate();
 
@@ -41,6 +42,10 @@ export function AppLayout() {
   };
 
   const initials = user?.email ? user.email[0]?.toUpperCase() : "?";
+
+  const lastActivityLabel = session?.last_activity_at
+    ? formatDistanceToNow(new Date(session.last_activity_at), { addSuffix: true })
+    : "Not recorded";
 
   return (
     <SidebarProvider>
@@ -86,12 +91,26 @@ export function AppLayout() {
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    {user?.email ?? "No active session"}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      {user?.email ?? "No active session"}
+                    </DropdownMenuLabel>
+                    {session && (
+                      <>
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                          Session {session.id.slice(0, 8)}…
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem disabled className="flex-col items-start whitespace-normal">
+                          <span className="text-xs">Issued: {new Date(session.issued_at).toLocaleString()}</span>
+                          <span className="text-xs">Expires: {new Date(session.expires_at).toLocaleString()}</span>
+                          <span className="text-xs">Last activity: {lastActivityLabel}</span>
+                          <span className="text-xs">Stores: {session.store_scope.join(", ")}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
                     onSelect={(event) => {
                       event.preventDefault();
                       void handleLogout();

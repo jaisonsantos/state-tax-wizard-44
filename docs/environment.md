@@ -98,6 +98,19 @@ Validates the end-to-end experience using seeded data.
 5. On failure, inspect the non-zero exit message in the terminal and review API
    container logs (`make logs-api`).
 
+## Runbook: make analytics-smoke
+
+Validates the analytics overview endpoint and Prometheus counter snapshots.
+
+1. Ensure the stack is running (`make up`) and seeded (`make migrate && make seed`).
+2. Execute `make analytics-smoke`.
+3. The target will:
+   - Log in with the smoke credentials and call `/v1/analytics/overview`.
+   - Assert KPI cards are returned with at least one metric.
+   - Validate the recent decisions feed supplies cursor metadata.
+   - Confirm Prometheus counters are included in the response payload.
+4. Inspect the console output for the counter snapshot and activity feed length.
+
 ## CI usage
 
 GitHub Actions workflows under `.github/workflows` provide parity with these

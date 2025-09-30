@@ -32,6 +32,12 @@ auth_events_total = Counter(
     ["event"],
 )
 
+analytics_dashboard_loaded_total = Counter(
+    "analytics_dashboard_loaded_total",
+    "Number of analytics dashboard responses served",
+    ["store_id"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",
@@ -72,6 +78,13 @@ def log_auth_event(event: Dict[str, Any]) -> None:
     """Emit a structured authentication lifecycle event log."""
 
     logger = logging.getLogger("auth")
+    logger.info(json.dumps(event, default=str))
+
+
+def log_analytics_event(event: Dict[str, Any]) -> None:
+    """Emit a structured analytics dashboard log."""
+
+    logger = logging.getLogger("analytics")
     logger.info(json.dumps(event, default=str))
 
 

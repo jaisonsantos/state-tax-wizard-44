@@ -58,4 +58,8 @@ smoke: up migrate seed
 
 # Focused smoke for report exports
 reports-smoke: up migrate seed
-	$(COMPOSE) exec api python smoke_test.py --reports-only
+        $(COMPOSE) exec api python smoke_test.py --reports-only
+
+# Focused smoke for analytics overview
+analytics-smoke: up migrate seed
+        $(COMPOSE) exec api python smoke_test.py --analytics-only
