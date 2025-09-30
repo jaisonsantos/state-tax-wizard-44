@@ -26,7 +26,8 @@ A backlog item is “done” only if all points below are satisfied:
 - **Code**: Feature implemented end-to-end, feature flags defaulted to the
   production path. Dead code and TODOs resolved or tracked.
 - **Tests**: Automated coverage (unit/integration/e2e as appropriate) added and
-  passing in CI. Include regression tests for bugs fixed.
+  passing in CI. Include regression tests for bugs fixed and capture Postman/Newman
+  evidence per [`docs/postman/README.md`](../postman/README.md).
 - **Documentation**: Relevant sections updated (`docs/`, API reference, README,
   release notes). Inline code comments explain non-obvious logic.
 - **Observability**: Metrics/logs updated, alert thresholds reviewed when
