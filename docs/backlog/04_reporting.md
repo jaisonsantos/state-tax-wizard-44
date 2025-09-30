@@ -25,7 +25,8 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
 
 ## Deliverables
 - Backend schema updates in `schemas/reports.py`.
-- Documentation: `docs/reports/mn_summary.md`, `docs/reports/co_dr1786.md`.
+- Documentation: [`docs/reports/mn_summary.md`](../reports/mn_summary.md),
+  [`docs/reports/co_dr1786.md`](../reports/co_dr1786.md).
 - Playwright (or Vitest) test to ensure download button triggers API call.
 
 ## Validation
