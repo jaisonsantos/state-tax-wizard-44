@@ -41,12 +41,23 @@ class AuditLogRepository:
         self.db = db
 
     def store_filter(self, store_id: str):
+        """Return a SQLAlchemy filter ensuring audit logs match the given store."""
+
         dialect_name = self.db.bind.dialect.name if self.db.bind else ""
+        target = str(store_id)
+
         if dialect_name == "sqlite":
-            return func.json_extract(AuditLog.payload, "$.store_id") == str(store_id)
+            # SQLite stores JSON as TEXT; json_extract safely pulls the key.
+            return func.json_extract(AuditLog.payload, "$.store_id") == target
+
         if dialect_name == "postgresql":
-            return AuditLog.payload["store_id"].astext == str(store_id)
-        return AuditLog.payload["store_id"].astext == str(store_id)
+            # SQLAlchemy 2.0 removed the `.astext` accessor. Use the `->>`
+            # operator to cast JSONB to text so the comparison works.
+            return AuditLog.payload.op("->>")("store_id") == target
+
+        # Fallback for other dialects uses the generic `->>` operator which most
+        # SQLAlchemy JSON dialects understand.
+        return AuditLog.payload.op("->>")("store_id") == target
 
     def fetch(
         self,

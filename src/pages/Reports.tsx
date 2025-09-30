@@ -42,6 +42,8 @@ export default function Reports() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { toast } = useToast();
   const { selectedStoreId: storeId } = useAuth();
 
