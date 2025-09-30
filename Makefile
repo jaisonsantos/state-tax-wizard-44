@@ -1,58 +1,61 @@
-.PHONY: dev up down build clean logs migrate seed smoke
+.PHONY: dev up down build clean logs logs-api migrate seed dev-tools shell-api shell-db smoke reports-smoke
 
-# Development - run all services
+# Choose docker compose flavor (v2 default)
+COMPOSE := docker compose
+
+# Development - run all services (foreground)
 dev:
-	docker-compose up --build
+	$(COMPOSE) up --build
 
-# Start services
+# Start services (detached)
 up:
-	docker-compose up -d
+	$(COMPOSE) up -d
 
 # Stop services
 down:
-	docker-compose down
+	$(COMPOSE) down
 
 # Build services
 build:
-	docker-compose build
+	$(COMPOSE) build
 
 # Clean up everything
 clean:
-	docker-compose down -v
+	$(COMPOSE) down -v
 	docker system prune -f
 
 # View logs
 logs:
-	docker-compose logs -f
+	$(COMPOSE) logs -f
 
 # View API logs only
 logs-api:
-	docker-compose logs -f api
+	$(COMPOSE) logs -f api
 
 # Run database migrations
 migrate:
-	docker-compose exec api python -m alembic upgrade head
+	$(COMPOSE) exec api python -m alembic upgrade head
 
 # Seed database
 seed:
-	docker-compose exec api python seed_data.py
+	$(COMPOSE) exec api python seed_data.py
 
-# Run with PGAdmin
+# Run with PGAdmin (profile tools)
 dev-tools:
-	docker-compose --profile tools up --build
+	$(COMPOSE) --profile tools up --build
 
 # Backend shell
 shell-api:
-	docker-compose exec api bash
+	$(COMPOSE) exec api bash
 
 # Database shell
 shell-db:
-	docker compose exec db psql -U user -d rdf
+	$(COMPOSE) exec db psql -U user -d rdf
 
 # End-to-end smoke test across login, fees, audit, and reports
 smoke: up migrate seed
-        docker-compose exec api python smoke_test.py
+	$(COMPOSE) exec api python smoke_test.py
 
 # Focused smoke for report exports
 reports-smoke: up migrate seed
-        docker-compose exec api python smoke_test.py --reports-only
+	$(COMPOSE) exec api python smoke_test.py --reports-only
