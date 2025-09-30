@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..models.models import User
+from ..db.database import get_db
+from ..models.models import SessionToken, User
 from .security import TokenPayload, verify_token
 
 
@@ -15,13 +17,18 @@ class AuthContext:
     subject: str
     store_ids: set[str]
     token: str
+    user_id: str
+    session_id: str
 
     @property
     def email(self) -> str:
         return self.subject
 
 
-def get_auth_context(authorization: Optional[str] = Header(None)) -> AuthContext:
+def get_auth_context(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> AuthContext:
     """Parse the Authorization header and validate the bearer token."""
 
     if not authorization or not authorization.startswith("Bearer "):
@@ -38,13 +45,59 @@ def get_auth_context(authorization: Optional[str] = Header(None)) -> AuthContext
             detail="Invalid or expired token",
         )
 
-    return AuthContext(subject=payload.sub, store_ids=set(payload.stores), token=token)
+    session = (
+        db.query(SessionToken)
+        .join(User)
+        .filter(SessionToken.jti == payload.jti)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session not found",
+        )
+
+    if session.user.email != payload.sub:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session subject mismatch",
+        )
+
+    if session.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session revoked",
+        )
+
+    now = datetime.now(timezone.utc)
+    expires_at = session.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at <= now:
+        session.revoked_at = session.revoked_at or now
+        session.revoked_reason = session.revoked_reason or "expired"
+        db.add(session)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired",
+        )
+
+    return AuthContext(
+        subject=payload.sub,
+        store_ids=set(payload.stores),
+        token=token,
+        user_id=str(session.user_id),
+        session_id=str(session.id),
+    )
 
 
-def get_current_user_email(authorization: Optional[str] = Header(None)) -> str:
+def get_current_user_email(auth: AuthContext = Depends(get_auth_context)) -> str:
     """Backward-compatible helper to retrieve the authenticated email."""
 
-    return get_auth_context(authorization).email
+    return auth.email
 
 
 def assert_store_access(db: Session, auth: AuthContext, store_id: str) -> None:
@@ -56,7 +109,7 @@ def assert_store_access(db: Session, auth: AuthContext, store_id: str) -> None:
             detail="Store access forbidden",
         )
 
-    user = db.query(User).filter(User.email == auth.email).first()
+    user = db.query(User).filter(User.id == auth.user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

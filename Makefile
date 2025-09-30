@@ -51,4 +51,8 @@ shell-db:
 
 # End-to-end smoke test across login, fees, audit, and reports
 smoke: up migrate seed
-	docker-compose exec api python smoke_test.py
+        docker-compose exec api python smoke_test.py
+
+# Focused smoke for report exports
+reports-smoke: up migrate seed
+        docker-compose exec api python smoke_test.py --reports-only

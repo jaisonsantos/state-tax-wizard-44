@@ -1,4 +1,5 @@
-import { Outlet } from "react-router-dom";
+import { useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,9 +12,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogOut } from "lucide-react";
 
 export function AppLayout() {
-  const { stores, selectedStoreId, selectStore, loading } = useAuth();
+  const { stores, selectedStoreId, selectStore, loading, user, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const initials = user?.email ? user.email[0]?.toUpperCase() : "?";
 
   return (
     <SidebarProvider>
@@ -31,7 +58,7 @@ export function AppLayout() {
               <Select
                 value={selectedStoreId ?? (stores.length > 0 ? stores[0].id : "")}
                 onValueChange={selectStore}
-                disabled={loading || stores.length === 0}
+                disabled={loading || loggingOut || stores.length === 0}
               >
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder={loading ? "Loading stores..." : "Select a store"} />
@@ -44,6 +71,38 @@ export function AppLayout() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 px-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="hidden sm:flex flex-col items-start">
+                      <span className="text-sm font-medium leading-none">
+                        {user?.email ?? "Signed out"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">Account</span>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    {user?.email ?? "No active session"}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      void handleLogout();
+                    }}
+                    disabled={loggingOut}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 

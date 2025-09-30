@@ -9,10 +9,12 @@ from app.models.models import (
     AuditLog,
     OrderFee,
     RuleVersion,
+    SessionToken,
     Store,
     StoreSetting,
     User,
 )
+from app.observability import auth_events_total
 from seed_data import seed_database
 
 
@@ -29,6 +31,15 @@ def test_login_creates_user_and_seed_store(client: TestClient, db_session: Sessi
 
     user = db_session.query(User).filter(User.email == "new-user@example.com").first()
     assert user is not None
+
+    sessions = (
+        db_session.query(SessionToken)
+        .join(User)
+        .filter(User.email == "new-user@example.com")
+        .all()
+    )
+    assert len(sessions) == 1
+    assert sessions[0].revoked_at is None
 
     seed_store = db_session.query(Store).filter(Store.name == "store_demo_1").first()
     assert seed_store is not None
@@ -79,6 +90,48 @@ def _login_and_get_store(client: TestClient):
         json={"email": f"store-user-{uuid.uuid4()}@example.com", "password": "secret"},
     ).json()
     return login["token"], login["stores"][0]["id"]
+
+
+def test_logout_revokes_session_and_metrics(client: TestClient, db_session: Session) -> None:
+    login_metric = auth_events_total.labels(event="login")
+    logout_metric = auth_events_total.labels(event="logout")
+    login_before = login_metric._value.get()
+    logout_before = logout_metric._value.get()
+
+    payload = client.post(
+        "/api/auth/login",
+        json={"email": "logout@example.com", "password": "secret"},
+    ).json()
+
+    token = payload["token"]
+    email = payload["user"]["email"]
+
+    session = (
+        db_session.query(SessionToken)
+        .join(User)
+        .filter(User.email == email)
+        .one()
+    )
+    assert session.revoked_at is None
+
+    logout_response = client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert logout_response.status_code == 204
+
+    db_session.refresh(session)
+    assert session.revoked_at is not None
+    assert session.revoked_reason == "user_logout"
+
+    unauthorized = client.get(
+        "/api/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert unauthorized.status_code == 401
+
+    assert login_metric._value.get() == login_before + 1
+    assert logout_metric._value.get() == logout_before + 1
 
 
 def test_fee_apply_idempotent(client: TestClient, db_session: Session):

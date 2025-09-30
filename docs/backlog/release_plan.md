@@ -14,10 +14,11 @@ closing.
 - Deliver Epic 02 (auth/tenant enforcement).
 - ✅ Store settings integration (Epic 03) live via `/v1/stores/{id}/settings`, and MN/CO reason codes expanded in July 2024 rollout.
 - Update frontend (Epic 05) for store selector to leverage new auth claims.
+- ✅ Session management hardened: JWTs now persist to `session_tokens`, `/api/auth/logout` revokes active sessions, and the frontend exposes an account menu for explicit sign-out.
 
 ## Milestone 2 — Reporting Confidence (Weeks 3–4)
 - ✅ Finish Epic 03 remaining scope (rule updater, metrics, docs) — delivered via `scripts/update_rules.py`, latency histogram labels, and updated MN/CO tables.
-- Complete Epic 04 (JSON output, contract tests, documentation).
+- ✅ Epic 04 telemetry and UX polished: report exports now emit audit logs/metrics, the reports page surfaces live history without unsupported formats, and Playwright/download smokes are wired behind an opt-in flag.
 - Update QA checklist (Epic 10 partial) to cover reporting cases.
 
 ## Milestone 3 — Frontend Polish & Analytics (Weeks 5–6)

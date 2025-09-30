@@ -71,7 +71,7 @@ def test_co_dr1786_csv_matches_golden(db_session: Session) -> None:
     )
 
     expected = (FIXTURES / "co_dr1786.csv").read_text()
-    assert output.replace("\r\n", "\n").strip() == expected.replace("\r\n", "\n").strip()
+    assert output.content.replace("\r\n", "\n").strip() == expected.replace("\r\n", "\n").strip()
 
 
 def test_mn_csv_matches_golden(db_session: Session) -> None:
@@ -132,4 +132,4 @@ def test_mn_csv_matches_golden(db_session: Session) -> None:
     )
 
     expected = (FIXTURES / "mn_summary.csv").read_text()
-    assert output.replace("\r\n", "\n").strip() == expected.replace("\r\n", "\n").strip()
+    assert output.content.replace("\r\n", "\n").strip() == expected.replace("\r\n", "\n").strip()

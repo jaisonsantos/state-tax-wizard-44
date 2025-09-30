@@ -20,6 +20,7 @@ acceptance criteria so that work can be planned and delivered in iterations.
 | `10_quality.md` | QA matrices, automated testing, CI/CD enhancements |
 | `iteration_checklist.md` | Incremental delivery guidelines & Definition of Done |
 | `release_plan.md` | Suggested milestone sequencing and dependencies |
+| `milestone_02_next_steps.md` | Milestone 2 closure summary plus the entry plan for Milestone 3 (Frontend polish & analytics) |
 
 Each epic file contains:
 

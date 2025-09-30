@@ -1,7 +1,7 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, cast, Text
+from sqlalchemy import Text, cast, func
 from sqlalchemy.orm import Session
 
 from ..core.deps import AuthContext, assert_store_access, get_auth_context
@@ -18,22 +18,29 @@ async def get_audit_logs(
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
     auth: AuthContext = Depends(get_auth_context),
+    action: Optional[str] = Query(default=None),
 ):
     """Get paginated audit logs for a store"""
     assert_store_access(db, auth, store_id)
 
     offset = (page - 1) * limit
 
-    total = (
-        db.query(func.count(AuditLog.id))
-        .filter(cast(AuditLog.payload["store_id"], Text) == str(store_id))
-        .scalar()
-    ) or 0
+    dialect_name = db.bind.dialect.name if db.bind else ""
+    if dialect_name == "sqlite":
+        store_filter = func.json_extract(AuditLog.payload, "$.store_id") == str(store_id)
+    elif dialect_name == "postgresql":
+        store_filter = AuditLog.payload["store_id"].astext == str(store_id)
+    else:
+        store_filter = cast(AuditLog.payload["store_id"], Text) == str(store_id)
+
+    base_query = db.query(AuditLog).filter(store_filter)
+    if action:
+        base_query = base_query.filter(AuditLog.action == action)
+
+    total = int(base_query.order_by(None).count())
 
     logs = (
-        db.query(AuditLog)
-        .filter(cast(AuditLog.payload["store_id"], Text) == store_id)
-        .order_by(AuditLog.ts.desc())
+        base_query.order_by(AuditLog.ts.desc())
         .offset(offset)
         .limit(limit)
         .all()

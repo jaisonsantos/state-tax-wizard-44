@@ -2,6 +2,7 @@
 """End-to-end smoke test against a running API instance."""
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from datetime import datetime, timedelta
@@ -11,6 +12,7 @@ import httpx
 
 
 API_BASE_URL = os.environ.get("SMOKE_API_BASE_URL", "http://localhost:8000/api")
+SMOKE_METRICS_URL = os.environ.get("SMOKE_METRICS_URL")
 SMOKE_EMAIL = os.environ.get("SMOKE_EMAIL", "smoke-tester@example.com")
 SMOKE_PASSWORD = os.environ.get("SMOKE_PASSWORD", "change-me")
 
@@ -113,10 +115,21 @@ def apply_fees(
     return data
 
 
-def fetch_audit(client: httpx.Client, headers: Dict[str, str], store_id: str) -> Dict[str, Any]:
+def fetch_audit(
+    client: httpx.Client,
+    headers: Dict[str, str],
+    store_id: str,
+    *,
+    action: str | None = None,
+    limit: int = 5,
+) -> Dict[str, Any]:
+    params = {"store_id": store_id, "limit": limit}
+    if action:
+        params["action"] = action
+
     response = client.get(
         f"{API_BASE_URL}/v1/audit",
-        params={"store_id": store_id, "limit": 5},
+        params=params,
         headers=headers,
         timeout=20.0,
     )
@@ -124,10 +137,14 @@ def fetch_audit(client: httpx.Client, headers: Dict[str, str], store_id: str) ->
     data = response.json()
     if not data.get("items"):
         raise SmokeFailure("audit endpoint returned no items")
+    if action and not any(item.get("action") == action for item in data.get("items", [])):
+        raise SmokeFailure(f"audit endpoint returned no '{action}' entries")
     return data
 
 
-def fetch_reports(client: httpx.Client, headers: Dict[str, str], store_id: str) -> None:
+def fetch_reports(
+    client: httpx.Client, headers: Dict[str, str], store_id: str, *, verify_audit: bool = False
+) -> Dict[str, Any]:
     now = datetime.utcnow()
     from_date = _iso(now - timedelta(days=1))
     to_date = _iso(now + timedelta(days=1))
@@ -156,9 +173,30 @@ def fetch_reports(client: httpx.Client, headers: Dict[str, str], store_id: str) 
     if "Transaction Date" not in response.text:
         raise SmokeFailure("co report missing CSV header")
 
+    audit_snapshot: Dict[str, Any] | None = None
+    if verify_audit:
+        audit_snapshot = fetch_audit(
+            client,
+            headers,
+            store_id,
+            action="report_export",
+            limit=10,
+        )
+
+    return audit_snapshot or {}
+
+def _metrics_url() -> str:
+    if SMOKE_METRICS_URL:
+        return SMOKE_METRICS_URL
+
+    base = API_BASE_URL.rstrip("/")
+    if base.endswith("/api"):
+        return f"{base[:-4]}/metrics"
+    return f"{base}/metrics"
+
 
 def fetch_metrics(client: httpx.Client) -> str:
-    response = client.get(f"{API_BASE_URL}/../metrics", timeout=20.0)
+    response = client.get(_metrics_url(), timeout=20.0)
     _raise_for_status(response, "metrics")
     text = response.text
     if "decision_latency_ms" not in text:
@@ -166,7 +204,7 @@ def fetch_metrics(client: httpx.Client) -> str:
     return text
 
 
-def main() -> None:
+def run_full_smoke() -> Dict[str, Any]:
     with httpx.Client() as client:
         login_payload = login(client)
         store_id = login_payload["stores"][0]["id"]
@@ -208,7 +246,7 @@ def main() -> None:
         apply_mn = apply_fees(client, headers, store_id, "smoke-order-mn", "MN")
         apply_co = apply_fees(client, headers, store_id, "smoke-order-co", "CO")
         audit_result = fetch_audit(client, headers, store_id)
-        fetch_reports(client, headers, store_id)
+        report_audit = fetch_reports(client, headers, store_id, verify_audit=True)
         metrics_text = fetch_metrics(client)
 
     print("Smoke test completed successfully.")
@@ -216,12 +254,47 @@ def main() -> None:
     print(f"MN apply lines: {len(apply_mn['lines'])}")
     print(f"CO apply lines: {len(apply_co['lines'])}")
     print(f"Audit events fetched: {len(audit_result['items'])}")
+    print(f"Report export audits: {len(report_audit.get('items', []))}")
     print(f"Metrics sample: {metrics_text.splitlines()[0]}")
+
+    return {
+        "mn_quote": mn_quote,
+        "mn_apply": apply_mn,
+        "co_apply": apply_co,
+        "audit": audit_result,
+        "report_audit": report_audit,
+        "metrics": metrics_text,
+    }
+
+
+def run_reports_only_smoke() -> Dict[str, Any]:
+    with httpx.Client() as client:
+        login_payload = login(client)
+        store_id = login_payload["stores"][0]["id"]
+        headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        audit_snapshot = fetch_reports(client, headers, store_id, verify_audit=True)
+
+    print("Report export smoke completed successfully.")
+    print(f"Report export audits: {len(audit_snapshot.get('items', []))}")
+
+    return {"report_audit": audit_snapshot}
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
+    parser = argparse.ArgumentParser(description="State Tax Wizard smoke tests")
+    parser.add_argument(
+        "--reports-only",
+        action="store_true",
+        help="Only execute report export validations",
+    )
+    parsed_args = parser.parse_args()
+
     try:
-        main()
+        if parsed_args.reports_only:
+            run_reports_only_smoke()
+        else:
+            run_full_smoke()
     except SmokeFailure as exc:
         print(f"SMOKE FAILURE: {exc}", file=sys.stderr)
         sys.exit(1)

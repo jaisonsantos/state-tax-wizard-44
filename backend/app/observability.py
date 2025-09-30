@@ -20,6 +20,18 @@ fees_absorbed_total = Counter(
     ["jurisdiction"],
 )
 
+report_exports_total = Counter(
+    "report_exports_total",
+    "Total number of report exports generated",
+    ["jurisdiction", "format"],
+)
+
+auth_events_total = Counter(
+    "auth_events_total",
+    "Total number of authentication lifecycle events",
+    ["event"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",
@@ -46,6 +58,20 @@ def log_fee_event(event: Dict[str, Any]) -> None:
     """Emit a structured fee event log."""
 
     logger = logging.getLogger("fee")
+    logger.info(json.dumps(event, default=str))
+
+
+def log_report_event(event: Dict[str, Any]) -> None:
+    """Emit a structured report export event log."""
+
+    logger = logging.getLogger("report")
+    logger.info(json.dumps(event, default=str))
+
+
+def log_auth_event(event: Dict[str, Any]) -> None:
+    """Emit a structured authentication lifecycle event log."""
+
+    logger = logging.getLogger("auth")
     logger.info(json.dumps(event, default=str))
 
 

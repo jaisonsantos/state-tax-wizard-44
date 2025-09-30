@@ -11,6 +11,9 @@ store-level claims, leaving critical security gaps.
 - ✅ All `/api/v1/**` endpoints require bearer tokens and verify store access
   against both JWT claims and persisted relationships.
 - ✅ JWT payload encodes `sub`, `exp`, and `stores` scopes with configurable TTL.
+- ✅ Session tokens are persisted in `session_tokens`, `/api/auth/logout` revokes
+  active sessions, and the frontend header exposes a logout affordance tied to
+  the new endpoint.
 
 ## Acceptance Criteria
 1. **Secure JWTs**: Tokens include `sub`, `exp`, and `stores` claim (array of
@@ -28,6 +31,7 @@ store-level claims, leaving critical security gaps.
 ## Deliverables
 - Updated `core/security.py` and router dependencies enforcing authorization.
 - Frontend state management for selected store (context or Zustand store).
+- Session token persistence with explicit logout endpoint and metrics/logs.
 - Tests ensuring unauthorized access is rejected (pytest) and token expiry is
   respected.
 - Updated documentation with diagrams (`docs/diagrams/auth_flow.mermaid`).

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,55 +6,117 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Download, Calendar, Filter } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileText, Download, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient, downloadBlob } from "@/lib/api";
+import { apiClient, downloadBlob, type DownloadResult } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
-const exportHistory = [
-  {
-    id: 1,
-    type: "CO DR-1786",
-    period: "Q3 2024",
-    generatedAt: "2024-10-01 09:30",
-    status: "completed",
-    fileSize: "45 KB"
-  },
-  {
-    id: 2,
-    type: "MN Summary",
-    period: "Sep 2024",
-    generatedAt: "2024-10-01 09:15", 
-    status: "completed",
-    fileSize: "12 KB"
-  },
-  {
-    id: 3,
-    type: "CO DR-1786",
-    period: "Q2 2024",
-    generatedAt: "2024-07-01 14:22",
-    status: "completed",
-    fileSize: "38 KB"
-  },
-  {
-    id: 4,
-    type: "MN Summary",
-    period: "Jun 2024",
-    generatedAt: "2024-07-01 14:20",
-    status: "completed",
-    fileSize: "8 KB"
-  }
-];
+type ReportKey = "co_dr1786" | "mn_summary";
+
+const REPORT_LABELS: Record<ReportKey, string> = {
+  co_dr1786: "CO DR-1786",
+  mn_summary: "MN Summary",
+};
+
+interface ReportHistoryRow {
+  id: string;
+  report: string;
+  format: string;
+  fromDate?: string;
+  toDate?: string;
+  generatedAt?: string | null;
+  outcome: string;
+  rowCount?: number;
+  mimeType?: string;
+}
 
 export default function Reports() {
   const [startDate, setStartDate] = useState("2024-07-01");
   const [endDate, setEndDate] = useState("2024-09-30");
-  const [reportFormat, setReportFormat] = useState("csv");
-  const [loading, setLoading] = useState(false);
+  const [mnFormat, setMnFormat] = useState<"csv" | "json">("csv");
+  const [generatingReport, setGeneratingReport] = useState<ReportKey | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [history, setHistory] = useState<ReportHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
   const { selectedStoreId: storeId } = useAuth();
 
-  const handleGenerateReport = async (type: string) => {
+  useEffect(() => {
+    if (!storeId) {
+      setHistory([]);
+      setHistoryError(null);
+      return;
+    }
+
+    let active = true;
+
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      setHistoryError(null);
+
+      try {
+        const response = await apiClient.getAuditLogs(storeId, 1, 25, "report_export");
+        if (!active) return;
+
+        const rows: ReportHistoryRow[] = response.items
+          .filter((item) => item.action === "report_export")
+          .map((item) => {
+            const payload = item.payload ?? {};
+            const rowCount = typeof payload.row_count === "number" ? payload.row_count : undefined;
+
+            return {
+              id: item.id,
+              report: payload.report ?? item.action ?? "report_export",
+              format: (payload.format ?? "csv") as string,
+              fromDate: payload.from_date,
+              toDate: payload.to_date,
+              generatedAt: item.timestamp,
+              outcome: (payload.outcome ?? "unknown") as string,
+              rowCount,
+              mimeType: payload.mime_type,
+            };
+          });
+
+        setHistory(rows);
+      } catch (error) {
+        if (!active) return;
+        setHistory([]);
+        setHistoryError(error instanceof Error ? error.message : "Unable to load export history");
+      } finally {
+        if (active) {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    void loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, [storeId, refreshKey]);
+
+  const historyRows = useMemo(() => {
+    return history.map((row) => {
+      const label = REPORT_LABELS[row.report as ReportKey] ?? row.report;
+      const from = row.fromDate ? new Date(row.fromDate).toLocaleDateString() : "—";
+      const to = row.toDate ? new Date(row.toDate).toLocaleDateString() : "—";
+      const generated = row.generatedAt ? new Date(row.generatedAt).toLocaleString() : "—";
+
+      return {
+        ...row,
+        label,
+        range: `${from} → ${to}`,
+        generated,
+      };
+    });
+  }, [history]);
+
+  const handleGenerateReport = async (target: ReportKey) => {
     if (!storeId) {
       toast({
         title: "Error",
@@ -64,39 +126,48 @@ export default function Reports() {
       return;
     }
 
-    setLoading(true);
-    
+    setGeneratingReport(target);
+    setExportError(null);
+
     try {
-      toast({
-        title: `${type} Report Generation Started`,
-        description: "Your report is being generated and will download shortly",
-      });
+      let download: DownloadResult;
+      let fallbackFilename: string;
 
-      let blob: Blob;
-      let filename: string;
-
-      if (type === "CO DR-1786") {
-        blob = await apiClient.downloadCOReport(storeId, startDate, endDate);
-        filename = `CO_DR1786_${startDate}_${endDate}.csv`;
+      if (target === "co_dr1786") {
+        toast({
+          title: "CO DR-1786 export queued",
+          description: "Your CSV will download once the export completes.",
+        });
+        download = await apiClient.downloadCOReport(storeId, startDate, endDate);
+        fallbackFilename = `CO_DR1786_${startDate}_${endDate}.csv`;
       } else {
-        blob = await apiClient.downloadMNReport(storeId, startDate, endDate, reportFormat);
-        filename = `MN_Summary_${startDate}_${endDate}.${reportFormat}`;
+        toast({
+          title: "MN summary export queued",
+          description: mnFormat === "csv"
+            ? "CSV output opens in spreadsheets with individual order rows."
+            : "JSON output is ideal for automation and dashboards.",
+        });
+        download = await apiClient.downloadMNReport(storeId, startDate, endDate, mnFormat);
+        fallbackFilename = `MN_Summary_${startDate}_${endDate}.${mnFormat}`;
       }
 
-      downloadBlob(blob, filename);
+      downloadBlob(download.blob, download.filename ?? fallbackFilename);
 
       toast({
-        title: `${type} Report Downloaded`,
-        description: "Your report has been successfully generated and downloaded",
+        title: "Report ready",
+        description: "The export history table now reflects the new download.",
       });
+      setRefreshKey((current) => current + 1);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate report";
+      setExportError(message);
       toast({
         title: "Report Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate report",
+        description: message,
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setGeneratingReport(null);
     }
   };
 
@@ -110,6 +181,13 @@ export default function Reports() {
             : "Select a store to access compliance reports"}
         </p>
       </div>
+
+      {exportError && (
+        <Alert variant="destructive">
+          <AlertTitle>Export failed</AlertTitle>
+          <AlertDescription>{exportError}</AlertDescription>
+        </Alert>
+      )}
 
       {!storeId && (
         <Card>
@@ -162,15 +240,9 @@ export default function Reports() {
 
               <div className="space-y-2">
                 <Label htmlFor="co-format">Format</Label>
-                <Select value={reportFormat} onValueChange={setReportFormat}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="csv">CSV (Recommended)</SelectItem>
-                    <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p id="co-format" className="text-sm text-muted-foreground">
+                  Colorado exports are delivered as CSV files matching the Department of Revenue template.
+                </p>
               </div>
             </div>
 
@@ -185,12 +257,16 @@ export default function Reports() {
             </div>
 
             <Button
-              onClick={() => handleGenerateReport("CO DR-1786")}
+              onClick={() => handleGenerateReport("co_dr1786")}
               className="w-full"
-              disabled={loading || !storeId}
+              disabled={!!generatingReport || !storeId}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Generate CO DR-1786 Report
+              {generatingReport === "co_dr1786" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {generatingReport === "co_dr1786" ? "Generating…" : "Generate CO DR-1786 Report"}
             </Button>
           </CardContent>
         </Card>
@@ -235,16 +311,18 @@ export default function Reports() {
 
               <div className="space-y-2">
                 <Label htmlFor="mn-format">Format</Label>
-                <Select value={reportFormat} onValueChange={setReportFormat}>
+                <Select value={mnFormat} onValueChange={(value) => setMnFormat(value as "csv" | "json")}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="csv">CSV</SelectItem>
                     <SelectItem value="json">JSON</SelectItem>
-                    <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  CSV includes each order line, while JSON returns aggregated counts for dashboards.
+                </p>
               </div>
             </div>
 
@@ -259,13 +337,17 @@ export default function Reports() {
             </div>
 
             <Button
-              onClick={() => handleGenerateReport("MN Summary")}
+              onClick={() => handleGenerateReport("mn_summary")}
               className="w-full"
               variant="outline"
-              disabled={loading || !storeId}
+              disabled={!!generatingReport || !storeId}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Generate MN Summary Report
+              {generatingReport === "mn_summary" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {generatingReport === "mn_summary" ? "Generating…" : "Generate MN Summary Report"}
             </Button>
           </CardContent>
         </Card>
@@ -282,44 +364,109 @@ export default function Reports() {
             Previously generated reports and downloads
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
+          {historyError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Unable to load export history</AlertTitle>
+              <AlertDescription>{historyError}</AlertDescription>
+            </Alert>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Report Type</TableHead>
-                <TableHead>Period</TableHead>
+                <TableHead>Report</TableHead>
+                <TableHead>Filters</TableHead>
                 <TableHead>Generated</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Size</TableHead>
+                <TableHead>Outcome</TableHead>
+                <TableHead>Format</TableHead>
+                <TableHead>Rows</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {exportHistory.map((export_) => (
-                <TableRow key={export_.id}>
-                  <TableCell>
-                    <Badge variant={export_.type.includes("CO") ? "default" : "secondary"}
-                           className={export_.type.includes("CO") ? "bg-colorado text-colorado-foreground" : "bg-minnesota text-minnesota-foreground"}>
-                      {export_.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">{export_.period}</TableCell>
-                  <TableCell className="text-muted-foreground">{export_.generatedAt}</TableCell>
-                  <TableCell>
-                    <Badge className="bg-success text-success-foreground">
-                      {export_.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{export_.fileSize}</TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="outline">
-                      <Download className="h-3 w-3 mr-1" />
-                      Download
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {historyLoading
+                ? Array.from({ length: 3 }).map((_, index) => (
+                    <TableRow key={`history-skeleton-${index}`}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-40" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-9 w-20" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : historyRows.length > 0
+                ? historyRows.map((export_) => (
+                    <TableRow key={export_.id}>
+                      <TableCell>
+                        <Badge
+                          variant={export_.report === "co_dr1786" ? "default" : "secondary"}
+                          className={export_.report === "co_dr1786" ? "bg-colorado text-colorado-foreground" : "bg-minnesota text-minnesota-foreground"}
+                        >
+                          {export_.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{export_.range}</TableCell>
+                      <TableCell className="text-muted-foreground">{export_.generated}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            export_.outcome === "success"
+                              ? "bg-success text-success-foreground"
+                              : "bg-destructive text-destructive-foreground"
+                          }
+                        >
+                          {export_.outcome}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="uppercase text-muted-foreground">{export_.format}</TableCell>
+                      <TableCell className="text-muted-foreground">{export_.rowCount ?? "—"}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleGenerateReport(
+                              export_.report === "co_dr1786" ? "co_dr1786" : "mn_summary"
+                            )
+                          }
+                          disabled={!!generatingReport || !storeId}
+                        >
+                          {generatingReport === export_.report ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3 mr-1" />
+                          )}
+                          Re-run
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                        {storeId
+                          ? "No exports recorded yet. Generate a report to populate this history."
+                          : "Select a store to view export history."}
+                      </TableCell>
+                    </TableRow>
+                  )}
             </TableBody>
           </Table>
         </CardContent>
