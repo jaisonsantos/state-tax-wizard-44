@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import uuid
 
 from fastapi.testclient import TestClient
@@ -30,7 +30,7 @@ def ensure_mn_rule(db_session: Session):
             RuleVersion(
                 jurisdiction="MN",
                 version=f"MN-test-{uuid.uuid4()}",
-                effective_from=datetime.utcnow() - timedelta(days=1),
+                effective_from=datetime.now(timezone.utc) - timedelta(days=1),
                 effective_to=None,
                 params={"threshold_cents": 10000, "fee_cents": 50},
             )

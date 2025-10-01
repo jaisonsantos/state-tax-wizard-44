@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from fastapi.testclient import TestClient
@@ -20,7 +20,7 @@ def _login(client: TestClient):
 
 def test_rules_endpoint_lists_versions(client: TestClient, db_session: Session) -> None:
     token, _ = _login(client)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     db_session.add_all(
         [

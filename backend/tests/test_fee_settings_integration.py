@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from fastapi.testclient import TestClient
@@ -16,7 +16,7 @@ def _create_rule_versions(db_session: Session) -> None:
         RuleVersion(
             jurisdiction="MN",
             version="MN-test",
-            effective_from=datetime.utcnow() - timedelta(days=1),
+            effective_from=datetime.now(timezone.utc) - timedelta(days=1),
             effective_to=None,
             params={"threshold_cents": 10000, "fee_cents": 50},
         )
@@ -25,7 +25,7 @@ def _create_rule_versions(db_session: Session) -> None:
         RuleVersion(
             jurisdiction="CO",
             version="CO-test",
-            effective_from=datetime.utcnow() - timedelta(days=1),
+            effective_from=datetime.now(timezone.utc) - timedelta(days=1),
             effective_to=None,
             params={"rate_cents": 28},
         )

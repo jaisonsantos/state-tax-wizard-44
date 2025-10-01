@@ -4,7 +4,7 @@ Seed the database with initial data
 """
 from sqlalchemy.orm import sessionmaker
 from app.db.database import engine
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.models.models import (
     AuditLog,
@@ -57,13 +57,14 @@ def ensure_store(
         store.settings.plan = plan
 
     if not store.subscriptions:
+        now = datetime.now(timezone.utc)
         subscription = Subscription(
             store_id=store.id,
             provider="stripe",
             plan=plan,
             status="trialing" if plan == "starter" else "active",
-            trial_end=datetime.utcnow() + timedelta(days=14) if plan == "starter" else None,
-            current_period_end=datetime.utcnow() + timedelta(days=30),
+            trial_end=now + timedelta(days=14) if plan == "starter" else None,
+            current_period_end=now + timedelta(days=30),
         )
         db.add(subscription)
 
@@ -79,7 +80,7 @@ def seed_fee_history(db, store: Store, days: int = 30) -> None:
     if existing >= days:
         return
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     actor = "user:seed-operator@example.com"
 
     for offset in range(days):

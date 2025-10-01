@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from fastapi.testclient import TestClient
@@ -15,7 +15,7 @@ def _create_rule_versions(db_session: Session) -> None:
         RuleVersion(
             jurisdiction="MN",
             version="MN-reversal",
-            effective_from=datetime.utcnow() - timedelta(days=1),
+            effective_from=datetime.now(timezone.utc) - timedelta(days=1),
             effective_to=None,
             params={"threshold_cents": 10000, "fee_cents": 50},
         )
@@ -24,7 +24,7 @@ def _create_rule_versions(db_session: Session) -> None:
         RuleVersion(
             jurisdiction="CO",
             version="CO-reversal",
-            effective_from=datetime.utcnow() - timedelta(days=1),
+            effective_from=datetime.now(timezone.utc) - timedelta(days=1),
             effective_to=None,
             params={"rate_cents": 28},
         )
@@ -83,11 +83,11 @@ def test_reversal_cancellation_refunds_fee(
     assert order_fee.reversal_reason == "DELIVERY_CANCELLED"
     assert order_fee.reversed_at is not None
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     params = {
         "store_id": store_id,
-        "from_date": (now - timedelta(days=1)).isoformat() + "Z",
-        "to_date": (now + timedelta(days=1)).isoformat() + "Z",
+        "from_date": (now - timedelta(days=1)).isoformat(),
+        "to_date": (now + timedelta(days=1)).isoformat(),
         "format": "json",
     }
     mn_report = client.get("/api/v1/reports/mn/summary", params=params, headers=auth_header)
