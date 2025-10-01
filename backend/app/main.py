@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Response
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from .routers import (
     analytics,
@@ -29,6 +32,14 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+)
+
+# Serve documentation assets over the API domain so frontend links resolve.
+DOCS_DIR = Path(__file__).resolve().parents[2] / "docs"
+app.mount(
+    "/api/files/docs",
+    StaticFiles(directory=str(DOCS_DIR), html=False),
+    name="docs_static",
 )
 
 # CORS middleware

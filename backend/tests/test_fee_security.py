@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -9,8 +7,10 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.models import OrderFee, RuleVersion, StoreSetting
+from app.core.config import settings as app_settings
+from app.models.models import OrderFee, ProcessedNonce, RuleVersion, StoreSetting
 from app.security.rate_limit import rate_limiter
+from app.security.hmac import compute_signature
 
 
 def _create_rule_versions(db_session: Session) -> None:
@@ -50,9 +50,15 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
     auth_header = {"Authorization": f"Bearer {token}"}
     _create_rule_versions(db_session)
 
-    settings = db_session.query(StoreSetting).filter(StoreSetting.store_id == store_id).one()
-    settings.hmac_secret = "test-secret"
+    store_settings = db_session.query(StoreSetting).filter(StoreSetting.store_id == store_id).one()
+    store_settings.hmac_secret = "test-secret"
+    store_settings.hmac_secret_rotated_at = datetime.now(timezone.utc)
     db_session.commit()
+
+    original_skew = app_settings.hmac_max_skew_seconds
+    original_ttl = app_settings.hmac_replay_ttl_seconds
+    app_settings.hmac_max_skew_seconds = 300
+    app_settings.hmac_replay_ttl_seconds = 60
 
     payload = {
         "store_id": store_id,
@@ -65,39 +71,121 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         "shipping_amount_cents": 0,
     }
 
-    # Missing signature
-    missing = client.post("/api/v1/fees/apply", json=payload, headers=auth_header)
-    assert missing.status_code == 401
+    try:
+        # Missing signature
+        unsigned_body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        unsigned_headers = dict(auth_header)
+        timestamp = datetime.now(timezone.utc).isoformat()
+        unsigned_headers.update(
+            {
+                "Content-Type": "application/json",
+                "x-rdf-timestamp": timestamp,
+                "x-rdf-nonce": uuid.uuid4().hex,
+            }
+        )
+        missing = client.post("/api/v1/fees/apply", data=unsigned_body, headers=unsigned_headers)
+        assert missing.status_code == 401
+        assert missing.json()["detail"]["code"] == "missing_signature"
 
-    # Invalid signature
-    body = json.dumps(payload).encode()
-    invalid_headers = dict(auth_header)
-    invalid_headers.update({
-        "Content-Type": "application/json",
-        "x-rdf-signature": "not-a-valid-signature",
-    })
-    invalid = client.post("/api/v1/fees/apply", data=body, headers=invalid_headers)
-    assert invalid.status_code == 403
+        # Invalid signature
+        invalid_headers = dict(unsigned_headers)
+        invalid_headers["x-rdf-signature"] = "not-a-valid-signature"
+        invalid = client.post("/api/v1/fees/apply", data=unsigned_body, headers=invalid_headers)
+        assert invalid.status_code == 403
+        assert invalid.json()["detail"]["code"] == "invalid_signature"
 
-    # Valid signature
-    valid_headers = dict(auth_header)
-    valid_headers.update({
-        "Content-Type": "application/json",
-        "x-rdf-signature": hmac.new(settings.hmac_secret.encode(), body, hashlib.sha256).hexdigest(),
-    })
-    success = client.post("/api/v1/fees/apply", data=body, headers=valid_headers)
-    assert success.status_code == 200
-    response_body = success.json()
-    assert response_body["success"] is True
-    assert db_session.query(OrderFee).filter(OrderFee.order_id == "hmac-test").count() == 1
+        # Valid signature
+        valid_headers = dict(auth_header)
+        timestamp_iso = datetime.now(timezone.utc).isoformat()
+        nonce_value = uuid.uuid4().hex
+        signature = compute_signature(store_settings.hmac_secret, timestamp_iso, nonce_value, unsigned_body)
+        valid_headers.update(
+            {
+                "Content-Type": "application/json",
+                "x-rdf-signature": signature,
+                "x-rdf-timestamp": timestamp_iso,
+                "x-rdf-nonce": nonce_value,
+            }
+        )
+        success = client.post("/api/v1/fees/apply", data=unsigned_body, headers=valid_headers)
+        assert success.status_code == 200
+        response_body = success.json()
+        assert response_body["success"] is True
+        db_session.expire_all()
+        assert (
+            db_session.query(OrderFee).filter(OrderFee.order_id == "hmac-test").count() == 1
+        )
+        assert (
+            db_session.query(ProcessedNonce)
+            .filter(ProcessedNonce.store_id == store_id, ProcessedNonce.nonce == nonce_value)
+            .count()
+            == 1
+        )
 
-    # Prefix format is also accepted
-    prefixed_headers = dict(valid_headers)
-    prefixed_headers["x-rdf-signature"] = (
-        "sha256=" + hmac.new(settings.hmac_secret.encode(), body, hashlib.sha256).hexdigest()
-    )
-    replay = client.post("/api/v1/fees/apply", data=body, headers=prefixed_headers)
-    assert replay.status_code == 200
+        # Prefixed signature format is also accepted
+        prefixed_timestamp = datetime.now(timezone.utc).isoformat()
+        prefixed_nonce = uuid.uuid4().hex
+        prefixed_signature = compute_signature(store_settings.hmac_secret, prefixed_timestamp, prefixed_nonce, unsigned_body)
+        prefixed_headers = dict(auth_header)
+        prefixed_headers.update(
+            {
+                "Content-Type": "application/json",
+                "x-rdf-signature": f"sha256={prefixed_signature}",
+                "x-rdf-timestamp": prefixed_timestamp,
+                "x-rdf-nonce": prefixed_nonce,
+            }
+        )
+        prefixed = client.post("/api/v1/fees/apply", data=unsigned_body, headers=prefixed_headers)
+        assert prefixed.status_code == 200
+
+        # Replay detection blocks duplicate nonce
+        replay = client.post("/api/v1/fees/apply", data=unsigned_body, headers=valid_headers)
+        assert replay.status_code == 409
+        assert replay.json()["detail"]["code"] == "replay_detected"
+
+        # Expired timestamp is rejected
+        stale_headers = dict(valid_headers)
+        stale_time = datetime.now(timezone.utc) - timedelta(seconds=app_settings.hmac_max_skew_seconds + 30)
+        stale_timestamp = stale_time.isoformat()
+        stale_signature = compute_signature(store_settings.hmac_secret, stale_timestamp, uuid.uuid4().hex, unsigned_body)
+        stale_headers.update(
+            {
+                "x-rdf-timestamp": stale_timestamp,
+                "x-rdf-nonce": uuid.uuid4().hex,
+                "x-rdf-signature": stale_signature,
+            }
+        )
+        stale = client.post("/api/v1/fees/apply", data=unsigned_body, headers=stale_headers)
+        assert stale.status_code == 401
+        assert stale.json()["detail"]["code"] == "stale_timestamp"
+
+        # Expired nonce entries are purged allowing reuse after TTL
+        record = (
+            db_session.query(ProcessedNonce)
+            .filter(ProcessedNonce.store_id == store_id, ProcessedNonce.nonce == nonce_value)
+            .one()
+        )
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        db_session.add(record)
+        db_session.commit()
+        db_session.expire_all()
+
+        fresh_timestamp = datetime.now(timezone.utc).isoformat()
+        fresh_signature = compute_signature(store_settings.hmac_secret, fresh_timestamp, nonce_value, unsigned_body)
+        refreshed_headers = dict(auth_header)
+        refreshed_headers.update(
+            {
+                "Content-Type": "application/json",
+                "x-rdf-signature": fresh_signature,
+                "x-rdf-timestamp": fresh_timestamp,
+                "x-rdf-nonce": nonce_value,
+            }
+        )
+        refreshed = client.post("/api/v1/fees/apply", data=unsigned_body, headers=refreshed_headers)
+        assert refreshed.status_code == 200
+    finally:
+        app_settings.hmac_max_skew_seconds = original_skew
+        app_settings.hmac_replay_ttl_seconds = original_ttl
 
 
 def test_rate_limit_per_token_route(client: TestClient, db_session: Session) -> None:

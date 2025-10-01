@@ -17,12 +17,18 @@
   but the initial KPI, analytics, and session metadata slices are now live in the
   dashboard and header.
 
-## Next Development Objective
-Deliver the initial slice of **Frontend Polish & Analytics** by replacing
-placeholder dashboard metrics with real telemetry, enriching account/session
-context, and rounding out automation so the richer UI states remain covered.
+## Status Update
+Milestone 3 core scope shipped: the dashboard now consumes live analytics
+telemetry, account/session metadata renders in the header, and automation covers
+analytics smoke flows. The notes below capture the historical plan and can be
+used for future enhancements (trend visualisations, alerting, etc.).
 
-## Implementation Plan
+## Remaining Enhancements
+Future iterations can build on this foundation by layering trend
+visualisations, alerting, or deeper analytics exploration. The historical plan
+is retained below as guidance when prioritising follow-up work.
+
+## Historical Implementation Notes
 
 ### 1. Backend Analytics Surface
 - Introduce `/v1/analytics/overview` router that aggregates fee counts, absorbed

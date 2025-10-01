@@ -38,6 +38,9 @@ configuration. The key variables are:
 | `SMOKE_API_BASE_URL` | `http://localhost:8000/api` | Optional override for `make smoke` when running outside Docker. |
 | `SMOKE_EMAIL` | `smoke-tester@example.com` | User email used by the smoke test. |
 | `SMOKE_PASSWORD` | `change-me` | Password used by the smoke test. |
+| `SMOKE_HMAC_SECRET` | `demo-hmac-secret` | HMAC secret consumed by `make security-smoke`; override when rotating store secrets. |
+| `HMAC_MAX_SKEW_SECONDS` | `300` | Allowed clock drift (± seconds) for signed `/v1/fees/apply` requests. |
+| `HMAC_REPLAY_TTL_SECONDS` | `600` | Time-to-live for nonce records used to detect replays. |
 
 > Copy `.env.example` to `.env` when you need to override any defaults.
 
@@ -123,3 +126,16 @@ runbooks:
 - `frontend.yml` performs `npm install`, `npm run typecheck`, and `npm run build`.
 - The smoke test can be invoked in CI by running `make up`, `make migrate`,
   `make seed`, and `make smoke` sequentially on a runner with Docker access.
+## Runbook: make security-smoke
+
+Validates HMAC signing, timestamp skew, and replay protection.
+
+1. Ensure the stack is running and seeded (`make migrate && make seed`).
+2. Export `SMOKE_HMAC_SECRET` if the seed default has been rotated.
+3. Execute `make security-smoke`.
+4. The target will:
+   - Log in, fetch a demo store, and sign `/v1/fees/apply` payloads with timestamp + nonce headers.
+   - Assert the initial apply succeeds, a replay attempt returns `409` with `detail.code = replay_detected`, and a stale timestamp yields `401`.
+   - Print summary output including the replay/stale status codes.
+5. On failure, inspect the exit message and check `security` logs or Prometheus counters via `/metrics`.
+

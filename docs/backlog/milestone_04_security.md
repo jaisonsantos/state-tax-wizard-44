@@ -4,7 +4,8 @@
 - **Auth foundation ready**: JWT-based authentication with session tokens persisted in `session_tokens` table, logout revokes active sessions ([`backend/app/routers/auth.py`](../../backend/app/routers/auth.py)).
 - **Store scoping enforced**: All fee endpoints validate store ownership via `AuthService.validate_store_access` ([`backend/app/core/security.py`](../../backend/app/core/security.py)).
 - **Observability in place**: Prometheus counters and structured logs capture fee operations and auth events ([`backend/app/observability.py`](../../backend/app/observability.py)).
-- **Remaining gap**: HMAC signature verification, rate limiting middleware, replay attack protection, and secrets rotation playbook are not yet implemented.
+- **Security slice delivered**: `/v1/fees/apply` now enforces timestamp/nonce validation, persists processed nonces, surfaces structured security logs, and exports Prometheus counters for failures/replays.
+- **Remaining gap**: Per-store rate limiting still relies on the in-memory limiter and secrets rotation SOP tooling is pending.
 
 ## Next Development Objective
 Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugin requests, per-store rate limiting, replay protection, and comprehensive security logging to prepare the platform for production traffic.
@@ -12,24 +13,24 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 ## Implementation Plan
 
 ### 1. HMAC Signature Verification
-- Add `hmac_secret` column to `stores` table (nullable initially for backward compatibility).
-- Generate unique HMAC secrets per store during onboarding/settings update via `/v1/stores/{id}/settings`.
-- Create `HMACMiddleware` in `backend/app/security/hmac.py` that:
-  - Reads `X-Signature`, `X-Timestamp`, and `X-Nonce` headers from incoming requests.
-  - Validates signature against request body using store's `hmac_secret`.
-  - Rejects requests with missing/invalid signatures or timestamps outside ±5 minute tolerance.
-- Apply middleware to `/v1/fees/quote`, `/v1/fees/apply`, and future webhook endpoints.
+- Extend existing `store_settings.hmac_secret` support with a `hmac_secret_rotated_at` timestamp so rotations are auditable.
+- Generate secrets during onboarding/settings update when absent and expose rotation endpoint/flow if required.
+- Create `backend/app/security/hmac.py` helpers that:
+  - Read `X-RDF-Signature`, `X-RDF-Timestamp`, and `X-RDF-Nonce` headers from incoming requests.
+  - Validate signature against the raw request body using the store's `hmac_secret`.
+  - Enforce ±5 minute timestamp tolerance (configurable) and reject stale/future requests.
+- Wire the helper into `/v1/fees/apply` (and future webhook endpoints) ahead of broader middleware adoption.
 - Document signature generation algorithm in `docs/security/hmac.md` with code examples for WooCommerce/Shopify integrations.
 
 ### 2. Replay Protection
-- Store processed nonces in Redis with TTL of 10 minutes (or PostgreSQL `processed_nonces` table if Redis unavailable).
-- Middleware checks nonce uniqueness before processing request.
+- Store processed nonces in a PostgreSQL `processed_nonces` table with a 10 minute TTL (SQLite-compatible for tests).
+- Validation checks nonce uniqueness before processing request and purges expired rows opportunistically.
 - Return `409 Conflict` for replayed requests with clear error message.
 - Add Prometheus counter `hmac_replay_attempts_total` with labels for store and endpoint.
 
 ### 3. Rate Limiting Infrastructure
-- Install `slowapi` or `fastapi-limiter` dependency for rate limiting.
-- Configure Redis backend for distributed rate limiting (shared across API instances).
+- Replace the existing in-memory limiter with a distributed solution (e.g., `slowapi` or `fastapi-limiter`).
+- Configure Redis backend for shared quotas across API instances and document local fallbacks.
 - Implement `RateLimitMiddleware` in `backend/app/security/rate_limit.py`:
   - Per-store limits: 120 requests/minute for `/v1/fees/*` endpoints.
   - Global limits: 1000 requests/minute for authenticated endpoints, 100/minute for public endpoints.
@@ -59,9 +60,9 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 
 ### 6. Database Migration
 - Create Alembic migration `backend/alembic/versions/202504010001_security_hardening.py`:
-  - Add `stores.hmac_secret` (varchar(256), nullable).
-  - Add `stores.hmac_secret_rotated_at` (timestamp with time zone, nullable).
-  - Create table `processed_nonces` (if not using Redis):
+  - Add `store_settings.hmac_secret_rotated_at` (timestamp with time zone, nullable) while keeping existing `hmac_secret`.
+  - Ensure historical rows populate `hmac_secret_rotated_at` with `now()` when a secret exists.
+  - Create table `processed_nonces`:
     ```sql
     CREATE TABLE processed_nonces (
       nonce VARCHAR(128) PRIMARY KEY,

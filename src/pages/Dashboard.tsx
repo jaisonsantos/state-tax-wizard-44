@@ -311,7 +311,7 @@ export default function Dashboard() {
               variant="outline"
               className="mt-4 w-full"
             >
-              <a href="docs/observability.md" target="_blank" rel="noreferrer">
+              <a href="/api/files/docs/observability.md" target="_blank" rel="noreferrer">
                 Review observability catalog
                 <ExternalLink className="ml-2 h-4 w-4" />
               </a>

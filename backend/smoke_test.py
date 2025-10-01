@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
-from datetime import datetime, timedelta
-from typing import Any, Dict
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Tuple
 
 import httpx
+
+from app.security.hmac import compute_signature
 
 
 API_BASE_URL = os.environ.get("SMOKE_API_BASE_URL", "http://localhost:8000/api")
 SMOKE_METRICS_URL = os.environ.get("SMOKE_METRICS_URL")
 SMOKE_EMAIL = os.environ.get("SMOKE_EMAIL", "smoke-tester@example.com")
 SMOKE_PASSWORD = os.environ.get("SMOKE_PASSWORD", "change-me")
+SMOKE_HMAC_SECRET = os.environ.get("SMOKE_HMAC_SECRET", "demo-hmac-secret")
 
 
 class SmokeFailure(RuntimeError):
@@ -83,13 +88,51 @@ def quote_fees(
     return response.json()
 
 
+def _require_hmac_secret() -> str:
+    secret = (SMOKE_HMAC_SECRET or "").strip()
+    if not secret:
+        raise SmokeFailure(
+            "SMOKE_HMAC_SECRET must be set to validate HMAC-protected endpoints",
+        )
+    return secret
+
+
+def _serialise_payload(payload: Dict[str, Any]) -> bytes:
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+
+
+def _signed_headers(
+    base_headers: Dict[str, str],
+    body: bytes,
+    *,
+    timestamp: str | None = None,
+    nonce: str | None = None,
+) -> Tuple[Dict[str, str], str, str]:
+    secret = _require_hmac_secret()
+    timestamp_value = timestamp or datetime.now(timezone.utc).isoformat()
+    nonce_value = nonce or uuid.uuid4().hex
+    signature = compute_signature(secret, timestamp_value, nonce_value, body)
+    headers = dict(base_headers)
+    headers.update(
+        {
+            "Content-Type": "application/json",
+            "X-RDF-Timestamp": timestamp_value,
+            "X-RDF-Nonce": nonce_value,
+            "X-RDF-Signature": signature,
+        }
+    )
+    return headers, timestamp_value, nonce_value
+
+
 def apply_fees(
     client: httpx.Client,
     headers: Dict[str, str],
     store_id: str,
     order_id: str,
     state: str,
-) -> Dict[str, Any]:
+    *,
+    return_meta: bool = False,
+) -> Dict[str, Any] | Tuple[Dict[str, Any], Dict[str, Any]]:
     payload = {
         "store_id": store_id,
         "order_id": order_id,
@@ -100,10 +143,12 @@ def apply_fees(
         ],
         "shipping_amount_cents": 750,
     }
+    body = _serialise_payload(payload)
+    signed_headers, timestamp, nonce = _signed_headers(headers, body)
     response = client.post(
         f"{API_BASE_URL}/v1/fees/apply",
-        json=payload,
-        headers=headers,
+        data=body,
+        headers=signed_headers,
         timeout=20.0,
     )
     _raise_for_status(response, "apply")
@@ -112,6 +157,14 @@ def apply_fees(
         raise SmokeFailure("apply response did not mark success")
     if not data.get("lines"):
         raise SmokeFailure("apply response missing fee lines")
+    if return_meta:
+        return data, {
+            "headers": signed_headers,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "body": body,
+            "payload": payload,
+        }
     return data
 
 
@@ -145,7 +198,7 @@ def fetch_audit(
 def fetch_reports(
     client: httpx.Client, headers: Dict[str, str], store_id: str, *, verify_audit: bool = False
 ) -> Dict[str, Any]:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     from_date = _iso(now - timedelta(days=1))
     to_date = _iso(now + timedelta(days=1))
 
@@ -291,6 +344,64 @@ def run_full_smoke() -> Dict[str, Any]:
     }
 
 
+def run_security_only_smoke() -> Dict[str, Any]:
+    with httpx.Client() as client:
+        login_payload = login(client)
+        store_id = login_payload["stores"][0]["id"]
+        headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        base_order_id = "smoke-security-order"
+        apply_result, meta = apply_fees(
+            client,
+            headers,
+            store_id,
+            base_order_id,
+            "CO",
+            return_meta=True,
+        )
+
+        replay_response = client.post(
+            f"{API_BASE_URL}/v1/fees/apply",
+            data=meta["body"],
+            headers=meta["headers"],
+            timeout=20.0,
+        )
+        if replay_response.status_code != 409:
+            raise SmokeFailure(
+                "Expected 409 replay rejection, got "
+                f"{replay_response.status_code}: {replay_response.text}"
+            )
+
+        stale_headers, _, _ = _signed_headers(
+            headers,
+            meta["body"],
+            timestamp=(datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat(),
+            nonce=uuid.uuid4().hex,
+        )
+        stale_response = client.post(
+            f"{API_BASE_URL}/v1/fees/apply",
+            data=meta["body"],
+            headers=stale_headers,
+            timeout=20.0,
+        )
+        if stale_response.status_code != 401:
+            raise SmokeFailure(
+                "Expected 401 for stale timestamp, got "
+                f"{stale_response.status_code}: {stale_response.text}"
+            )
+
+    print("Security smoke completed successfully.")
+    print(f"Initial apply lines: {len(apply_result['lines'])}")
+    print("Replay attempt rejected with 409.")
+    print("Stale timestamp rejected with 401.")
+
+    return {
+        "apply": apply_result,
+        "replay_status": replay_response.status_code,
+        "stale_status": stale_response.status_code,
+    }
+
+
 def run_reports_only_smoke() -> Dict[str, Any]:
     with httpx.Client() as client:
         login_payload = login(client)
@@ -335,13 +446,25 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
         action="store_true",
         help="Only execute analytics overview validation",
     )
+    parser.add_argument(
+        "--security-only",
+        action="store_true",
+        help="Only execute HMAC validation smoke checks",
+    )
     parsed_args = parser.parse_args()
 
     try:
-        if parsed_args.analytics_only and parsed_args.reports_only:
-            raise SmokeFailure("Choose either --reports-only or --analytics-only")
+        selected = [
+            flag
+            for flag in (parsed_args.analytics_only, parsed_args.reports_only, parsed_args.security_only)
+            if flag
+        ]
+        if len(selected) > 1:
+            raise SmokeFailure("Choose at most one focused smoke option")
         if parsed_args.analytics_only:
             run_analytics_only_smoke()
+        elif parsed_args.security_only:
+            run_security_only_smoke()
         elif parsed_args.reports_only:
             run_reports_only_smoke()
         else:

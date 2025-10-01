@@ -49,6 +49,7 @@ async def get_store_settings(
         absorb_fee=settings.absorb_fee,
         label_override=settings.label_override,
         plan=settings.plan,
+        hmac_last_rotated_at=settings.hmac_secret_rotated_at,
     )
 
 
@@ -96,4 +97,5 @@ async def update_store_settings(
         absorb_fee=settings.absorb_fee,
         label_override=settings.label_override,
         plan=settings.plan,
+        hmac_last_rotated_at=settings.hmac_secret_rotated_at,
     )
