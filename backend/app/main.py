@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -37,12 +38,23 @@ app = FastAPI(
 )
 
 # Serve documentation assets over the API domain so frontend links resolve.
-DOCS_DIR = Path(__file__).resolve().parents[2] / "docs"
-app.mount(
-    "/api/files/docs",
-    StaticFiles(directory=str(DOCS_DIR), html=False),
-    name="docs_static",
-)
+DOCS_DIR = None
+for parent in Path(__file__).resolve().parents:
+    candidate = parent / "docs"
+    if candidate.is_dir():
+        DOCS_DIR = candidate
+        break
+
+if DOCS_DIR is not None:
+    app.mount(
+        "/api/files/docs",
+        StaticFiles(directory=str(DOCS_DIR), html=False),
+        name="docs_static",
+    )
+else:
+    logging.getLogger(__name__).warning(
+        "Documentation assets directory not found; skipping /api/files/docs mount."
+    )
 
 # CORS middleware
 app.add_middleware(
