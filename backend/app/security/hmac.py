@@ -92,6 +92,25 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
         synchronize_session=False
     )
 
+    existing = (
+        db.query(ProcessedNonce)
+        .filter(ProcessedNonce.store_id == store_id)
+        .filter(ProcessedNonce.nonce == nonce)
+        .filter(ProcessedNonce.expires_at >= now)
+        .first()
+    )
+    if existing:
+        hmac_replay_attempts_total.labels(store_id=store_id).inc()
+        log_security_event(
+            {
+                "event": "hmac_replay_detected",
+                "store_id": store_id,
+                "nonce_preview": nonce[:8],
+                "reason": "duplicate_nonce_in_ttl_window",
+            }
+        )
+        _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
+
     record = ProcessedNonce(
         store_id=store_id,
         nonce=nonce,
