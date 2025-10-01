@@ -22,6 +22,11 @@ acceptance criteria so that work can be planned and delivered in iterations.
 | `release_plan.md` | Suggested milestone sequencing and dependencies |
 | `milestone_02_next_steps.md` | Milestone 2 closure summary plus the entry plan for Milestone 3 (Frontend polish & analytics) |
 | `milestone_03_frontend_polish.md` | Milestone 3 kickoff plan covering analytics endpoints, dashboard polish, and supporting checklists |
+| `milestone_04_security.md` | Milestone 4 — Security & Rate Limiting (HMAC, replay, throttling, secrets, logging) |
+| `milestone_05_billing.md` | Milestone 5 — Billing & Stripe Integration (checkout/portal, webhooks, entitlements) |
+| `milestone_06_integrations.md` | Milestone 6 — Platform Integrations Alpha (Woo plugin, Shopify POC, SDK) |
+| `milestone_07_webhooks.md` | Milestone 7 — Webhooks & Order Lifecycle (reversals, idempotency, reporting) |
+| `milestone_08_launch.md` | Milestone 8 — Production Readiness & Launch |
 
 Each epic file contains:
 
