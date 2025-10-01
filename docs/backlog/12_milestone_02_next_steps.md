@@ -1,3 +1,7 @@
+# Milestone 2 — Next Steps
+
+_[← Release Plan](00_release_plan.md) • [Milestone 3 — Frontend Polish →](13_milestone_03_frontend_polish.md)_
+
 ## Current Stage Assessment
 - Milestone 2 — Reporting Confidence is fully closed. Failure-path telemetry now records unsupported export attempts, JSON downloads advertise attachment filenames, and the `/v1/audit` endpoint filters in SQL with a dedicated Postgres expression index.
 - Session persistence for Epic 02 remains stable with the new `session_tokens` migration, and smoke tests can point at explicit Prometheus hosts via `SMOKE_METRICS_URL`.
@@ -10,7 +14,7 @@
 - Smoke and Postman suites gained guards for metrics URLs, attachment headers, and 422 scenarios, ensuring CI and manual evidence cover the new telemetry surface.
 
 ## Next Iteration Goal — Milestone 3 Kickoff
-Deliver the first slice of **Milestone 3 — Frontend Polish & Analytics** by wiring dashboard telemetry, extending report history usability, and tightening automation to cover the richer UI states. The detailed kickoff plan lives in [`milestone_03_frontend_polish.md`](./milestone_03_frontend_polish.md).
+Deliver the first slice of **Milestone 3 — Frontend Polish & Analytics** by wiring dashboard telemetry, extending report history usability, and tightening automation to cover the richer UI states. The detailed kickoff plan lives in [`13_milestone_03_frontend_polish.md`](./13_milestone_03_frontend_polish.md).
 
 ## Planned Changes
 ### Frontend
@@ -29,8 +33,8 @@ Deliver the first slice of **Milestone 3 — Frontend Polish & Analytics** by wi
 - Add pytest cases for the analytics endpoint payloads, including multi-store authorization checks.
 
 ### Documentation & Enablement
-- Refresh `docs/ui-guide.md` with dashboard screenshots and pagination usage notes once built.
-- Document the analytics endpoint contract in `docs/observability.md` and `docs/postman/README.md` so operators know where to pull metrics.
+- Refresh `docs/security/ui-guide.md` with dashboard screenshots and pagination usage notes once built.
+- Document the analytics endpoint contract in `docs/security/observability.md` and `docs/postman/README.md` so operators know where to pull metrics.
 - Update iteration and release checklists to reflect Milestone 3 objectives and link to new evidence requirements.
 
 ## Cross-functional Checklist

@@ -18,7 +18,7 @@ stack and inspect system health.
   and report flows.
 
 ## Acceptance Criteria
-1. **Environment Guide**: `docs/environment.md` (or equivalent) explains how to
+1. **Environment Guide**: `docs/security/environment.md` (or equivalent) explains how to
    bootstrap dev and CI environments, including environment variables,
    migrations, and seed expectations.
 2. **Data Contract Reference**: Logical model diagram/table referencing all
@@ -33,9 +33,9 @@ stack and inspect system health.
    works end-to-end using seeded data.
 
 ## Deliverables
-- `docs/environment.md`
-- `docs/data-model.md`
-- `docs/observability.md`
+- `docs/security/environment.md`
+- `docs/security/data-model.md`
+- `docs/security/observability.md`
 - Updated `Makefile` targets and documentation references.
 
 ## Validation
@@ -43,7 +43,7 @@ stack and inspect system health.
 - Link to documentation reviewed/approved by stakeholders.
 
 ## Definition of Done
-- `docs/environment.md`, `docs/data-model.md`, and `docs/observability.md`
+- `docs/security/environment.md`, `docs/security/data-model.md`, and `docs/security/observability.md`
   checked into source control with diagrams or tables as applicable.
 - `make smoke` target (and CI equivalent) executes end-to-end without manual
   setup, producing logs stored with the PR or release notes.

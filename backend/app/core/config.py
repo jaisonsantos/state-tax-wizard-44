@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     shopify_app_secret: Optional[str] = "stub_secret"
     hmac_max_skew_seconds: int = 300
     hmac_replay_ttl_seconds: int = 600
+    redis_url: Optional[str] = None
+    rate_limit_window_seconds: int = 60
+    rate_limit_limit: int = 120
     
     class Config:
         env_file = ".env"

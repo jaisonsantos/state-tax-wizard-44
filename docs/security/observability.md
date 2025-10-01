@@ -24,6 +24,7 @@ All metrics are defined in `backend/app/observability.py`.
 | `analytics_dashboard_loaded_total` | Counter | `store_id` | Increments when `/v1/analytics/overview` responds successfully so ops teams can monitor dashboard traffic by store. |
 | `hmac_validation_failures_total` | Counter | `reason`, `store_id` | Counts request signing failures segmented by failure reason (missing signature, stale timestamp, invalid signature). |
 | `hmac_replay_attempts_total` | Counter | `store_id` | Tracks replay attempts detected by nonce validation to highlight potential abuse. |
+| `rate_limit_throttles_total` | Counter | `route` | Counts how often the distributed rate limiter rejects requests for each API route. |
 
 Scrape `/metrics` from the API container or <http://localhost:8000/metrics> when
 running locally.
@@ -118,12 +119,13 @@ jurisdictions and formats operators are downloading.
 
 | Field | Example | Notes |
 | ----- | ------- | ----- |
-| `event` | `"hmac_validation_failed"` | Event types include `hmac_validation_failed`, `hmac_validation_succeeded`, `hmac_replay_detected`, and `hmac_nonce_recorded`. |
+| `event` | `"hmac_validation_failed"` | Event types include `hmac_validation_failed`, `hmac_validation_succeeded`, `hmac_replay_detected`, `hmac_nonce_recorded`, and `rate_limit_throttle`. |
 | `store_id` | `"1cc66e24-4e93-4c9e-bebd-8ff9690e33cd"` | UUID for the store associated with the signed request. |
 | `code` | `"stale_timestamp"` | Failure-specific reason code mirrored in API responses. |
 | `nonce_preview` | `"abc123ef"` | First eight characters of the nonce for debugging without leaking the full value. |
 | `timestamp` | `"2025-03-15T18:02:14+00:00"` | Present on successful validations. |
 | `expires_at` | `"2025-03-15T18:12:14+00:00"` | Present on nonce recording events to indicate TTL. |
+| `retry_after_seconds` | `12` | Present on `rate_limit_throttle` events to indicate when a client can retry safely. |
 
 ```json
 {

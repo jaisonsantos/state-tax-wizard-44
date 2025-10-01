@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d8df6d4f-b89f-4ecf-8dc2-99e6043d55b3",
     "name": "State Tax Wizard API",
-    "description": "## Como usar\n1. Defina a vari\u00e1vel `base_url` para apontar para sua inst\u00e2ncia do backend (por padr\u00e3o \"http://localhost:8000\").\n2. Execute a requisi\u00e7\u00e3o **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como vari\u00e1veis de cole\u00e7\u00e3o.\n3. As demais requisi\u00e7\u00f5es usam `{{token}}` no cabe\u00e7alho `Authorization` e `{{store_id}}` como par\u00e2metro ou campo do corpo quando necess\u00e1rio.\n4. Ajuste payloads e par\u00e2metros conforme seu cen\u00e1rio e utilize os exemplos de resposta como refer\u00eancia para os esquemas retornados pelo FastAPI.",
+    "description": "## Como usar\n1. Defina a variável `base_url` para apontar para sua instância do backend (por padrão \"http://localhost:8000\").\n2. Execute a requisição **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como variáveis de coleção.\n3. As demais requisições usam `{{token}}` no cabeçalho `Authorization` e `{{store_id}}` como parâmetro ou campo do corpo quando necessário.\n4. Ajuste payloads e parâmetros conforme seu cenário e utilize os exemplos de resposta como referência para os esquemas retornados pelo FastAPI.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -485,6 +485,56 @@
                   "pm.collectionVariables.set('last_signed_timestamp', timestamp);",
                   "pm.collectionVariables.set('last_signed_body', resolvedBody);",
                   "pm.request.body.raw = resolvedBody;"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rotate HMAC secret",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores/{{store_id}}/hmac/rotate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores",
+                "{{store_id}}",
+                "hmac",
+                "rotate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Rotation request succeeded', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Secret returned once', function () {",
+                  "    pm.expect(body).to.have.property('hmac_secret');",
+                  "    pm.expect(body.hmac_secret).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('hmac_secret', body.hmac_secret);",
+                  "pm.collectionVariables.set('hmac_timestamp_override', '');",
+                  "pm.collectionVariables.set('hmac_nonce_override', '');",
+                  "pm.test('Collection variable updated', function () {",
+                  "    pm.expect(pm.collectionVariables.get('hmac_secret')).to.eql(body.hmac_secret);",
+                  "});"
                 ]
               }
             }

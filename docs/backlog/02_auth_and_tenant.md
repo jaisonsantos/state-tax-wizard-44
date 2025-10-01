@@ -46,7 +46,7 @@ store-level claims, leaving critical security gaps.
 - All production routers import and use the shared authorization dependency;
   automated lint/test checks fail if the dependency is absent.
 - JWT configuration, rotation process, and environment variables documented in
-  `docs/environment.md` with references from this epic.
+  `docs/security/environment.md` with references from this epic.
 - Frontend default store selection persisted and exercised in `make smoke` or
   equivalent automated scenario.
 - Audit logs verified to include authenticated subject identifiers, and

@@ -69,6 +69,13 @@ export interface StoreSettings {
   hmac_last_rotated_at?: string | null;
 }
 
+export interface RotateHmacSecretResponse {
+  store_id: string;
+  hmac_secret: string;
+  rotated_at: string;
+  previous_rotated_at?: string | null;
+}
+
 export interface UpdateStoreSettingsPayload {
   enable_mn: boolean;
   enable_co: boolean;
@@ -371,6 +378,12 @@ class ApiClient {
     return this.request<StoreSettings>(`/v1/stores/${storeId}/settings`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    });
+  }
+
+  async rotateHmacSecret(storeId: string): Promise<RotateHmacSecretResponse> {
+    return this.request<RotateHmacSecretResponse>(`/v1/stores/${storeId}/hmac/rotate`, {
+      method: 'POST',
     });
   }
 

@@ -28,3 +28,12 @@ class UpdateStoreSettingsRequest(BaseModel):
     enable_co: bool
     absorb_fee: bool
     label_override: str = Field(min_length=1, max_length=120)
+
+
+class RotateHmacSecretResponse(BaseModel):
+    """Response payload for HMAC secret rotations."""
+
+    store_id: str
+    hmac_secret: str = Field(..., min_length=32)
+    rotated_at: datetime
+    previous_rotated_at: Optional[datetime] = None

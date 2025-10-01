@@ -1,5 +1,7 @@
 # Milestone 7 — Webhooks & Order Lifecycle
 
+_[← Milestone 6 — Integrations](16_milestone_06_integrations.md) • [Milestone 8 — Launch →](18_milestone_08_launch.md)_
+
 ## Stage Validation Summary
 - **Platform integrations functional**: WooCommerce plugin and Shopify app send order data to `/v1/fees/apply` (Milestone 6).
 - **Audit logging captures decisions**: All fee applications logged with context ([`backend/app/services/audit_repository.py`](../../backend/app/services/audit_repository.py)).

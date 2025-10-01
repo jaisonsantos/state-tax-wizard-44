@@ -95,11 +95,40 @@ def sign_apply_request(secret: str, payload: dict[str, object]) -> tuple[dict[st
 
 Inspect the `security` logger or the `hmac_validation_failures_total`/`hmac_replay_attempts_total` metrics for additional diagnostics when debugging integration issues.
 
+## Rate limiting
+
+The fees API enforces a distributed rate limiter backed by Redis. Limits are tracked per store (or token subject) and route. When a client exceeds the quota within the one-minute window the response is `429 Too Many Requests` with a JSON payload such as:
+
+```json
+{
+  "message": "Rate limit exceeded",
+  "retry_after_seconds": 12,
+  "route": "quote"
+}
+```
+
+Operations can monitor `rate_limit_throttles_total{route}` and the `security` logger event `rate_limit_throttle` to observe pressure or abuse. Apply exponential backoff or pause for the indicated retry window before reattempting the call.
+
 ## Secret rotation
 
-1. Generate a new random 32+ byte secret per store (e.g. `openssl rand -hex 32`).
-2. Update the store via the admin tooling or seed script; the `hmac_secret_rotated_at` timestamp records when the secret changed.
-3. Distribute the secret over a secure channel to each integration. Avoid emailing raw secrets.
-4. Monitor `hmac_validation_failures_total{store_id}` for spikes during the transition. Roll back by reapplying the previous secret if necessary.
+Secrets can be rotated from the Settings UI ("Rotate HMAC Secret") or programmatically via `POST /api/v1/stores/{store_id}/hmac/rotate`. The API responds once with the freshly generated secret:
 
-For audits, capture the output of `python backend/seed_data.py` (which prints the seeded secret) or query the admin view to show rotation history.
+```json
+{
+  "store_id": "...",
+  "hmac_secret": "new-secret-value",
+  "rotated_at": "2025-01-10T22:10:33+00:00",
+  "previous_rotated_at": "2024-12-01T15:42:11+00:00"
+}
+```
+
+Immediately copy the secret into your secrets manager—neither the API nor logs will display it again. After rotation, any requests signed with the old secret return `403` and `detail.code = invalid_signature`. Previously recorded nonces continue to expire normally; rotation does not flush the nonce table.
+
+**Recommended workflow**
+
+1. Rotate the secret via UI or API during a planned maintenance window.
+2. Distribute the new value to each integration (Postman scripts automatically pick up the response).
+3. Redeploy integrations, then remove any temporary overrides (`hmac_timestamp_override`, `hmac_nonce_override`).
+4. Watch `hmac_validation_failures_total{reason="invalid_signature"}` for spikes while clients migrate.
+
+The audit log records `store_secret.rotated` entries with timestamps (no secret payload) for compliance reviews.

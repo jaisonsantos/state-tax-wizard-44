@@ -78,7 +78,7 @@ GET /api/v1/analytics/overview
 - `recent_decisions.next_cursor` is `null` when the requested window has no additional audit rows. Pass the cursor value back to continue fetching history without an ever-increasing offset.
 - `counters` contains Prometheus snapshot values pulled directly from the in-process collectors (`fees_applied_total`, `fees_absorbed_total`, and `report_exports_total`). This avoids scraping `/metrics` from the frontend.
 - KPI totals and deltas in `metric_cards` come from transactional data, not the Prometheus counters, so deployments with multiple API instances continue to return consistent analytics.
-- Successful responses increment the `analytics_dashboard_loaded_total{store_id="..."}` counter and emit a structured `analytics_dashboard_loaded` log entry for auditability. See [`docs/observability.md`](../observability.md) for field definitions.
+- Successful responses increment the `analytics_dashboard_loaded_total{store_id="..."}` counter and emit a structured `analytics_dashboard_loaded` log entry for auditability. See [`docs/security/observability.md`](../security/observability.md) for field definitions.
 
 ### Error responses
 - `401 Unauthorized` — The request is missing a valid `Authorization: Bearer <token>` header.

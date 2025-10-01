@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Play, AlertTriangle } from "lucide-react";
+import { Settings2, Play, AlertTriangle, RotateCw, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +22,8 @@ export default function Settings() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [hmacRotatedAt, setHmacRotatedAt] = useState<string | null>(null);
+  const [rotatingSecret, setRotatingSecret] = useState(false);
+  const [lastRotatedSecret, setLastRotatedSecret] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<{
     totalFeeCents: number;
     reasonCodes: string[];
@@ -81,11 +83,13 @@ export default function Settings() {
       setAbsorbFee(false);
       setLabelOverride("Delivery Fee");
       setHmacRotatedAt(null);
+      setLastRotatedSecret(null);
       return;
     }
 
     let cancelled = false;
     setSettingsLoading(true);
+    setLastRotatedSecret(null);
 
     apiClient
       .getStoreSettings(storeId)
@@ -154,6 +158,67 @@ export default function Settings() {
       });
     } finally {
       setSettingsSaving(false);
+    }
+  };
+
+  const handleRotateSecret = async () => {
+    if (!storeId) {
+      toast({
+        title: "Select a store",
+        description: "Choose a store before rotating the HMAC secret.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRotatingSecret(true);
+    try {
+      const response = await apiClient.rotateHmacSecret(storeId);
+      setHmacRotatedAt(response.rotated_at ?? null);
+      setLastRotatedSecret(response.hmac_secret);
+
+      toast({
+        title: "HMAC secret rotated",
+        description:
+          "All future signatures must use the new secret. Copy it now and store it securely.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to rotate secret",
+        description: error instanceof Error ? error.message : "Unexpected error",
+        variant: "destructive",
+      });
+    } finally {
+      setRotatingSecret(false);
+    }
+  };
+
+  const handleCopySecret = async () => {
+    if (!lastRotatedSecret) {
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      toast({
+        title: "Clipboard unavailable",
+        description: "Copy this value manually from the field below.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(lastRotatedSecret);
+      toast({
+        title: "Secret copied",
+        description: "Store it in your password manager or secrets vault.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: error instanceof Error ? error.message : "Copy command was blocked.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -319,6 +384,58 @@ export default function Settings() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RotateCw className="h-5 w-5" />
+            HMAC Secret Management
+          </CardTitle>
+          <CardDescription>
+            Rotate your signing secret to invalidate compromised credentials.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Rotating the secret immediately blocks existing signatures. Generate a new secret before distributing
+            credentials to your commerce platform.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={handleRotateSecret}
+              variant="outline"
+              disabled={rotatingSecret || !storeId}
+            >
+              <RotateCw className="mr-2 h-4 w-4" />
+              {rotatingSecret ? "Rotating…" : "Rotate HMAC Secret"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Ensure all integrations update their stored secret after rotation.
+            </p>
+          </div>
+          {lastRotatedSecret && (
+            <div className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-4">
+              <p className="text-sm font-medium text-primary-foreground">
+                New secret generated — copy it now. This value will not be shown again.
+              </p>
+              <Textarea value={lastRotatedSecret} readOnly rows={3} className="font-mono text-xs" />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" size="sm" onClick={handleCopySecret}>
+                  <Copy className="mr-2 h-4 w-4" /> Copy secret
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLastRotatedSecret(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

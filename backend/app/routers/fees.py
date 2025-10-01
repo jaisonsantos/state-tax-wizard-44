@@ -62,9 +62,9 @@ async def quote_fees(
 ):
     """Calculate delivery fees for a given order."""
 
-    rate_limiter.check(auth.token, "quote")
-
     assert_store_access(db, auth, request.store_id)
+
+    rate_limiter.check(str(request.store_id), "quote")
 
     store = db.query(Store).filter(Store.id == request.store_id).first()
     if not store:
@@ -111,9 +111,9 @@ async def apply_fees(
 ):
     """Apply delivery fees to an order (idempotent)."""
 
-    rate_limiter.check(auth.token, "apply")
-
     assert_store_access(db, auth, request.store_id)
+
+    rate_limiter.check(str(request.store_id), "apply")
 
     settings = (
         db.query(StoreSetting)
@@ -245,9 +245,9 @@ async def reverse_fees(
 ):
     """Reverse previously applied fees for an order."""
 
-    rate_limiter.check(auth.token, "reverse")
-
     assert_store_access(db, auth, request.store_id)
+
+    rate_limiter.check(str(request.store_id), "reverse")
 
     fees = (
         db.query(OrderFee)

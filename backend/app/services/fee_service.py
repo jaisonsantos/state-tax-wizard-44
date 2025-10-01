@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List
 
 from sqlalchemy.orm import Session
@@ -48,7 +48,7 @@ class FeeCalculationService:
         absorb_fee = settings.absorb_fee if settings else False
         label_override = _normalize_override(settings.label_override if settings else None)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         mn_rule = (
             db.query(RuleVersion)
             .filter(

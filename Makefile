@@ -1,4 +1,4 @@
-.PHONY: dev up down build clean logs logs-api migrate seed dev-tools shell-api shell-db smoke reports-smoke analytics-smoke security-smoke
+.PHONY: dev up down build clean logs logs-api migrate seed dev-tools shell-api shell-db smoke reports-smoke analytics-smoke security-smoke anti-drift ci-anti-drift
 
 # Choose docker compose flavor (v2 default)
 COMPOSE := docker compose
@@ -67,3 +67,12 @@ analytics-smoke: up migrate seed
 # Focused smoke for HMAC/replay validation
 security-smoke: up migrate seed
 	$(COMPOSE) exec api python smoke_test.py --security-only
+
+# Anti-drift scan used by CI to keep docs aligned with headers and secrets
+anti-drift:
+	rg "X-.*Signature\|Timestamp\|Nonce" docs src backend
+	rg "hmac_secret.*store" -n docs backend
+
+# CI helper: run anti-drift scans and the security smoke suite
+ci-anti-drift: anti-drift
+	$(MAKE) security-smoke

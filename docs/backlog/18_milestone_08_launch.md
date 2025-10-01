@@ -1,5 +1,7 @@
 # Milestone 8 — Production Readiness & Launch
 
+_[← Milestone 7 — Webhooks](17_milestone_07_webhooks.md) • [Backlog Overview →](README.md)_
+
 ## Stage Validation Summary
 - **Core features complete**: Fee engine, reporting, analytics, billing, integrations, and webhooks implemented (Milestones 1-7).
 - **Security hardened**: HMAC verification, rate limiting, session management, and secrets rotation in place (Milestone 4).

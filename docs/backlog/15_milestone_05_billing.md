@@ -1,5 +1,7 @@
 # Milestone 5 — Billing & Stripe Integration
 
+_[← Milestone 4 — Security](14_milestone_04_security.md) • [Milestone 6 — Integrations →](16_milestone_06_integrations.md)_
+
 ## Stage Validation Summary
 - **Mock billing endpoint live**: `/v1/billing/entitlements` returns hardcoded plan data for UI development ([`backend/app/routers/billing.py`](../../backend/app/routers/billing.py)).
 - **Frontend billing page exists**: Displays static pricing tables and mock subscription history ([`src/pages/Billing.tsx`](../../src/pages/Billing.tsx)).
@@ -176,7 +178,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   ```
 
 ### 10. Operations & Rollout
-- Extend `docs/environment.md`:
+- Extend `docs/security/environment.md`:
   - Document `STRIPE_SECRET_KEY` setup (test vs production keys).
   - Webhook endpoint URL for Stripe dashboard: `https://api.yourdomain.com/v1/billing/webhooks/stripe`.
   - Required webhook events to enable in Stripe: subscription.*, invoice.*.

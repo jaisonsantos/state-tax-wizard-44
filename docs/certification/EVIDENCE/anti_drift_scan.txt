@@ -1,0 +1,2 @@
+rg "X-.*Signature|Timestamp|Nonce" docs src backend
+rg "hmac_secret.*store" -n docs backend

@@ -1,12 +1,14 @@
 # Milestone 4 — Security & Rate Limiting
 
+_[← Milestone 3 — Frontend Polish](13_milestone_03_frontend_polish.md) • [Milestone 5 — Billing →](15_milestone_05_billing.md)_
+
 ## Stage Validation Summary
 - **Auth foundation ready**: JWT-based authentication with session tokens persisted in `session_tokens` table, logout revokes active sessions ([`backend/app/routers/auth.py`](../../backend/app/routers/auth.py)).
 - **Store scoping enforced**: All fee endpoints validate store ownership via `AuthService.validate_store_access` ([`backend/app/core/security.py`](../../backend/app/core/security.py)).
 - **Observability in place**: Prometheus counters and structured logs capture fee operations and auth events ([`backend/app/observability.py`](../../backend/app/observability.py)).
 - **Security slice delivered**: `/v1/fees/apply` now enforces timestamp/nonce validation, persists processed nonces, surfaces structured security logs, and exports Prometheus counters for failures/replays.
 - **Secrets centralised**: Store-specific signing keys live in `store_settings.hmac_secret` with rotation timestamps managed in the same table, keeping credentials out of the legacy `stores` record.
-- **Remaining gap**: Per-store rate limiting still relies on the in-memory limiter and secrets rotation SOP tooling is pending.
+- **Remaining gap**: Document production guidance for Redis/HMAC secrets in the ops runbook; security code changes are complete.
 
 ## Next Development Objective
 Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugin requests, per-store rate limiting, replay protection, and comprehensive security logging to prepare the platform for production traffic.
@@ -48,7 +50,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
   - `HighHMACFailureRate`: >10% of requests failing HMAC validation in 5-minute window.
   - `RateLimitAbusePattern`: Single store hitting rate limits >5 times in 10 minutes.
   - `TokenReuseAttempts`: Revoked tokens being reused.
-- Integrate with observability dashboard (Grafana/Prometheus) per `docs/observability.md`.
+- Integrate with observability dashboard (Grafana/Prometheus) per `docs/security/observability.md`.
 
 ### 5. Secrets Management Documentation
 - Create `docs/security/secrets.md` covering:
@@ -105,7 +107,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
   - Button to regenerate HMAC secret (with confirmation dialog).
 
 ### 10. Operations Runbook
-- Extend `docs/environment.md` with security configuration:
+- Extend `docs/security/environment.md` with security configuration:
   - Required environment variables: `REDIS_URL`, `JWT_SECRET`, `HMAC_ALGORITHM` (default HS256).
   - Feature flags: `ENABLE_HMAC_VERIFICATION`, `ENABLE_RATE_LIMITING` (default true in production).
 - Create `docs/security/incident-response.md`:
