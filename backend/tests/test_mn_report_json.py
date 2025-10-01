@@ -114,3 +114,24 @@ def test_mn_summary_json_with_data(client: TestClient, db_session: Session):
     assert payload["fee_total_cents"] > 0
     assert payload["tx_count_threshold_met"] >= 1
     assert payload["shown_count"] >= 1
+
+
+def test_mn_summary_accepts_zulu_timestamps(client: TestClient, db_session: Session):
+    token, store_id = authenticate(client)
+    ensure_mn_rule(db_session)
+
+    start = datetime.now(timezone.utc) - timedelta(days=1)
+    end = datetime.now(timezone.utc)
+
+    response = client.get(
+        "/api/v1/reports/mn/summary",
+        params={
+            "store_id": store_id,
+            "from_date": start.isoformat().replace("+00:00", "Z"),
+            "to_date": end.isoformat(),
+            "format": "json",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
