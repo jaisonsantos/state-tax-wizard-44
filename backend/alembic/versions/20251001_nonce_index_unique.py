@@ -3,7 +3,7 @@
 from alembic import op
 
 
-revision = "20251001_ensure_unique_nonce_index"
+revision = "20251001_nonce_index_unique"
 down_revision = "202503150001"
 branch_labels = None
 depends_on = None
