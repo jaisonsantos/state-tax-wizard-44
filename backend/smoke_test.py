@@ -35,7 +35,10 @@ def _raise_for_status(response: httpx.Response, context: str) -> None:
 
 
 def _iso(dt: datetime) -> str:
-    return dt.replace(microsecond=0).isoformat() + "Z"
+    value = dt.replace(microsecond=0).isoformat()
+    if value.endswith("+00:00"):
+        return value[:-6] + "Z"
+    return value
 
 
 def login(client: httpx.Client) -> Dict[str, Any]:

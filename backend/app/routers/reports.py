@@ -1,6 +1,6 @@
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,9 +18,24 @@ router = APIRouter(prefix="/v1/reports", tags=["reports"])
 def _parse_iso_datetime(value: str) -> datetime:
     """Parse ISO8601 strings that may end with "Z" or contain offsets."""
 
-    if value.endswith("Z"):
-        value = value[:-1] + "+00:00"
-    return datetime.fromisoformat(value)
+    raw = value.strip()
+
+    # Support epoch timestamps for convenience when debugging.
+    try:
+        if raw.replace(".", "", 1).lstrip("+-").isdigit():
+            return datetime.fromtimestamp(float(raw), tz=timezone.utc)
+    except ValueError:  # pragma: no cover - defensive guard
+        pass
+
+    if raw.endswith("Z"):
+        core = raw[:-1]
+        # Detect offsets such as +00:00 or -05:00.
+        if len(core) >= 6 and core[-6] in {"+", "-"} and core[-3] == ":":
+            raw = core
+        else:
+            raw = core + "+00:00"
+
+    return datetime.fromisoformat(raw)
 
 
 def _persist_audit(
