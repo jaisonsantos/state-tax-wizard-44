@@ -15,6 +15,14 @@ from ..services.report_service import ReportExportResult, ReportService
 router = APIRouter(prefix="/v1/reports", tags=["reports"])
 
 
+def _parse_iso_datetime(value: str) -> datetime:
+    """Parse ISO8601 strings that may end with "Z" or contain offsets."""
+
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.fromisoformat(value)
+
+
 def _persist_audit(
     db: Session,
     *,
@@ -61,8 +69,8 @@ async def generate_co_dr1786(
     assert_store_access(db, auth, store_id)
 
     # Parse dates
-    from_dt = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
-    to_dt = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+    from_dt = _parse_iso_datetime(from_date)
+    to_dt = _parse_iso_datetime(to_date)
 
     actor = f"user:{auth.email}"
 
@@ -130,8 +138,8 @@ async def generate_mn_summary(
     assert_store_access(db, auth, store_id)
 
     # Parse dates
-    from_dt = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
-    to_dt = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+    from_dt = _parse_iso_datetime(from_date)
+    to_dt = _parse_iso_datetime(to_date)
 
     actor = f"user:{auth.email}"
 
