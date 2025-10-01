@@ -13,6 +13,16 @@ from app.security.rate_limit import rate_limiter
 from app.security.hmac import compute_signature
 
 
+def _enable_hmac(db_session: Session, store_id: str, secret: str = "test-secret") -> str:
+    store_settings = (
+        db_session.query(StoreSetting).filter(StoreSetting.store_id == store_id).one()
+    )
+    store_settings.hmac_secret = secret
+    store_settings.hmac_secret_rotated_at = datetime.now(timezone.utc)
+    db_session.commit()
+    return secret
+
+
 def _create_rule_versions(db_session: Session) -> None:
     db_session.add(
         RuleVersion(
@@ -50,10 +60,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
     auth_header = {"Authorization": f"Bearer {token}"}
     _create_rule_versions(db_session)
 
-    store_settings = db_session.query(StoreSetting).filter(StoreSetting.store_id == store_id).one()
-    store_settings.hmac_secret = "test-secret"
-    store_settings.hmac_secret_rotated_at = datetime.now(timezone.utc)
-    db_session.commit()
+    secret = _enable_hmac(db_session, store_id)
 
     original_skew = app_settings.hmac_max_skew_seconds
     original_ttl = app_settings.hmac_replay_ttl_seconds
@@ -98,7 +105,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         valid_headers = dict(auth_header)
         timestamp_iso = datetime.now(timezone.utc).isoformat()
         nonce_value = uuid.uuid4().hex
-        signature = compute_signature(store_settings.hmac_secret, timestamp_iso, nonce_value, unsigned_body)
+        signature = compute_signature(secret, timestamp_iso, nonce_value, unsigned_body)
         valid_headers.update(
             {
                 "Content-Type": "application/json",
@@ -125,7 +132,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         # Prefixed signature format is also accepted
         prefixed_timestamp = datetime.now(timezone.utc).isoformat()
         prefixed_nonce = uuid.uuid4().hex
-        prefixed_signature = compute_signature(store_settings.hmac_secret, prefixed_timestamp, prefixed_nonce, unsigned_body)
+        prefixed_signature = compute_signature(secret, prefixed_timestamp, prefixed_nonce, unsigned_body)
         prefixed_headers = dict(auth_header)
         prefixed_headers.update(
             {
@@ -147,7 +154,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         stale_headers = dict(valid_headers)
         stale_time = datetime.now(timezone.utc) - timedelta(seconds=app_settings.hmac_max_skew_seconds + 30)
         stale_timestamp = stale_time.isoformat()
-        stale_signature = compute_signature(store_settings.hmac_secret, stale_timestamp, uuid.uuid4().hex, unsigned_body)
+        stale_signature = compute_signature(secret, stale_timestamp, uuid.uuid4().hex, unsigned_body)
         stale_headers.update(
             {
                 "x-rdf-timestamp": stale_timestamp,
@@ -171,7 +178,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         db_session.expire_all()
 
         fresh_timestamp = datetime.now(timezone.utc).isoformat()
-        fresh_signature = compute_signature(store_settings.hmac_secret, fresh_timestamp, nonce_value, unsigned_body)
+        fresh_signature = compute_signature(secret, fresh_timestamp, nonce_value, unsigned_body)
         refreshed_headers = dict(auth_header)
         refreshed_headers.update(
             {
@@ -223,3 +230,113 @@ def test_rate_limit_per_token_route(client: TestClient, db_session: Session) -> 
     finally:
         rate_limiter.limit = original_limit
         rate_limiter.reset()
+
+
+def test_hmac_accepts_iso_timestamp_with_z_suffix(client: TestClient, db_session: Session) -> None:
+    token, store_id = _login(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
+    _create_rule_versions(db_session)
+    secret = _enable_hmac(db_session, store_id)
+
+    payload = {
+        "store_id": store_id,
+        "order_id": "hmac-z-test",
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU", "qty": 1, "unit_price_cents": 15000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    timestamp_z = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    nonce_value = uuid.uuid4().hex
+    signature = compute_signature(secret, timestamp_z, nonce_value, body)
+
+    headers = {
+        **auth_header,
+        "Content-Type": "application/json",
+        "x-rdf-timestamp": timestamp_z,
+        "x-rdf-nonce": nonce_value,
+        "x-rdf-signature": signature,
+    }
+
+    response = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    assert response.status_code == 200
+
+
+def test_hmac_accepts_epoch_timestamp(client: TestClient, db_session: Session) -> None:
+    token, store_id = _login(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
+    _create_rule_versions(db_session)
+    secret = _enable_hmac(db_session, store_id)
+
+    payload = {
+        "store_id": store_id,
+        "order_id": "hmac-epoch-test",
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU", "qty": 1, "unit_price_cents": 15000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    timestamp_epoch = str(int(datetime.now(timezone.utc).timestamp()))
+    nonce_value = uuid.uuid4().hex
+    signature = compute_signature(secret, timestamp_epoch, nonce_value, body)
+
+    headers = {
+        **auth_header,
+        "Content-Type": "application/json",
+        "x-rdf-timestamp": timestamp_epoch,
+        "x-rdf-nonce": nonce_value,
+        "x-rdf-signature": signature,
+    }
+
+    response = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    assert response.status_code == 200
+
+
+def test_security_logs_do_not_expose_secrets(
+    client: TestClient, db_session: Session, caplog
+) -> None:
+    token, store_id = _login(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
+    _create_rule_versions(db_session)
+    secret = _enable_hmac(db_session, store_id, secret="log-guard-secret")
+
+    payload = {
+        "store_id": store_id,
+        "order_id": "hmac-log-test",
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU", "qty": 1, "unit_price_cents": 15000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    timestamp_iso = datetime.now(timezone.utc).isoformat()
+    nonce_value = uuid.uuid4().hex
+    invalid_signature = "deadbeef"
+
+    headers = {
+        **auth_header,
+        "Content-Type": "application/json",
+        "x-rdf-timestamp": timestamp_iso,
+        "x-rdf-nonce": nonce_value,
+        "x-rdf-signature": invalid_signature,
+    }
+
+    caplog.set_level("INFO", logger="security")
+    response = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    assert response.status_code == 403
+    log_output = "\n".join(record.getMessage() for record in caplog.records)
+    assert log_output
+    assert "hmac_validation_failed" in log_output
+    assert secret not in log_output
+    assert invalid_signature not in log_output

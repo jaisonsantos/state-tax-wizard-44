@@ -283,11 +283,14 @@ def seed_database():
         print("Database seeded successfully!")
         for store in db.query(Store).all():
             if store.settings and store.settings.hmac_secret:
+                secret = store.settings.hmac_secret
+                suffix = secret[-6:] if len(secret) >= 6 else secret
+                masked = f"****{suffix}"
                 print(
                     "HMAC secret for",
                     f"{store.name} ({store.id})",
                     "=",
-                    store.settings.hmac_secret,
+                    masked,
                 )
         
     except Exception as e:

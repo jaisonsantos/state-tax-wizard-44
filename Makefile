@@ -62,8 +62,8 @@ reports-smoke: up migrate seed
 
 # Focused smoke for analytics overview
 analytics-smoke: up migrate seed
-        $(COMPOSE) exec api python smoke_test.py --analytics-only
+	$(COMPOSE) exec api python smoke_test.py --analytics-only
 
 # Focused smoke for HMAC/replay validation
 security-smoke: up migrate seed
-        $(COMPOSE) exec api python smoke_test.py --security-only
+	$(COMPOSE) exec api python smoke_test.py --security-only

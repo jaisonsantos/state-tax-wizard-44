@@ -148,8 +148,9 @@ def enforce_hmac(
     if not signature_header:
         _raise_failure(store_id_str, 401, "missing_signature", "Missing X-RDF-Signature header")
 
+    raw_ts = timestamp_header.strip()
     try:
-        parsed_timestamp = _parse_timestamp(timestamp_header)
+        parsed_timestamp = _parse_timestamp(raw_ts)
     except ValueError as exc:
         _raise_failure(store_id_str, 401, "invalid_timestamp", str(exc))
 
@@ -158,14 +159,15 @@ def enforce_hmac(
     if skew_seconds > settings.hmac_max_skew_seconds:
         _raise_failure(store_id_str, 401, "stale_timestamp", "Timestamp outside allowable window")
 
-    nonce_value = nonce_header or ""
-    _validate_nonce(db, store_id_str, nonce_value, current)
-
-    expected = compute_signature(secret, parsed_timestamp.isoformat(), nonce_value, body)
+    nonce_value = (nonce_header or "").strip()
+    expected = compute_signature(secret, raw_ts, nonce_value, body)
     provided = _strip_prefix(signature_header)
 
     if not hmac.compare_digest(provided, expected):
         _raise_failure(store_id_str, 403, "invalid_signature", "HMAC signature mismatch")
+
+    # Registra o nonce somente após assinatura válida (reduz write-amplification em ataques)
+    _validate_nonce(db, store_id_str, nonce_value, current)
 
     log_security_event(
         {

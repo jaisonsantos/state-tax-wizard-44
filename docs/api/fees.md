@@ -20,9 +20,15 @@ settings. The API also returns `absorbed` at the top level and persists
 
 `POST /api/v1/fees/apply` supports optional request signing to protect against
 payload tampering. When a store setting includes an `hmac_secret`, clients **must**
-send an `X-RDF-Signature` header containing a lowercase hexadecimal SHA-256 digest
-of the raw request body using that secret as the key. The API accepts either the
-bare digest or an explicit algorithm prefix:
+send:
+
+- `X-RDF-Timestamp`: ISO-8601 timestamp (recommended) or Unix epoch seconds. The
+  signature uses the **exact** header value provided, including a trailing `Z`
+  when present.
+- `X-RDF-Nonce`: unique, one-time value per request.
+- `X-RDF-Signature`: lowercase hexadecimal SHA-256 digest of the canonical payload
+  (`timestamp + "\n" + nonce + "\n" + body`) using the store secret. The API accepts
+  either the bare digest or an explicit algorithm prefix:
 
 ```
 X-RDF-Signature: <hex digest>
@@ -30,9 +36,9 @@ X-RDF-Signature: <hex digest>
 X-RDF-Signature: sha256=<hex digest>
 ```
 
-If a secret is configured and the header is **missing**, the API responds with
-`401 Unauthorized`. If the header is present but **invalid**, the API responds
-with `403 Forbidden`.
+If a secret is configured and a required header is **missing**, the API responds
+with `401 Unauthorized`. If the signature is present but **invalid**, the API
+responds with `403 Forbidden`.
 
 The quote endpoint does not require HMAC, and the reversal endpoint intentionally
 leaves HMAC optional for MVP to simplify back-office tooling.

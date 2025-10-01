@@ -64,5 +64,4 @@ def downgrade() -> None:
     op.drop_index("ix_processed_nonces_expires", table_name="processed_nonces")
     op.drop_index("uq_processed_nonces_store_nonce", table_name="processed_nonces")
     op.drop_table("processed_nonces")
-
     op.drop_column("store_settings", "hmac_secret_rotated_at")
