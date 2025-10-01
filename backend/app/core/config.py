@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings
 from typing import Optional
+
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://user:pass@postgres:5432/rdf"
@@ -11,6 +13,8 @@ class Settings(BaseSettings):
     stripe_secret_key: Optional[str] = "sk_test_stub"
     shopify_app_key: Optional[str] = "stub_key"
     shopify_app_secret: Optional[str] = "stub_secret"
+    hmac_max_skew_seconds: int = 300
+    hmac_replay_ttl_seconds: int = 600
     
     class Config:
         env_file = ".env"

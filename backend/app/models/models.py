@@ -68,6 +68,7 @@ class StoreSetting(Base):
     label_override = Column(Text, default="Delivery Fee")
     plan = Column(String(20), default="starter")  # "starter", "pro", "plus"
     hmac_secret = Column(Text, nullable=True)
+    hmac_secret_rotated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     store = relationship("Store", back_populates="settings")
@@ -174,3 +175,22 @@ class SessionToken(Base):
     user = relationship("User", back_populates="sessions")
 
     __table_args__ = (Index("uq_session_tokens_jti", "jti", unique=True),)
+
+
+class ProcessedNonce(Base):
+    __tablename__ = "processed_nonces"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    store_id = Column(GUID(), ForeignKey("stores.id"), nullable=False)
+    nonce = Column(String(128), nullable=False)
+    processed_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("uq_processed_nonces_store_nonce", "store_id", "nonce", unique=True),
+        Index("ix_processed_nonces_expires", "expires_at"),
+    )

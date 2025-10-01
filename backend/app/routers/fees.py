@@ -1,7 +1,5 @@
-import hashlib
-import hmac
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -26,6 +24,7 @@ from ..schema.fees import (
     FeeReversalRequest,
     FeeReversalResponse,
 )
+from ..security.hmac import enforce_hmac
 from ..security.rate_limit import rate_limiter
 from ..services.fee_service import (
     DEFAULT_LABELS,
@@ -53,26 +52,6 @@ def _resolve_display_name(order_fee: OrderFee, settings: StoreSetting | None) ->
     if override:
         return override
     return DEFAULT_LABELS.get(order_fee.jurisdiction, "Delivery Fee")
-
-
-def _enforce_hmac(signature: str | None, body: bytes, settings: StoreSetting | None) -> None:
-    secret = (settings.hmac_secret or "").strip() if settings and settings.hmac_secret else ""
-    if not secret:
-        return
-
-    if not signature:
-        raise HTTPException(status_code=401, detail="Missing HMAC signature")
-
-    provided = signature.strip()
-    lowered = provided.lower()
-    if lowered.startswith("sha256="):
-        # aceita tanto "sha256=<hex>" quanto apenas "<hex>"
-        provided = provided.split("=", 1)[1].strip()
-        lowered = provided.lower()
-
-    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(lowered, digest):
-        raise HTTPException(status_code=403, detail="Invalid HMAC signature")
 
 
 @router.post("/quote", response_model=FeeQuoteResponse)
@@ -143,7 +122,13 @@ async def apply_fees(
     )
 
     raw_body = await http_request.body()
-    _enforce_hmac(http_request.headers.get("x-rdf-signature"), raw_body, settings)
+    enforce_hmac(
+        headers=http_request.headers,
+        body=raw_body,
+        settings_model=settings,
+        store_id=str(request.store_id),
+        db=db,
+    )
 
     existing_lines = db.query(OrderFee).filter(
         OrderFee.store_id == request.store_id,
@@ -280,7 +265,7 @@ async def reverse_fees(
     refunded_amount = 0
     reversal_tag = f"REVERSAL_{request.reason}"
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if request.reason == "DELIVERY_CANCELLED":
         for fee in fees:

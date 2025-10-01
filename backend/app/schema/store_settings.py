@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -14,6 +15,10 @@ class StoreSettingsResponse(BaseModel):
     absorb_fee: bool = Field(..., description="If true, the shopper does not see the fee line item")
     label_override: str = Field(..., description="Custom label shown when the fee is visible")
     plan: Optional[str] = Field(None, description="Billing plan associated with the store")
+    hmac_last_rotated_at: Optional[datetime] = Field(
+        None,
+        description="Timestamp of the most recent HMAC secret rotation",
+    )
 
 
 class UpdateStoreSettingsRequest(BaseModel):

@@ -38,6 +38,18 @@ analytics_dashboard_loaded_total = Counter(
     ["store_id"],
 )
 
+hmac_validation_failures_total = Counter(
+    "hmac_validation_failures_total",
+    "Count of failed HMAC validation attempts",
+    ["reason", "store_id"],
+)
+
+hmac_replay_attempts_total = Counter(
+    "hmac_replay_attempts_total",
+    "Count of replayed HMAC nonce attempts",
+    ["store_id"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",
@@ -85,6 +97,13 @@ def log_analytics_event(event: Dict[str, Any]) -> None:
     """Emit a structured analytics dashboard log."""
 
     logger = logging.getLogger("analytics")
+    logger.info(json.dumps(event, default=str))
+
+
+def log_security_event(event: Dict[str, Any]) -> None:
+    """Emit a structured security log entry."""
+
+    logger = logging.getLogger("security")
     logger.info(json.dumps(event, default=str))
 
 

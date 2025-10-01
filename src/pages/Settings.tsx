@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2, Play, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Settings() {
@@ -21,6 +21,7 @@ export default function Settings() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [hmacRotatedAt, setHmacRotatedAt] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<{
     totalFeeCents: number;
     reasonCodes: string[];
@@ -44,6 +45,34 @@ export default function Settings() {
     return stores.find((store) => store.id === storeId)?.name ?? "";
   }, [stores, storeId]);
 
+  const formattedHmacRotation = useMemo(() => {
+    if (!hmacRotatedAt) {
+      return null;
+    }
+    const parsed = new Date(hmacRotatedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return hmacRotatedAt;
+    }
+    return parsed.toLocaleString();
+  }, [hmacRotatedAt]);
+
+  const describeHmacError = (error: ApiError): string => {
+    switch (error.code) {
+      case "missing_signature":
+        return "Request signature missing. Refresh the page and try again.";
+      case "invalid_signature":
+        return "Signature verification failed. Confirm the HMAC secret configured for this store.";
+      case "stale_timestamp":
+        return "Signature expired. Ensure your integration sends UTC timestamps within the 5-minute window.";
+      case "replay_detected":
+        return "Replay detected. Generate a new nonce for each request before retrying.";
+      case "missing_nonce":
+        return "Nonce header missing. Include X-RDF-Nonce when signing requests.";
+      default:
+        return error.message;
+    }
+  };
+
   useEffect(() => {
     if (!storeId) {
       setPlan(null);
@@ -51,6 +80,7 @@ export default function Settings() {
       setEnableCO(true);
       setAbsorbFee(false);
       setLabelOverride("Delivery Fee");
+      setHmacRotatedAt(null);
       return;
     }
 
@@ -66,6 +96,7 @@ export default function Settings() {
         setAbsorbFee(settings.absorb_fee);
         setLabelOverride(settings.label_override);
         setPlan(settings.plan ?? null);
+        setHmacRotatedAt(settings.hmac_last_rotated_at ?? null);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -109,6 +140,7 @@ export default function Settings() {
       setAbsorbFee(updated.absorb_fee);
       setLabelOverride(updated.label_override);
       setPlan(updated.plan ?? null);
+      setHmacRotatedAt(updated.hmac_last_rotated_at ?? null);
 
       toast({
         title: "Settings saved",
@@ -237,9 +269,15 @@ export default function Settings() {
       });
     } catch (error) {
       setApplyResult(null);
+      const description =
+        error instanceof ApiError
+          ? `${describeHmacError(error)} Review docs/security/hmac.md for integration steps.`
+          : error instanceof Error
+            ? error.message
+            : "Failed to apply fee";
       toast({
         title: "Apply Error",
-        description: error instanceof Error ? error.message : "Failed to apply fee",
+        description,
         variant: "destructive",
       });
     } finally {
@@ -257,6 +295,14 @@ export default function Settings() {
         {plan && (
           <p className="text-xs text-muted-foreground mt-1">
             Current plan: <span className="font-medium text-foreground">{plan}</span>
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground mt-2">
+          Signed requests are required when using the Apply endpoint. Review <span className="font-medium text-foreground">docs/security/hmac.md</span> for header, nonce, and rotation guidance.
+        </p>
+        {formattedHmacRotation && (
+          <p className="text-xs text-muted-foreground mt-1">
+            HMAC secret last rotated: <span className="font-medium text-foreground">{formattedHmacRotation}</span>
           </p>
         )}
       </div>

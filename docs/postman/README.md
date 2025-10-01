@@ -19,6 +19,9 @@ The collection expects the following collection variables:
 | `token` | JWT captured after authenticating | _set by login script_ |
 | `store_id` | Active store for fee scenarios | _set by login script_ |
 | `evidence_dir` | Directory where Newman should write report artifacts | _optional_; used to echo artifact paths into the CI logs |
+| `hmac_secret` | Shared secret used to sign `/v1/fees/apply` requests | `demo-hmac-secret` (matches seed data) |
+| `hmac_timestamp_override` | Forces a specific timestamp for negative tests | _optional_ |
+| `hmac_nonce_override` | Forces a specific nonce to simulate replays | _optional_ |
 
 When running in Postman, set `base_url` manually if your API is not on `localhost`. The login request will automatically populate `token` and `store_id` via the test script. For Newman, you can override defaults with an environment JSON file or `--env-var` flags.
 
@@ -42,6 +45,8 @@ To validate error handling, exercise at least the following scenarios after a su
 - Call **Auth / Login** with an invalid password to ensure the API returns the expected `401` error payload and does not overwrite the cached token.
 - For idempotent operations (such as fee application), repeat the request with the same payload and verify the response indicates no duplicate fee records were created.
 - Exercise **Reports / Minnesota summary (invalid format)** to validate the `422` response body and capture evidence that unsupported formats are rejected and audited.
+- In the **Fees / Apply fees (invalid HMAC)** request, leave `hmac_secret` untouched so the pre-request script generates an intentionally corrupted signature and verify a `403` response with `detail.code = invalid_signature`.
+- To simulate stale timestamps or nonce replays, set `hmac_timestamp_override` or `hmac_nonce_override` before calling **Fees / Apply fees (HMAC)**. Expect `detail.code = stale_timestamp` for an expired timestamp and `detail.code = replay_detected` when the same nonce is reused.
 
 Document the responses in your test evidence to show both happy-path and guardrail coverage.
 

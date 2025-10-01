@@ -3,9 +3,9 @@
 State Tax Wizard is a full-stack demo application that showcases a configurable fee engine for U.S. state taxes. It combines a FastAPI backend with a React frontend to simulate fee calculations, audit logging, and observability for demo stores.
 
 ## Features
-- **FastAPI backend** with JWT authentication, seeded demo data, and idempotent fee application.
+- **FastAPI backend** with JWT authentication, seeded demo data, idempotent fee application, and replay-protected HMAC signing on `/v1/fees/apply`.
 - **Fee rules for Minnesota and Colorado** that persist `OrderFee` records and structured `AuditLog` entries.
-- **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request and store context.
+- **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request, store, and security context.
 - **React frontend** with a fee playground, audit log viewer, CSV export powered by a shared API client, and a persistent header menu for store switching and logout.
 - **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
 
@@ -93,6 +93,11 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```
   Set `SMOKE_METRICS_URL` when the Prometheus endpoint is exposed on a separate
   host; otherwise the smoke test derives `/metrics` from `SMOKE_API_BASE_URL`.
+- Security smoke (validates HMAC signing and replay protection):
+  ```sh
+  make security-smoke
+  ```
+  Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
 - Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
   ```sh
   ENABLE_REPORT_DOWNLOAD_TEST=1 npm run test:e2e
@@ -111,14 +116,10 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
 - Postman collection: follow [`docs/postman/README.md`](docs/postman/README.md) for setup, execution order, and Newman automation tips when importing `docs/postman/state-tax-wizard.postman_collection.json`.
 - Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
-- Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token` e `store_id` antes de testar as demais rotas protegidas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
+- Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token`, `store_id` e configure `hmac_secret` antes de testar as rotas assinadas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
+- Guia de segurança HMAC: [`docs/security/hmac.md`](docs/security/hmac.md) detalha o algoritmo de assinatura, exemplos de código e estratégias de rotação.
 - Guia de interface: consulte [`docs/ui-guide.md`](docs/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
 
 ## Roadmap status
-- **Current stage**: Milestone 3 — Frontend Polish & Analytics is underway. The
-  `/v1/analytics/overview` endpoint, dynamic dashboard cards, session metadata,
-  and analytics automation (Postman, Playwright, `make analytics-smoke`) are live.
-- **Next focus**: Continue iterating on Milestone 3 by layering in trend
-  visualizations and alerting. See
-  [`docs/backlog/milestone_03_frontend_polish.md`](docs/backlog/milestone_03_frontend_polish.md)
-  for the latest status and remaining enhancements.
+- **Current stage**: Milestone 4 — Security Hardening is underway. Replay-resistant HMAC validation, nonce persistence, and smoke automation (`make security-smoke`) are live alongside updated observability.
+- **Next focus**: Expand the security slice with rate limiting and secrets tooling. Track progress in [`docs/backlog/milestone_04_security.md`](docs/backlog/milestone_04_security.md).

@@ -28,6 +28,20 @@ export const API_BASE_URL = normalisedBaseURL;
 
 export const API_DOCS_URL = appendPath(API_BASE_URL, '/docs');
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  detail?: unknown;
+
+  constructor(status: number, message: string, code?: string, detail?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
 // Types
 export interface LoginRequest {
   email: string;
@@ -52,6 +66,7 @@ export interface StoreSettings {
   absorb_fee: boolean;
   label_override: string;
   plan?: string | null;
+  hmac_last_rotated_at?: string | null;
 }
 
 export interface UpdateStoreSettingsPayload {
@@ -271,14 +286,34 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      let message: string;
+      let parsedBody: unknown = null;
+      let message = `API Error: ${response.status}`;
+      let code: string | undefined;
+
       try {
-        const data = await response.json();
-        message = typeof data === 'string' ? data : JSON.stringify(data);
+        parsedBody = await response.json();
       } catch {
-        message = await response.text();
+        parsedBody = await response.text();
       }
-      throw new Error(`API Error: ${response.status} - ${message}`);
+
+      if (parsedBody && typeof parsedBody === 'object' && 'detail' in (parsedBody as Record<string, unknown>)) {
+        const detail = (parsedBody as Record<string, unknown>).detail;
+        if (typeof detail === 'string') {
+          message = detail;
+        } else if (detail && typeof detail === 'object') {
+          const detailRecord = detail as Record<string, unknown>;
+          if (typeof detailRecord.message === 'string') {
+            message = detailRecord.message;
+          }
+          if (typeof detailRecord.code === 'string') {
+            code = detailRecord.code;
+          }
+        }
+      } else if (typeof parsedBody === 'string' && parsedBody.trim().length > 0) {
+        message = parsedBody;
+      }
+
+      throw new ApiError(response.status, message, code, parsedBody);
     }
 
     const contentType = response.headers.get('content-type') ?? '';

@@ -2,6 +2,8 @@
 """
 Seed the database with initial data
 """
+import os
+from secrets import token_hex
 from sqlalchemy.orm import sessionmaker
 from app.db.database import engine
 from datetime import datetime, timedelta, timezone
@@ -15,6 +17,8 @@ from app.models.models import (
     RuleVersion,
 )
 import uuid
+
+DEFAULT_HMAC_SECRET = os.environ.get("SEED_HMAC_SECRET", "demo-hmac-secret")
 
 
 def ensure_store(
@@ -49,12 +53,18 @@ def ensure_store(
             absorb_fee=False,
             label_override="Delivery Fee" if state == "MN" else "Colorado Delivery Fee",
             plan=plan,
+            hmac_secret=DEFAULT_HMAC_SECRET,
+            hmac_secret_rotated_at=datetime.now(timezone.utc),
         )
         db.add(settings)
     else:
         store.settings.enable_mn = enable_mn
         store.settings.enable_co = enable_co
         store.settings.plan = plan
+        if not store.settings.hmac_secret:
+            store.settings.hmac_secret = DEFAULT_HMAC_SECRET or token_hex(32)
+        if not store.settings.hmac_secret_rotated_at:
+            store.settings.hmac_secret_rotated_at = datetime.now(timezone.utc)
 
     if not store.subscriptions:
         now = datetime.now(timezone.utc)
@@ -271,6 +281,14 @@ def seed_database():
 
         db.commit()
         print("Database seeded successfully!")
+        for store in db.query(Store).all():
+            if store.settings and store.settings.hmac_secret:
+                print(
+                    "HMAC secret for",
+                    f"{store.name} ({store.id})",
+                    "=",
+                    store.settings.hmac_secret,
+                )
         
     except Exception as e:
         db.rollback()

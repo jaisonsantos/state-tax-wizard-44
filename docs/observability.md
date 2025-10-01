@@ -22,6 +22,8 @@ All metrics are defined in `backend/app/observability.py`.
 | `report_exports_total` | Counter | `jurisdiction`, `format` | Counts report exports emitted by `ReportService` so dashboards can trend CSV vs JSON demand per jurisdiction. |
 | `auth_events_total` | Counter | `event` | Tracks authentication lifecycle activity (`login`, `logout`) to confirm session churn and spot unexpected spikes. |
 | `analytics_dashboard_loaded_total` | Counter | `store_id` | Increments when `/v1/analytics/overview` responds successfully so ops teams can monitor dashboard traffic by store. |
+| `hmac_validation_failures_total` | Counter | `reason`, `store_id` | Counts request signing failures segmented by failure reason (missing signature, stale timestamp, invalid signature). |
+| `hmac_replay_attempts_total` | Counter | `store_id` | Tracks replay attempts detected by nonce validation to highlight potential abuse. |
 
 Scrape `/metrics` from the API container or <http://localhost:8000/metrics> when
 running locally.
@@ -33,8 +35,7 @@ entries and audit rows so compliance teams can trace every attempt.
 ## Structured application logs
 
 Structured logs are emitted via `observability.log_fee_event`,
-`observability.log_report_event`, `observability.log_analytics_event`, and `observability.log_auth_event` as JSON
-messages to dedicated loggers. Each invocation includes contextual fields useful
+`observability.log_report_event`, `observability.log_analytics_event`, `observability.log_security_event`, and `observability.log_auth_event` as JSON messages to dedicated loggers. Each invocation includes contextual fields useful
 for tracing user behavior. Fee
 application and reversal flows publish events through the `fee` logger so
 downstream systems can reconcile adjustments. Report exports stream to the
@@ -112,6 +113,34 @@ jurisdictions and formats operators are downloading.
 | `user_id` | `"4e021a16-65b5-4ad0-9ad7-673d6b4d9c4d"` | UUID of the authenticated user. |
 | `session_id` | `"5f3f5d3c-3d81-4a20-8a6c-5f7b2b2c871e"` | Identifier of the `session_tokens` row tied to the token. |
 | `jti` | `"a3c45846-31d0-47a8-bc47-542d68c30cb8"` | Present on login events to mirror the JWT claim. |
+
+### Security event schema
+
+| Field | Example | Notes |
+| ----- | ------- | ----- |
+| `event` | `"hmac_validation_failed"` | Event types include `hmac_validation_failed`, `hmac_validation_succeeded`, `hmac_replay_detected`, and `hmac_nonce_recorded`. |
+| `store_id` | `"1cc66e24-4e93-4c9e-bebd-8ff9690e33cd"` | UUID for the store associated with the signed request. |
+| `code` | `"stale_timestamp"` | Failure-specific reason code mirrored in API responses. |
+| `nonce_preview` | `"abc123ef"` | First eight characters of the nonce for debugging without leaking the full value. |
+| `timestamp` | `"2025-03-15T18:02:14+00:00"` | Present on successful validations. |
+| `expires_at` | `"2025-03-15T18:12:14+00:00"` | Present on nonce recording events to indicate TTL. |
+
+```json
+{
+  "event": "hmac_validation_failed",
+  "store_id": "1cc66e24-4e93-4c9e-bebd-8ff9690e33cd",
+  "code": "replay_detected",
+  "nonce_preview": "6f19c8e1"
+}
+```
+
+```json
+{
+  "event": "hmac_validation_succeeded",
+  "store_id": "1cc66e24-4e93-4c9e-bebd-8ff9690e33cd",
+  "timestamp": "2025-03-15T18:02:14+00:00"
+}
+```
 
 ### Analytics dashboard schema
 
