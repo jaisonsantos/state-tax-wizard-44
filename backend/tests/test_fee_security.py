@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import uuid
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings as app_settings
@@ -193,6 +194,50 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
     finally:
         app_settings.hmac_max_skew_seconds = original_skew
         app_settings.hmac_replay_ttl_seconds = original_ttl
+
+
+def test_replay_detected_without_unique_index(client: TestClient, db_session: Session) -> None:
+    token, store_id = _login(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
+    _create_rule_versions(db_session)
+
+    secret = _enable_hmac(db_session, store_id)
+
+    payload = {
+        "store_id": store_id,
+        "order_id": "missing-index",
+        "destination": {"state": "MN"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU", "qty": 1, "unit_price_cents": 15000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    timestamp_iso = datetime.now(timezone.utc).isoformat()
+    nonce_value = uuid.uuid4().hex
+    signature = compute_signature(secret, timestamp_iso, nonce_value, body)
+
+    headers = dict(auth_header)
+    headers.update(
+        {
+            "Content-Type": "application/json",
+            "x-rdf-signature": signature,
+            "x-rdf-timestamp": timestamp_iso,
+            "x-rdf-nonce": nonce_value,
+        }
+    )
+
+    success = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    assert success.status_code == 200
+
+    db_session.execute(text("DROP INDEX IF EXISTS uq_processed_nonces_store_nonce"))
+    db_session.commit()
+
+    replay = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["code"] == "replay_detected"
 
 
 def test_rate_limit_per_token_route(client: TestClient, db_session: Session) -> None:
