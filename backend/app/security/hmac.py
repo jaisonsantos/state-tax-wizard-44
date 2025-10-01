@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Mapping
 
@@ -88,9 +89,45 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
     ttl_seconds = max(settings.hmac_replay_ttl_seconds, 1)
     expires_at = now + timedelta(seconds=ttl_seconds)
 
-    db.query(ProcessedNonce).filter(ProcessedNonce.expires_at < now).delete(
-        synchronize_session=False
+    try:
+        store_uuid = uuid.UUID(str(store_id))
+    except (ValueError, TypeError):  # pragma: no cover - defensive guard
+        _raise_failure(store_id, 401, "invalid_store", "Invalid store identifier for nonce validation")
+
+    db.query(ProcessedNonce).filter(
+        ProcessedNonce.store_id == store_uuid,
+        ProcessedNonce.expires_at < now,
+    ).delete(synchronize_session=False)
+    db.flush()
+
+    existing = (
+        db.query(ProcessedNonce)
+        .filter(ProcessedNonce.store_id == store_uuid)
+        .filter(ProcessedNonce.nonce == nonce)
+        .order_by(ProcessedNonce.expires_at.desc())
+        .first()
     )
+    existing_expiry: datetime | None = None
+    if existing:
+        existing_expiry = existing.expires_at or now
+        if existing_expiry.tzinfo is None:
+            existing_expiry = existing_expiry.replace(tzinfo=timezone.utc)
+
+    if existing and existing_expiry and existing_expiry >= now:
+        hmac_replay_attempts_total.labels(store_id=store_id).inc()
+        log_security_event(
+            {
+                "event": "hmac_replay_detected",
+                "store_id": store_id,
+                "nonce_preview": nonce[:8],
+                "reason": "duplicate_nonce_in_ttl_window",
+            }
+        )
+        _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
+
+    if existing and existing_expiry and existing_expiry < now:
+        db.delete(existing)
+        db.flush()
 
     existing = (
         db.query(ProcessedNonce)
@@ -112,7 +149,7 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
         _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
 
     record = ProcessedNonce(
-        store_id=store_id,
+        store_id=store_uuid,
         nonce=nonce,
         expires_at=expires_at,
     )
