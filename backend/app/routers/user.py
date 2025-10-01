@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -30,10 +30,16 @@ async def get_me(
         for store in user.stores
     ]
 
+    created_at = user.created_at
+    if created_at is None:
+        created_at = datetime.now(timezone.utc)
+    elif created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+
     user_summary = UserSummary(
         id=str(user.id),
         email=user.email,
-        created_at=user.created_at or datetime.utcnow(),
+        created_at=created_at,
     )
 
     session: SessionMetadata | None = None

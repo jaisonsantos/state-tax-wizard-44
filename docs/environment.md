@@ -73,6 +73,8 @@ Populates the database with deterministic demo data (`store_demo_1` and
 2. Execute `make seed`.
 3. Verify the command prints `Database seeded successfully!`.
 4. If re-running, the script is idempotent and will only insert missing records.
+5. Seeded timestamp fields (e.g., subscription trials, audit logs) now return UTC
+   offsets in responses such as `2024-01-01T00:00:00+00:00`.
 
 ## Runbook: make smoke
 
