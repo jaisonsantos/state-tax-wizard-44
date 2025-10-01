@@ -5,6 +5,7 @@
 - **Store scoping enforced**: All fee endpoints validate store ownership via `AuthService.validate_store_access` ([`backend/app/core/security.py`](../../backend/app/core/security.py)).
 - **Observability in place**: Prometheus counters and structured logs capture fee operations and auth events ([`backend/app/observability.py`](../../backend/app/observability.py)).
 - **Security slice delivered**: `/v1/fees/apply` now enforces timestamp/nonce validation, persists processed nonces, surfaces structured security logs, and exports Prometheus counters for failures/replays.
+- **Secrets centralised**: Store-specific signing keys live in `store_settings.hmac_secret` with rotation timestamps managed in the same table, keeping credentials out of the legacy `stores` record.
 - **Remaining gap**: Per-store rate limiting still relies on the in-memory limiter and secrets rotation SOP tooling is pending.
 
 ## Next Development Objective

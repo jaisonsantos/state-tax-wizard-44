@@ -390,15 +390,70 @@ def run_security_only_smoke() -> Dict[str, Any]:
                 f"{stale_response.status_code}: {stale_response.text}"
             )
 
+        metrics_snapshot = fetch_metrics(client)
+
+        def _require_counter(metric: str, required_labels: dict[str, str]) -> float:
+            for raw in metrics_snapshot.splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or not line.startswith(metric):
+                    continue
+                try:
+                    left, value_str = line.rsplit(" ", 1)
+                    value = float(value_str)
+                except ValueError:  # pragma: no cover - defensive branch
+                    continue
+
+                if "{" in left and "}" in left:
+                    labels_str = left[left.find("{") + 1 : left.rfind("}")]
+                    observed: dict[str, str] = {}
+                    for pair in labels_str.split(","):
+                        if "=" not in pair:
+                            continue
+                        key, raw_val = pair.split("=", 1)
+                        observed[key.strip()] = raw_val.strip().strip('"')
+                    matches = all(observed.get(k) == v for k, v in required_labels.items())
+                else:
+                    matches = not required_labels
+
+                if matches:
+                    return value
+
+            want = ",".join(f'{k}="{v}"' for k, v in required_labels.items())
+            raise SmokeFailure(
+                f"Metrics missing {metric} with labels {{{want}}}:\n{metrics_snapshot}"
+            )
+
+        stale_counter = _require_counter(
+            "hmac_validation_failures_total",
+            {"reason": "stale_timestamp", "store_id": store_id},
+        )
+        replay_counter = _require_counter(
+            "hmac_replay_attempts_total",
+            {"store_id": store_id},
+        )
+
+        if stale_counter <= 0:
+            raise SmokeFailure("Stale timestamp counter did not increment")
+        if replay_counter <= 0:
+            raise SmokeFailure("Replay counter did not increment")
+
     print("Security smoke completed successfully.")
     print(f"Initial apply lines: {len(apply_result['lines'])}")
     print("Replay attempt rejected with 409.")
     print("Stale timestamp rejected with 401.")
+    print(
+        "Metrics confirmed: "
+        f"hmac_validation_failures_total(stale_timestamp)={stale_counter}, "
+        f"hmac_replay_attempts_total={replay_counter}"
+    )
 
     return {
         "apply": apply_result,
         "replay_status": replay_response.status_code,
         "stale_status": stale_response.status_code,
+        "metrics": metrics_snapshot,
+        "stale_counter": stale_counter,
+        "replay_counter": replay_counter,
     }
 
 

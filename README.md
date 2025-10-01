@@ -79,6 +79,8 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```sh
   pytest -q
   ```
+  Ensure `APP_ENV=dev` (default) so SQLite-based tests auto-create tables, or
+  pre-create the schema when running against another environment.
 - Frontend type-check:
   ```sh
   npm run typecheck
@@ -97,6 +99,7 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```sh
   make security-smoke
   ```
+  Requires the Docker stack with PostgreSQL running (`make up migrate seed`).
   Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
 - Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
   ```sh

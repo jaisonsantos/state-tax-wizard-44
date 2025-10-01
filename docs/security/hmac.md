@@ -19,6 +19,11 @@ canonical = `${timestamp}\n${nonce}\n${body}`
 signature = HMAC_SHA256(secret, canonical)
 ```
 
+> **Importante:** a assinatura é calculada usando **exatamente** o valor enviado em
+`X-RDF-Timestamp` (incluindo `Z` quando presente). O servidor normaliza o
+timestamp apenas para checar skew, não para recomputar a assinatura.
+Timestamps em epoch (segundos) são aceitos por compatibilidade, porém recomenda-se ISO-8601.
+
 The request body must be identical to the bytes used to compute the signature. When sending JSON, serialize with consistent ordering (e.g. `JSON.stringify` without additional whitespace) and send via the `data`/`body` transport rather than a language helper that might reformat the payload.
 
 ## JavaScript example

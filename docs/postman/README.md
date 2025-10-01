@@ -46,7 +46,8 @@ To validate error handling, exercise at least the following scenarios after a su
 - For idempotent operations (such as fee application), repeat the request with the same payload and verify the response indicates no duplicate fee records were created.
 - Exercise **Reports / Minnesota summary (invalid format)** to validate the `422` response body and capture evidence that unsupported formats are rejected and audited.
 - In the **Fees / Apply fees (invalid HMAC)** request, leave `hmac_secret` untouched so the pre-request script generates an intentionally corrupted signature and verify a `403` response with `detail.code = invalid_signature`.
-- To simulate stale timestamps or nonce replays, set `hmac_timestamp_override` or `hmac_nonce_override` before calling **Fees / Apply fees (HMAC)**. Expect `detail.code = stale_timestamp` for an expired timestamp and `detail.code = replay_detected` when the same nonce is reused.
+- Exercise the dedicated negative requests — **Fees / Apply fees (stale timestamp)** and **Fees / Apply fees (replay)** — which auto-generate signatures using the exact request body to confirm `401`/`409` responses without manual overrides.
+- You can still force specific values via `hmac_timestamp_override` or `hmac_nonce_override` before calling **Fees / Apply fees (HMAC)** if you need custom test cases. Expect `detail.code = stale_timestamp` for an expired timestamp and `detail.code = replay_detected` when the same nonce is reused.
 
 Document the responses in your test evidence to show both happy-path and guardrail coverage.
 

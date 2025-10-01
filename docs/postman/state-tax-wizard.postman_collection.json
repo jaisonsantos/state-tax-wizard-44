@@ -470,17 +470,21 @@
                   "}",
                   "const orderId = `postman-${Date.now()}`;",
                   "pm.collectionVariables.set('order_id', orderId);",
-                  "const body = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+                  "const template = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+                  "const resolvedBody = pm.variables.replaceIn(template);",
                   "const forcedTimestamp = pm.environment.get('hmac_timestamp_override') || pm.collectionVariables.get('hmac_timestamp_override');",
                   "const timestamp = (forcedTimestamp && forcedTimestamp.length) ? forcedTimestamp : new Date().toISOString();",
                   "const forcedNonce = pm.environment.get('hmac_nonce_override') || pm.collectionVariables.get('hmac_nonce_override');",
                   "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
                   "pm.collectionVariables.set('last_signed_nonce', nonce);",
-                  "const message = `${timestamp}\\n${nonce}\\n${body}`;",
+                  "const message = `${timestamp}\\n${nonce}\\n${resolvedBody}`;",
                   "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
+                  "pm.collectionVariables.set('last_signed_timestamp', timestamp);",
+                  "pm.collectionVariables.set('last_signed_body', resolvedBody);",
+                  "pm.request.body.raw = resolvedBody;"
                 ]
               }
             }
@@ -615,17 +619,22 @@
                   "}",
                   "const orderId = `postman-${Date.now()}`;",
                   "pm.collectionVariables.set('order_id', orderId);",
-                  "const body = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+                  "const template = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+                  "const resolvedBody = pm.variables.replaceIn(template);",
                   "const forcedTimestamp = pm.environment.get('hmac_timestamp_override') || pm.collectionVariables.get('hmac_timestamp_override');",
                   "const timestamp = (forcedTimestamp && forcedTimestamp.length) ? forcedTimestamp : new Date().toISOString();",
                   "const forcedNonce = pm.environment.get('hmac_nonce_override') || pm.collectionVariables.get('hmac_nonce_override');",
                   "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
                   "pm.collectionVariables.set('last_signed_nonce', nonce);",
-                  "const message = `${timestamp}\\n${nonce}\\n${body}`;",
+                  "const message = `${timestamp}\\n${nonce}\\n${resolvedBody}`;",
                   "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
-                  "const tampered = signature.replace(/^[0-9a-f]/, function(char) { return char === 'a' ? 'b' : 'a'; });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
+                  "pm.collectionVariables.set('last_signed_timestamp', timestamp);",
+                  "pm.collectionVariables.set('last_signed_body', resolvedBody);",
+                  "pm.request.body.raw = resolvedBody;",
+                  "const tampered = signature.replace(/^[0-9a-f]/, function(char) { return char === 'a' ? 'b' : 'a'; });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: tampered });"
                 ]
               }
@@ -657,6 +666,176 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Apply fees (stale timestamp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0,\n  \"source_of_remittance\": \"merchant\"\n}\n"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/apply",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "apply"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "FeeApplyResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"lines\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"amount_cents\": 28,\n      \"display_name\": \"Retail Delivery Fee (CO)\",\n      \"rule_version\": \"CO-2025H1\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\",\n        \"CO_MARKETPLACE_SOR\"\n      ],\n      \"absorbed\": false\n    }\n  ],\n  \"decisions\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"outcome\": \"applied\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\"\n      ],\n      \"amount_cents\": 28\n    },\n    {\n      \"jurisdiction\": \"MN\",\n      \"outcome\": \"skipped\",\n      \"reason_codes\": [\n        \"MN_DEST_OUT_OF_STATE\"\n      ],\n      \"amount_cents\": 0\n    }\n  ],\n  \"absorbed\": false\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Stale timestamp rejected with 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().detail.code).to.eql('stale_timestamp');",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const secret = pm.environment.get('hmac_secret') || pm.collectionVariables.get('hmac_secret');",
+                  "if (!secret) {",
+                  "  throw new Error('Set hmac_secret in variables before calling Apply fees');",
+                  "}",
+                  "const orderId = `postman-stale-${Date.now()}`;",
+                  "pm.collectionVariables.set('order_id', orderId);",
+                  "const template = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+                  "const body = pm.variables.replaceIn(template);",
+                  "const timestamp = new Date(Date.now() - (15 * 60 * 1000)).toISOString();",
+                  "const nonce = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
+                  "const message = `${timestamp}\\n${nonce}\\n${body}`;",
+                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.body.raw = body;",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply fees (replay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"store_id\": \"{{store_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"destination\": {\n    \"state\": \"CO\",\n    \"zip\": \"80202\"\n  },\n  \"delivery_method\": \"ship\",\n  \"items\": [\n    {\n      \"sku\": \"SKU-CO-1\",\n      \"qty\": 1,\n      \"unit_price_cents\": 1500,\n      \"taxability\": \"taxable\"\n    }\n  ],\n  \"shipping_amount_cents\": 0,\n  \"source_of_remittance\": \"merchant\"\n}\n"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/fees/apply",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fees",
+                "apply"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "FeeApplyResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"lines\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"amount_cents\": 28,\n      \"display_name\": \"Retail Delivery Fee (CO)\",\n      \"rule_version\": \"CO-2025H1\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\",\n        \"CO_MARKETPLACE_SOR\"\n      ],\n      \"absorbed\": false\n    }\n  ],\n  \"decisions\": [\n    {\n      \"jurisdiction\": \"CO\",\n      \"outcome\": \"applied\",\n      \"reason_codes\": [\n        \"CO_HAS_TAXABLE_ITEM\"\n      ],\n      \"amount_cents\": 28\n    },\n    {\n      \"jurisdiction\": \"MN\",\n      \"outcome\": \"skipped\",\n      \"reason_codes\": [\n        \"MN_DEST_OUT_OF_STATE\"\n      ],\n      \"amount_cents\": 0\n    }\n  ],\n  \"absorbed\": false\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Replay attempt rejected with 409', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().detail.code).to.eql('replay_detected');",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const secret = pm.environment.get('hmac_secret') || pm.collectionVariables.get('hmac_secret');",
+                  "if (!secret) {",
+                  "  throw new Error('Set hmac_secret in variables before calling Apply fees');",
+                  "}",
+                  "const timestamp = pm.collectionVariables.get('last_signed_timestamp');",
+                  "const nonce = pm.collectionVariables.get('last_signed_nonce');",
+                  "const body = pm.collectionVariables.get('last_signed_body');",
+                  "if (!timestamp || !nonce || !body) {",
+                  "  throw new Error('Run Apply fees (HMAC) first to capture timestamp, nonce, and body.');",
+                  "}",
+                  "const message = `${timestamp}\\n${nonce}\\n${body}`;",
+                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.body.raw = body;",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

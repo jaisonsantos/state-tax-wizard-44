@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Response
@@ -23,8 +24,9 @@ from .observability import setup_logging
 # Configure logging once at startup
 setup_logging()
 
-# Create database tables (no-op if already present)
-models.Base.metadata.create_all(bind=engine)
+if os.environ.get("APP_ENV", "dev") == "dev":
+    # Create database tables (no-op if already present)
+    models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Retail Delivery Fee Router API",
