@@ -390,6 +390,94 @@ def run_security_only_smoke() -> Dict[str, Any]:
                 f"{stale_response.status_code}: {stale_response.text}"
             )
 
+        throttle_payload = {
+            "store_id": store_id,
+            "destination": {"state": "CO"},
+            "delivery_method": "ship",
+            "items": [
+                {"sku": "RATE-LIMIT", "qty": 1, "unit_price_cents": 1000, "taxability": "taxable"}
+            ],
+            "shipping_amount_cents": 0,
+        }
+
+        throttle_detail: Dict[str, Any] | None = None
+        for attempt in range(1, 181):
+            quote_response = client.post(
+                f"{API_BASE_URL}/v1/fees/quote",
+                json=throttle_payload,
+                headers=headers,
+                timeout=20.0,
+            )
+            if quote_response.status_code == 429:
+                throttle_detail = quote_response.json()
+                break
+            if quote_response.status_code != 200:
+                raise SmokeFailure(
+                    "Unexpected status during throttle probe: "
+                    f"{quote_response.status_code} {quote_response.text}"
+                )
+
+        if not throttle_detail:
+            raise SmokeFailure("Unable to trigger rate limit within 180 attempts")
+        if throttle_detail.get("route") != "quote":
+            raise SmokeFailure(f"Throttle detail missing route: {throttle_detail}")
+
+        rotate_response = client.post(
+            f"{API_BASE_URL}/v1/stores/{store_id}/hmac/rotate",
+            headers=headers,
+            timeout=20.0,
+        )
+        _raise_for_status(rotate_response, "rotate HMAC secret")
+        rotation_payload = rotate_response.json()
+        new_secret = rotation_payload.get("hmac_secret")
+        if not isinstance(new_secret, str) or len(new_secret) < 32:
+            raise SmokeFailure("Rotate secret response missing hmac_secret")
+
+        new_timestamp = datetime.now(timezone.utc).isoformat()
+        new_nonce = uuid.uuid4().hex
+        old_signature = compute_signature(
+            _require_hmac_secret(),
+            new_timestamp,
+            new_nonce,
+            meta["body"],
+        )
+        invalid_headers = dict(headers)
+        invalid_headers.update(
+            {
+                "Content-Type": "application/json",
+                "X-RDF-Timestamp": new_timestamp,
+                "X-RDF-Nonce": new_nonce,
+                "X-RDF-Signature": old_signature,
+            }
+        )
+        invalid_after_rotation = client.post(
+            f"{API_BASE_URL}/v1/fees/apply",
+            data=meta["body"],
+            headers=invalid_headers,
+            timeout=20.0,
+        )
+        if invalid_after_rotation.status_code != 403:
+            raise SmokeFailure(
+                "Old secret should fail after rotation, got "
+                f"{invalid_after_rotation.status_code}: {invalid_after_rotation.text}"
+            )
+        detail_body = invalid_after_rotation.json().get("detail", {})
+        if detail_body.get("code") != "invalid_signature":
+            raise SmokeFailure(
+                f"Expected invalid_signature after rotation, received {detail_body}"
+            )
+
+        global SMOKE_HMAC_SECRET
+        SMOKE_HMAC_SECRET = new_secret
+
+        rotated_apply = apply_fees(
+            client,
+            headers,
+            store_id,
+            f"{base_order_id}-rotated",
+            "CO",
+        )
+
         metrics_snapshot = fetch_metrics(client)
 
         def _require_counter(metric: str, required_labels: dict[str, str]) -> float:
@@ -431,29 +519,42 @@ def run_security_only_smoke() -> Dict[str, Any]:
             "hmac_replay_attempts_total",
             {"store_id": store_id},
         )
+        throttle_counter = _require_counter(
+            "rate_limit_throttles_total",
+            {"route": "quote"},
+        )
 
         if stale_counter <= 0:
             raise SmokeFailure("Stale timestamp counter did not increment")
         if replay_counter <= 0:
             raise SmokeFailure("Replay counter did not increment")
+        if throttle_counter <= 0:
+            raise SmokeFailure("Rate limit counter did not increment")
 
     print("Security smoke completed successfully.")
     print(f"Initial apply lines: {len(apply_result['lines'])}")
     print("Replay attempt rejected with 409.")
     print("Stale timestamp rejected with 401.")
+    print("Rate limiter throttled quote traffic as expected.")
+    print("HMAC secret rotation generated a new secret and invalidated the previous one.")
     print(
         "Metrics confirmed: "
         f"hmac_validation_failures_total(stale_timestamp)={stale_counter}, "
-        f"hmac_replay_attempts_total={replay_counter}"
+        f"hmac_replay_attempts_total={replay_counter}, "
+        f"rate_limit_throttles_total={throttle_counter}"
     )
 
     return {
         "apply": apply_result,
         "replay_status": replay_response.status_code,
         "stale_status": stale_response.status_code,
+        "throttle_detail": throttle_detail,
+        "rotated_apply": rotated_apply,
+        "rotation_payload": rotation_payload,
         "metrics": metrics_snapshot,
         "stale_counter": stale_counter,
         "replay_counter": replay_counter,
+        "throttle_counter": throttle_counter,
     }
 
 

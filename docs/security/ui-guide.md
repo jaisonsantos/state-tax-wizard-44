@@ -4,7 +4,7 @@
 - The **Dashboard** now renders KPI cards from `/v1/analytics/overview`. Each card surfaces live counts, trend indicators, and jurisdiction badges when scoped (for example, CO fee totals). Loading skeletons appear while the API request is in flight so operators never see stale placeholder data.
 - Clicking **Refresh analytics snapshot** reissues the overview query to capture the latest counters without reloading the page. Use this after generating reports to see the applied/absorbed mix update.
 - The **Recent Fee Decisions** feed hydrates directly from audit logs using cursor-based pagination. The **Load more activity** button requests additional pages without re-fetching the first set, and disables itself while the API call is in progress to prevent duplicate clicks.
-- A Prometheus snapshot card shows the aggregated counters returned by the backend dependency injection. The **Review observability catalog** button opens `/api/files/docs/observability.md`, which is served by the backend so the Markdown renders in both local and production environments. Link buttons also reference `docs/api/analytics.md` so operators know where the contract and metrics live.
+- A Prometheus snapshot card shows the aggregated counters returned by the backend dependency injection. The **Review observability catalog** button opens `/api/files/docs/security/observability.md`, which is served by the backend so the Markdown renders in both local and production environments. Link buttons also reference `docs/api/analytics.md` so operators know where the contract and metrics live.
 
 ## Reports
 - The **Reports** page disables download buttons until a store is selected and shows inline helper text describing CSV vs JSON behavior.
@@ -17,6 +17,7 @@
 ## Settings & security
 - The **Rules & Settings** header now includes a security note reminding operators that `/v1/fees/apply` requires signed requests and points to `docs/security/hmac.md` for integration details.
 - The settings summary displays the most recent HMAC rotation timestamp beneath the plan badge so admins can confirm when secrets were refreshed.
+- A **Rotate HMAC Secret** button appears in the security card. When clicked it surfaces a copy-once alert with the new secret and disables the action while rotation is in flight.
 - Playground error toasts map HMAC failure codes (`invalid_signature`, `replay_detected`, `stale_timestamp`) to actionable copy encouraging nonce rotation or clock sync.
 
 ## Account menu & logout

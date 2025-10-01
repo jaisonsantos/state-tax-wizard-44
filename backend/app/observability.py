@@ -50,6 +50,12 @@ hmac_replay_attempts_total = Counter(
     ["store_id"],
 )
 
+rate_limit_throttles_total = Counter(
+    "rate_limit_throttles_total",
+    "Count of requests throttled by the rate limiter",
+    ["route"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",

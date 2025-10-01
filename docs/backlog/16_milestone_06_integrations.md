@@ -1,5 +1,7 @@
 # Milestone 6 — Platform Integrations Alpha
 
+_[← Milestone 5 — Billing](15_milestone_05_billing.md) • [Milestone 7 — Webhooks →](17_milestone_07_webhooks.md)_
+
 ## Stage Validation Summary
 - **Backend fee endpoints ready**: `/v1/fees/quote` and `/v1/fees/apply` accept structured payloads with item details ([`backend/app/routers/fees.py`](../../backend/app/routers/fees.py)).
 - **Security foundation in place**: HMAC verification and rate limiting protect API endpoints (Milestone 4).
@@ -229,7 +231,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Note WooCommerce alpha available for testing, Shopify POC functional.
 
 ### 13. Operations & Support
-- Extend `docs/environment.md`:
+- Extend `docs/security/environment.md`:
   - Document integration-specific environment variables.
   - Note CORS configuration if frontend integrations call API directly.
 - Create support playbook `docs/integrations/support.md`:

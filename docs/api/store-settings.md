@@ -31,7 +31,8 @@ created on first access if it does not exist.
   "enable_co": true,
   "absorb_fee": false,
   "label_override": "Delivery Fee",
-  "plan": "starter"
+  "plan": "starter",
+  "hmac_last_rotated_at": "2025-01-12T19:44:21+00:00"
 }
 ```
 
@@ -61,9 +62,27 @@ trims surrounding whitespace on `label_override`.
   "enable_co": true,
   "absorb_fee": true,
   "label_override": "Handling Surcharge",
-  "plan": "starter"
+  "plan": "starter",
+  "hmac_last_rotated_at": "2025-01-12T19:44:21+00:00"
 }
 ```
+
+### `POST /api/v1/stores/{store_id}/hmac/rotate`
+
+Generates a new per-store HMAC secret, persists the timestamp, emits a `store_secret.rotated` audit log, and returns the secret **once** so operators can copy it into their integration tooling.
+
+**Response**
+
+```json
+{
+  "store_id": "1d9a5d24-8a53-4a40-9ae1-6fcb83b4f0be",
+  "hmac_secret": "<new-secret-value>",
+  "rotated_at": "2025-01-12T19:45:02+00:00",
+  "previous_rotated_at": "2024-12-01T17:12:44+00:00"
+}
+```
+
+> Copy the secret immediately—neither the API nor audit log payloads will display it again.
 
 ## Audit trail
 
@@ -74,8 +93,7 @@ rules and when.
 ## Related resources
 
 - Frontend integration lives in `src/pages/Settings.tsx`.
-- Postman collection requests are stored under the **Store Settings** folder in
-  `docs/postman/state-tax-wizard.postman_collection.json`.
+- Postman collection requests (including rotation) live under the **Store Settings** and **Fees** folders in `docs/postman/state-tax-wizard.postman_collection.json`.
 - Fee calculation honors these toggles via `backend/app/services/fee_service.py` and
   propagates `absorb_fee` to `FeeLine.absorbed` / `order_fees.absorbed` for audit and
   reporting.

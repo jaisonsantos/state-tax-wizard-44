@@ -33,7 +33,7 @@ The sections below remain for reference when onboarding new contributors or expa
 4. **Configuration**
    - Extend settings (`backend/app/core/config.py` or equivalent) with environment variables `HMAC_MAX_SKEW_SECONDS` (default 300) and `HMAC_REPLAY_TTL_SECONDS` (default 600).
    - Document fallback when values are not set; ensure smoke/tests can override via env var.
-   - DoD: settings covered by unit tests; defaults appear in `docs/environment.md`.
+   - DoD: settings covered by unit tests; defaults appear in `docs/security/environment.md`.
 
 5. **Logging & Metrics**
    - Add Prometheus counters: `hmac_validation_failures_total{reason,store_id}` and `hmac_replay_attempts_total{store_id}`.
@@ -55,7 +55,7 @@ The sections below remain for reference when onboarding new contributors or expa
 - DoD: Running `python backend/seed_data.py` creates secrets and prints instructions on retrieving them.
 
 ### Observability
-- Update `docs/observability.md` with new counters/log fields; include alerting recommendation (failure ratio, replay spikes).
+- Update `docs/security/observability.md` with new counters/log fields; include alerting recommendation (failure ratio, replay spikes).
 - DoD: Document references match metric names; example payloads include `event=\"hmac_validation_failed\"`.
 
 ### Automation & QA
@@ -80,7 +80,7 @@ The sections below remain for reference when onboarding new contributors or expa
 ### Documentation
 - Refresh `docs/backlog/milestone_04_security.md` intro/status to acknowledge existing HMAC hook and clarify new goals (timestamp/nonce, replay store, metrics).
 - Create `docs/security/hmac.md` describing header contract, sample signing code (JS/Python), rotation steps, and troubleshooting.
-- Update `docs/ui-guide.md` session/security sections if UI surfaces HMAC status.
+- Update `docs/security/ui-guide.md` session/security sections if UI surfaces HMAC status.
 - DoD: Docs merged with references from PR description; links validated via `markdownlint`/manual check.
 
 ### Makefile & CI

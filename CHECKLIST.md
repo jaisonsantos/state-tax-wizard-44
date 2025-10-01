@@ -9,7 +9,7 @@
 - [x] Implement security module to validate signature, timestamp skew, and nonce uniqueness; integrate with `/v1/fees/apply`.
 - [x] Persist nonce usage and purge expired entries per request.
 - [x] Emit Prometheus counters (`hmac_validation_failures_total`, `hmac_replay_attempts_total`) and structured security logs.
-- [x] Document new config (`HMAC_MAX_SKEW_SECONDS`, `HMAC_REPLAY_TTL_SECONDS`) in `docs/environment.md`.
+- [x] Document new config (`HMAC_MAX_SKEW_SECONDS`, `HMAC_REPLAY_TTL_SECONDS`) in `docs/security/environment.md`.
 
 ## Frontend & UX
 - [x] Surface actionable error messages for 401/403/409 HMAC failures in fee flows and settings playground.
@@ -21,7 +21,7 @@
 - [ ] Optionally seed expiring nonces for integration tests.
 
 ## Observability
-- [x] Update `docs/observability.md` with new counters and security log schemas.
+- [x] Update `docs/security/observability.md` with new counters and security log schemas.
 - [ ] Verify `/metrics` exposes the new counters after a signed request.
 
 ## Automation & Tests

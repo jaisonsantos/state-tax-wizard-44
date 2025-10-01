@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.config import settings as app_settings
-from app.models.models import OrderFee, ProcessedNonce, RuleVersion, StoreSetting
+from app.models.models import AuditLog, OrderFee, ProcessedNonce, RuleVersion, StoreSetting
+from app.observability import rate_limit_throttles_total
 from app.security.rate_limit import rate_limiter
 from app.security.hmac import compute_signature
 
@@ -204,6 +205,8 @@ def test_rate_limit_per_token_route(client: TestClient, db_session: Session) -> 
     rate_limiter.limit = 2
     rate_limiter.reset()
     try:
+        metric = rate_limit_throttles_total.labels(route="quote")
+        before = metric._value.get()
         payload = {
             "store_id": store_id,
             "destination": {"state": "MN"},
@@ -227,6 +230,8 @@ def test_rate_limit_per_token_route(client: TestClient, db_session: Session) -> 
         assert third.status_code == 429
         detail = third.json()["detail"]
         assert detail["route"] == "quote"
+        after = metric._value.get()
+        assert after == before + 1
     finally:
         rate_limiter.limit = original_limit
         rate_limiter.reset()
@@ -340,3 +345,100 @@ def test_security_logs_do_not_expose_secrets(
     assert "hmac_validation_failed" in log_output
     assert secret not in log_output
     assert invalid_signature not in log_output
+
+
+def test_secret_rotation_invalidates_previous_signatures(
+    client: TestClient, db_session: Session
+) -> None:
+    token, store_id = _login(client)
+    auth_header = {"Authorization": f"Bearer {token}"}
+    _create_rule_versions(db_session)
+
+    original_secret = _enable_hmac(db_session, store_id, secret="rotate-old-secret")
+
+    payload = {
+        "store_id": store_id,
+        "order_id": "rotate-test-order",
+        "destination": {"state": "CO"},
+        "delivery_method": "ship",
+        "items": [
+            {"sku": "SKU", "qty": 1, "unit_price_cents": 15000, "taxability": "taxable"}
+        ],
+        "shipping_amount_cents": 0,
+    }
+
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    timestamp = datetime.now(timezone.utc).isoformat()
+    nonce = uuid.uuid4().hex
+    signature = compute_signature(original_secret, timestamp, nonce, body)
+    signed_headers = {
+        **auth_header,
+        "Content-Type": "application/json",
+        "x-rdf-timestamp": timestamp,
+        "x-rdf-nonce": nonce,
+        "x-rdf-signature": signature,
+    }
+
+    first_apply = client.post("/api/v1/fees/apply", data=body, headers=signed_headers)
+    assert first_apply.status_code == 200
+
+    rotate_response = client.post(
+        f"/api/v1/stores/{store_id}/hmac/rotate",
+        headers=auth_header,
+    )
+    assert rotate_response.status_code == 200
+    rotation_payload = rotate_response.json()
+    assert rotation_payload["store_id"] == store_id
+    new_secret = rotation_payload["hmac_secret"]
+    assert isinstance(new_secret, str) and len(new_secret) >= 40
+    assert rotation_payload["rotated_at"]
+
+    db_session.expire_all()
+    settings = (
+        db_session.query(StoreSetting)
+        .filter(StoreSetting.store_id == store_id)
+        .one()
+    )
+    assert settings.hmac_secret == new_secret
+    assert settings.hmac_secret_rotated_at is not None
+
+    audit_entry = (
+        db_session.query(AuditLog)
+        .filter(AuditLog.action == "store_secret.rotated")
+        .order_by(AuditLog.ts.desc())
+        .first()
+    )
+    assert audit_entry is not None
+    assert audit_entry.payload.get("store_id") == store_id
+    assert "hmac_secret" not in audit_entry.payload
+
+    replay_with_old_secret = client.post(
+        "/api/v1/fees/apply",
+        data=body,
+        headers=signed_headers,
+    )
+    assert replay_with_old_secret.status_code == 403
+    assert replay_with_old_secret.json()["detail"]["code"] == "invalid_signature"
+
+    refreshed_timestamp = datetime.now(timezone.utc).isoformat()
+    refreshed_nonce = uuid.uuid4().hex
+    refreshed_signature = compute_signature(
+        new_secret,
+        refreshed_timestamp,
+        refreshed_nonce,
+        body,
+    )
+    refreshed_headers = {
+        **auth_header,
+        "Content-Type": "application/json",
+        "x-rdf-timestamp": refreshed_timestamp,
+        "x-rdf-nonce": refreshed_nonce,
+        "x-rdf-signature": refreshed_signature,
+    }
+
+    refreshed_apply = client.post(
+        "/api/v1/fees/apply",
+        data=body,
+        headers=refreshed_headers,
+    )
+    assert refreshed_apply.status_code == 200

@@ -1,0 +1,70 @@
+docs/backlog/milestone_07_webhooks.md:  - WooCommerce: Verify custom `X-WC-Webhook-Signature` using delivery secret.
+docs/backlog/milestone_04_security.md:  - Read `X-RDF-Signature`, `X-RDF-Timestamp`, and `X-RDF-Nonce` headers from incoming requests.
+docs/backlog/milestone_04_security.md:3. **HMAC Failure - Expired Timestamp**: Request older than 5 minutes → 401 Unauthorized.
+docs/backlog/milestone_04_security.md:4. **HMAC Failure - Replayed Nonce**: Duplicate nonce within 10-minute window → 409 Conflict.
+docs/backlog/milestone_06_integrations.md:  - Columns: Timestamp, Order ID, Jurisdiction, Fee Amount, Status, Reason Codes.
+backend/app/schema/store_settings.py:        description="Timestamp of the most recent HMAC secret rotation",
+src/pages/Settings.tsx:        return "Nonce header missing. Include X-RDF-Nonce when signing requests.";
+src/pages/Logs.tsx:                  <TableHead>Timestamp</TableHead>
+backend/app/security/hmac.py:from ..models.models import ProcessedNonce, StoreSetting
+backend/app/security/hmac.py:        raise ValueError("Timestamp header was empty")
+backend/app/security/hmac.py:        _raise_failure(store_id, 401, "missing_nonce", "Missing X-RDF-Nonce header")
+backend/app/security/hmac.py:        _raise_failure(store_id, 401, "invalid_nonce", "Nonce exceeds maximum length of 128 characters")
+backend/app/security/hmac.py:    db.query(ProcessedNonce).filter(ProcessedNonce.expires_at < now).delete(
+backend/app/security/hmac.py:    record = ProcessedNonce(
+backend/app/security/hmac.py:        _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
+backend/app/security/hmac.py:        _raise_failure(store_id_str, 401, "missing_timestamp", "Missing X-RDF-Timestamp header")
+backend/app/security/hmac.py:        _raise_failure(store_id_str, 401, "missing_signature", "Missing X-RDF-Signature header")
+backend/app/security/hmac.py:        _raise_failure(store_id_str, 401, "stale_timestamp", "Timestamp outside allowable window")
+backend/app/models/models.py:class ProcessedNonce(Base):
+backend/smoke_test.py:            "X-RDF-Timestamp": timestamp_value,
+backend/smoke_test.py:            "X-RDF-Nonce": nonce_value,
+backend/smoke_test.py:            "X-RDF-Signature": signature,
+backend/tests/test_fee_security.py:from app.models.models import OrderFee, ProcessedNonce, RuleVersion, StoreSetting
+backend/tests/test_fee_security.py:            db_session.query(ProcessedNonce)
+backend/tests/test_fee_security.py:            .filter(ProcessedNonce.store_id == store_id, ProcessedNonce.nonce == nonce_value)
+backend/tests/test_fee_security.py:            db_session.query(ProcessedNonce)
+backend/tests/test_fee_security.py:            .filter(ProcessedNonce.store_id == store_id, ProcessedNonce.nonce == nonce_value)
+docs/api/fees.md:- `X-RDF-Timestamp`: ISO-8601 timestamp (recommended) or Unix epoch seconds. The
+docs/api/fees.md:- `X-RDF-Nonce`: unique, one-time value per request.
+docs/api/fees.md:- `X-RDF-Signature`: lowercase hexadecimal SHA-256 digest of the canonical payload
+docs/api/fees.md:X-RDF-Signature: <hex digest>
+docs/api/fees.md:X-RDF-Signature: sha256=<hex digest>
+docs/postman/state-tax-wizard.postman_collection.json:                  "const forcedTimestamp = pm.environment.get('hmac_timestamp_override') || pm.collectionVariables.get('hmac_timestamp_override');",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const timestamp = (forcedTimestamp && forcedTimestamp.length) ? forcedTimestamp : new Date().toISOString();",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const forcedNonce = pm.environment.get('hmac_nonce_override') || pm.collectionVariables.get('hmac_nonce_override');",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const forcedTimestamp = pm.environment.get('hmac_timestamp_override') || pm.collectionVariables.get('hmac_timestamp_override');",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const timestamp = (forcedTimestamp && forcedTimestamp.length) ? forcedTimestamp : new Date().toISOString();",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const forcedNonce = pm.environment.get('hmac_nonce_override') || pm.collectionVariables.get('hmac_nonce_override');",
+docs/postman/state-tax-wizard.postman_collection.json:                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: tampered });"
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
+docs/postman/state-tax-wizard.postman_collection.json:                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+docs/security/hmac.md:| `X-RDF-Timestamp` | UTC timestamp in ISO 8601 format (e.g. `2025-03-15T18:02:14Z`). Requests more than ±5 minutes from the API clock are rejected with `detail.code = stale_timestamp`. |
+docs/security/hmac.md:| `X-RDF-Nonce` | Unique identifier for the request. Nonces are persisted for 10 minutes; reuse within that window returns `detail.code = replay_detected`. |
+docs/security/hmac.md:| `X-RDF-Signature` | Hex-encoded SHA-256 HMAC digest of the canonical payload. A `sha256=` prefix is optional. |
+docs/security/hmac.md:`X-RDF-Timestamp` (incluindo `Z` quando presente). O servidor normaliza o
+docs/security/hmac.md:Timestamps em epoch (segundos) são aceitos por compatibilidade, porém recomenda-se ISO-8601.
+docs/security/hmac.md:      "X-RDF-Timestamp": timestamp,
+docs/security/hmac.md:      "X-RDF-Nonce": nonce,
+docs/security/hmac.md:      "X-RDF-Signature": signature,
+docs/security/hmac.md:            "X-RDF-Timestamp": timestamp,
+docs/security/hmac.md:            "X-RDF-Nonce": nonce,
+docs/security/hmac.md:            "X-RDF-Signature": signature,
+docs/security/hmac.md:- Nonces are stored for 10 minutes. Reusing a nonce within that window returns `409 Conflict` with `detail.code = replay_detected`.
+docs/security/hmac.md:| `detail.code = missing_signature` | `X-RDF-Signature` header absent | Ensure your HTTP client is not stripping custom headers and that authentication middleware runs before signing. |
+docs/security/hmac.md:| `detail.code = invalid_signature` | Timestamp/nonce/body mismatch or wrong secret | Confirm the exact request body bytes used by the HTTP client and regenerate the signature with the same string. |
+docs/security/hmac.md:| `detail.code = replay_detected` | Nonce reused within 10 minutes | Generate a new nonce per request or wait for the TTL to expire. |
+docs/security/hmac.md:| `detail.code = stale_timestamp` | Timestamp outside ±5 minute skew | Synchronise server clocks (e.g. `systemd-timesyncd`, `ntpd`). |
+docs/backlog/milestone_04_security.md:8:- **Secrets centralised**: Store-specific signing keys live in `store_settings.hmac_secret` with rotation timestamps managed in the same table, keeping credentials out of the legacy `stores` record.

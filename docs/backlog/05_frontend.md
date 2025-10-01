@@ -33,7 +33,7 @@ and polished for GA.
 4. **UX Polish**: Loading spinners, empty states, and toast notifications across
    Reports, Logs, and Billing pages.
 5. **Design System Consistency**: Document component usage (shadcn variants,
-   Tailwind classes) in `docs/ui-guide.md`.
+   Tailwind classes) in `docs/security/ui-guide.md`.
 
 ## Deliverables
 - Frontend state management updates (React Query/Zustand contexts).
@@ -54,7 +54,7 @@ and polished for GA.
 - Dashboard metrics sourced from live API, with fallback states documented and
   covered by unit/component tests.
 - Error/loading states demonstrated in Playwright recordings and referenced in
-  `docs/ui-guide.md`.
+  `docs/security/ui-guide.md`.
 - Epic status updated to link to design artifacts and QA evidence.
 
 ## Dependencies

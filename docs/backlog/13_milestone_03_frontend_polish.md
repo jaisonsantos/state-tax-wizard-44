@@ -1,5 +1,7 @@
 # Milestone 3 — Frontend Polish & Analytics
 
+_[← Milestone 2 — Next Steps](12_milestone_02_next_steps.md) • [Milestone 4 — Security →](14_milestone_04_security.md)_
+
 ## Stage Validation Summary
 - **Reporting confidence shipped**: `ReportService.observe_export` captures success
   and failure telemetry and persists audit rows for each export
@@ -10,7 +12,7 @@
 - **Logs view wired to API**: `/v1/audit` data powers filtering, CSV export, and
   refresh states in the Logs page ([`src/pages/Logs.tsx`](../../src/pages/Logs.tsx)).
 - **Operator guidance updated**: the UI guide documents export behavior and
-  account logout flows ([`docs/ui-guide.md`](../ui-guide.md)).
+  account logout flows ([`docs/security/ui-guide.md`](../security/ui-guide.md)).
 - **Automation hook in place**: `make reports-smoke` exercises the export flow in
   CI/local pipelines ([`Makefile`](../../Makefile)).
 - **Remaining gap**: Future iterations can add trend visualizations and alerts,
@@ -62,7 +64,7 @@ is retained below as guidance when prioritising follow-up work.
   history pagination.
 
 ### 4. Observability & Metrics
-- Expand `docs/observability.md` with the analytics payload contract and the
+- Expand `docs/security/observability.md` with the analytics payload contract and the
   Prometheus counters that back each dashboard widget.
 - Emit structured logs (`analytics_dashboard_loaded`) whenever the frontend
   queries the analytics endpoint to support troubleshooting.
@@ -81,17 +83,17 @@ is retained below as guidance when prioritising follow-up work.
   structure, wiring it into CI once stable.
 
 ### 6. Documentation & Enablement
-- Document dashboard usage patterns and session metadata in `docs/ui-guide.md`
+- Document dashboard usage patterns and session metadata in `docs/security/ui-guide.md`
   with fresh screenshots (capture via the frontend once the feature ships).
 - Add API contract details to `docs/api` (e.g., new `analytics.md`) describing
   request/response fields, auth requirements, and pagination semantics.
 - Update `README.md` roadmap/status to point to this milestone document and note
   the availability of analytics telemetry.
-- Revise `docs/backlog/iteration_checklist.md` to include evidence expectations
+- Revise `docs/backlog/11_iteration_checklist.md` to include evidence expectations
   for analytics UI/endpoint changes.
 
 ### 7. Operations & Rollout
-- Provide a short operations runbook entry (`docs/environment.md`) describing
+- Provide a short operations runbook entry (`docs/security/environment.md`) describing
   feature flags (if any), environment variables required for analytics, and how
   to backfill historical counters.
 - Confirm migrations (if needed for aggregates) are idempotent and documented in
@@ -114,7 +116,7 @@ is retained below as guidance when prioritising follow-up work.
 - [x] Account dropdown surfaces session metadata sourced from `session_tokens`.
 - [x] Seeds + fixtures provide deterministic analytics data for local/CI runs.
 - [x] Playwright + Newman scripts archive evidence for analytics responses.
-- [x] Docs (`README`, `docs/ui-guide.md`, `docs/observability.md`, Postman guide)
+- [x] Docs (`README`, `docs/security/ui-guide.md`, `docs/security/observability.md`, Postman guide)
   reference the new analytics surface.
 - [x] Makefile (or equivalent automation) exposes a repeatable analytics smoke
   test consumed by CI.

@@ -43,6 +43,10 @@ responds with `403 Forbidden`.
 The quote endpoint does not require HMAC, and the reversal endpoint intentionally
 leaves HMAC optional for MVP to simplify back-office tooling.
 
+### Rate limiting
+
+Authenticated `/v1/fees/*` routes share a Redis-backed rate limiter (120 requests/minute per store by default). Clients exceeding the quota receive `429 Too Many Requests` with a JSON payload including `retry_after_seconds` and `route`. The Prometheus counter `rate_limit_throttles_total{route}` tracks rejected traffic.
+
 ## Reversal endpoint
 
 `POST /api/v1/fees/reverse` accepts `{ "store_id", "order_id", "reason" }` with

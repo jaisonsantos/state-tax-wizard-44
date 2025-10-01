@@ -63,6 +63,11 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
 - Prometheus metrics are exposed at `/metrics`.
 - Application logs are JSON-formatted and include fields such as `request_id`, `store_id`, `jurisdiction`, and `reason_codes`.
 
+### Environment variables
+- `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The smoke tests default to `demo-hmac-secret` but you should override it once secrets are rotated.
+- `REDIS_URL` (optional) configures the distributed rate limiter. When running via Docker Compose the API service automatically connects to the bundled Redis container; set `REDIS_URL=redis://redis:6379/0` if you provision Redis yourself.
+- `HMAC_MAX_SKEW_SECONDS` and `HMAC_REPLAY_TTL_SECONDS` remain tunable via `.env`.
+
 ## Frontend development
 1. Install dependencies:
    ```sh
@@ -118,11 +123,12 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
 - Postman collection: follow [`docs/postman/README.md`](docs/postman/README.md) for setup, execution order, and Newman automation tips when importing `docs/postman/state-tax-wizard.postman_collection.json`.
+- Backlog overview: explore [`docs/backlog/README.md`](docs/backlog/README.md) for milestone context, dependencies, and iteration checklists.
 - Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
 - Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token`, `store_id` e configure `hmac_secret` antes de testar as rotas assinadas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
 - Guia de segurança HMAC: [`docs/security/hmac.md`](docs/security/hmac.md) detalha o algoritmo de assinatura, exemplos de código e estratégias de rotação.
-- Guia de interface: consulte [`docs/ui-guide.md`](docs/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
+- Guia de interface: consulte [`docs/security/ui-guide.md`](docs/security/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
 
 ## Roadmap status
-- **Current stage**: Milestone 4 — Security Hardening is underway. Replay-resistant HMAC validation, nonce persistence, and smoke automation (`make security-smoke`) are live alongside updated observability.
-- **Next focus**: Expand the security slice with rate limiting and secrets tooling. Track progress in [`docs/backlog/milestone_04_security.md`](docs/backlog/milestone_04_security.md).
+- **Current stage**: Milestone 4 — Security Hardening is complete (distributed rate limiting, secret rotation UX, replay protection, and observability are live).
+- **Next focus**: Milestone 5 — Billing/Stripe integration (subscription sync, entitlements, and billing telemetry). Track work-in-progress in the release plan backlog as items are promoted. 【F:docs/backlog/00_release_plan.md†L40-L120】

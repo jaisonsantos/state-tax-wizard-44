@@ -18,15 +18,15 @@ acceptance criteria so that work can be planned and delivered in iterations.
 | `08_security.md` | Security hardening (HMAC, rate limiting, key rotation) |
 | `09_webhooks_and_reversals.md` | Order lifecycle webhooks, refunds, cancellations |
 | `10_quality.md` | QA matrices, automated testing, CI/CD enhancements |
-| `iteration_checklist.md` | Incremental delivery guidelines & Definition of Done |
-| `release_plan.md` | Suggested milestone sequencing and dependencies |
-| `milestone_02_next_steps.md` | Milestone 2 closure summary plus the entry plan for Milestone 3 (Frontend polish & analytics) |
-| `milestone_03_frontend_polish.md` | Milestone 3 kickoff plan covering analytics endpoints, dashboard polish, and supporting checklists |
-| `milestone_04_security.md` | Milestone 4 — Security & Rate Limiting (HMAC, replay, throttling, secrets, logging) |
-| `milestone_05_billing.md` | Milestone 5 — Billing & Stripe Integration (checkout/portal, webhooks, entitlements) |
-| `milestone_06_integrations.md` | Milestone 6 — Platform Integrations Alpha (Woo plugin, Shopify POC, SDK) |
-| `milestone_07_webhooks.md` | Milestone 7 — Webhooks & Order Lifecycle (reversals, idempotency, reporting) |
-| `milestone_08_launch.md` | Milestone 8 — Production Readiness & Launch |
+| `00_release_plan.md` | Suggested milestone sequencing and dependencies |
+| `11_iteration_checklist.md` | Incremental delivery guidelines & Definition of Done |
+| `12_milestone_02_next_steps.md` | Milestone 2 closure summary plus the entry plan for Milestone 3 (Frontend polish & analytics) |
+| `13_milestone_03_frontend_polish.md` | Milestone 3 kickoff plan covering analytics endpoints, dashboard polish, and supporting checklists |
+| `14_milestone_04_security.md` | Milestone 4 — Security & Rate Limiting (HMAC, replay, throttling, secrets, logging) |
+| `15_milestone_05_billing.md` | Milestone 5 — Billing & Stripe Integration (checkout/portal, webhooks, entitlements) |
+| `16_milestone_06_integrations.md` | Milestone 6 — Platform Integrations Alpha (Woo plugin, Shopify POC, SDK) |
+| `17_milestone_07_webhooks.md` | Milestone 7 — Webhooks & Order Lifecycle (reversals, idempotency, reporting) |
+| `18_milestone_08_launch.md` | Milestone 8 — Production Readiness & Launch |
 
 Each epic file contains:
 
@@ -39,5 +39,5 @@ Each epic file contains:
 
 Use this backlog as the single source of truth when planning sprints or
 incremental deliveries. Combine the epic-specific acceptance criteria with the
-shared checklist in `iteration_checklist.md` to verify each slice is production
+shared checklist in `11_iteration_checklist.md` to verify each slice is production
 ready before marking it complete.

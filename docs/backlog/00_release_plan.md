@@ -1,13 +1,13 @@
 # MVP Release Plan — Iterative Milestones
 
-Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura ~1–2 sprints (≈2 semanas) e deve cumprir a **Definition of Done** em `docs/backlog/iteration_checklist.md` antes de ser fechado.
+Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura ~1–2 sprints (≈2 semanas) e deve cumprir a **Definition of Done** em `docs/backlog/11_iteration_checklist.md` antes de ser fechado.
 
-> Convenções: sempre que um milestone menciona migração, feature flag ou variável de ambiente, a operação/rollback deve estar documentada em `docs/environment.md` e nas notas de release.
+> Convenções: sempre que um milestone menciona migração, feature flag ou variável de ambiente, a operação/rollback deve estar documentada em `docs/security/environment.md` e nas notas de release.
 
 ---
 
 ## Milestone 0 — Foundations (Week 0)
-- ✅ Epic 01 concluído (`docs/environment.md`, `docs/data-model.md`, `docs/observability.md`, `make smoke`).
+- ✅ Epic 01 concluído (`docs/security/environment.md`, `docs/security/data-model.md`, `docs/security/observability.md`, `make smoke`).
 - Rituais de engenharia e checklist de PR definidos.
 
 ## Milestone 1 — Secure Core APIs (Weeks 1–2)
@@ -25,7 +25,7 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 - ✅ `/v1/analytics/overview` com KPIs, feed com cursor, snapshot de contadores.
 - ✅ Dashboard consome analytics; menu de conta mostra metadados de sessão.
 - QA: smoke `make analytics-smoke`, testes e2e do dashboard.
-- Docs: `docs/api/analytics.md`, `docs/ui-guide.md` atualizados.
+- Docs: `docs/api/analytics.md`, `docs/security/ui-guide.md` atualizados.
 
 ---
 
