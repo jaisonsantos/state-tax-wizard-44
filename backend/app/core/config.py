@@ -12,7 +12,11 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440  # 24 hours
     app_env: str = "dev"
     stripe_public_key: Optional[str] = "pk_test_stub"
-    stripe_secret_key: Optional[str] = "sk_test_stub"
+    stripe_secret_key: Optional[str] = None
+    stripe_webhook_secret: Optional[str] = None
+    stripe_price_id_starter: Optional[str] = None
+    stripe_price_id_pro: Optional[str] = None
+    stripe_price_id_plus: Optional[str] = None
     shopify_app_key: Optional[str] = "stub_key"
     shopify_app_secret: Optional[str] = "stub_secret"
     hmac_max_skew_seconds: int = 300
