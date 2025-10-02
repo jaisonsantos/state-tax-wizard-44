@@ -1,6 +1,6 @@
 """Entitlement service for plan limits and feature gates."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 from fastapi import HTTPException
@@ -8,17 +8,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models.models import OrderFee, Subscription
+from ..observability import entitlement_denials_total, log_billing_event
 
 logger = logging.getLogger(__name__)
-
-
-def _to_iso(dt: datetime | None) -> str | None:
-    if dt is None:
-        return None
-    value = dt.replace(microsecond=0).isoformat()
-    if value.endswith("+00:00"):
-        return value[:-6] + "Z"
-    return value
 
 
 class EntitlementService:
@@ -75,7 +67,7 @@ class EntitlementService:
         subscription = db.query(Subscription).filter(
             Subscription.store_id == store_id
         ).first()
-        
+
         if not subscription:
             # Return default trial subscription
             return Subscription(
@@ -84,9 +76,12 @@ class EntitlementService:
                 plan="starter",
                 plan_tier="starter",
                 status="trialing",
-                trial_end=datetime.now(timezone.utc)
+                trial_end=datetime.now(timezone.utc),
+                current_period_start=datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+                current_period_end=datetime.now(timezone.utc) + timedelta(days=14),
+                cancel_at_period_end=False,
             )
-        
+
         return subscription
     
     @staticmethod
@@ -105,13 +100,17 @@ class EntitlementService:
         
         # Check if subscription is active
         if subscription.status not in ["active", "trialing"]:
+            entitlement_denials_total.labels(feature=feature, plan=subscription.plan_tier).inc()
             return False
-        
+
         # Get plan limits
         limits = EntitlementService.get_plan_limits(subscription.plan_tier)
-        
+
         # Check feature access
-        return feature in limits.get("features", [])
+        allowed = feature in limits.get("features", [])
+        if not allowed:
+            entitlement_denials_total.labels(feature=feature, plan=subscription.plan_tier).inc()
+        return allowed
     
     @staticmethod
     def enforce_transaction_limit(db: Session, store_id: str):
@@ -133,7 +132,7 @@ class EntitlementService:
         # Unlimited for plus plan
         if monthly_limit is None:
             return
-        
+
         # Count transactions this billing period
         period_start = getattr(
             subscription,
@@ -148,6 +147,14 @@ class EntitlementService:
         
         if transaction_count >= monthly_limit:
             logger.warning(f"Store {store_id} exceeded transaction limit: {transaction_count}/{monthly_limit}")
+            entitlement_denials_total.labels(feature="transactions", plan=subscription.plan_tier).inc()
+            log_billing_event(
+                "transaction_limit_exceeded",
+                store_id=store_id,
+                plan_tier=subscription.plan_tier,
+                current_usage=transaction_count,
+                limit=monthly_limit,
+            )
             raise HTTPException(
                 status_code=403,
                 detail={
@@ -186,11 +193,23 @@ class EntitlementService:
         
         monthly_limit = limits.get("transactions_per_month")
         
-        return {
+        usage = {
+            "plan": subscription.plan_tier,
             "transactions_used": transaction_count,
             "transactions_limit": monthly_limit,
             "unlimited": monthly_limit is None,
-            "percentage_used": (transaction_count / monthly_limit * 100) if monthly_limit else 0,
-            "period_start": _to_iso(period_start),
-            "period_end": _to_iso(subscription.current_period_end),
+            "percentage_used": (transaction_count / monthly_limit * 100) if monthly_limit else 0.0,
+            "period_start": period_start,
+            "period_end": subscription.current_period_end,
+            "status": subscription.status,
         }
+
+        log_billing_event(
+            "usage_fetched",
+            store_id=store_id,
+            plan_tier=subscription.plan_tier,
+            transactions_used=transaction_count,
+            unlimited=usage["unlimited"],
+        )
+
+        return usage

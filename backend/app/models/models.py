@@ -136,12 +136,18 @@ class Subscription(Base):
     plan = Column(String(20), nullable=False)
     status = Column(String(20), nullable=False)
     trial_end = Column(DateTime(timezone=True), nullable=True)
+    current_period_start = Column(DateTime(timezone=True), nullable=True)
     current_period_end = Column(DateTime(timezone=True), nullable=True)
     stripe_subscription_id = Column(String(255), unique=True, nullable=True)
     stripe_customer_id = Column(String(255), nullable=True)
     plan_tier = Column(String(50), nullable=False, default="starter")
     cancel_at_period_end = Column(Boolean, nullable=False, default=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
     # Relationships
     store = relationship("Store", back_populates="subscriptions")

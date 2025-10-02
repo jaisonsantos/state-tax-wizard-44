@@ -160,8 +160,11 @@ def test_get_current_usage(db_session: Session, demo_store: Store, patched_start
 
     usage = EntitlementService.get_current_usage(db_session, str(demo_store.id))
 
+    assert usage["plan"] == "starter"
+    assert usage["status"] in {"active", "trialing"}
     assert usage["transactions_used"] == 2
     assert usage["transactions_limit"] == 5
     assert not usage["unlimited"]
     assert usage["percentage_used"] == 40.0
-    assert usage["period_start"].endswith("Z")
+    assert usage["period_start"] is not None
+    assert usage["period_start"].tzinfo is not None

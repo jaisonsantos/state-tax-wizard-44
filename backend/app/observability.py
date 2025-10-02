@@ -56,6 +56,24 @@ rate_limit_throttles_total = Counter(
     ["route"],
 )
 
+billing_events_total = Counter(
+    "billing_events_total",
+    "Count of billing lifecycle events",
+    ["event"],
+)
+
+checkout_sessions_created_total = Counter(
+    "checkout_sessions_created_total",
+    "Number of Stripe Checkout sessions created",
+    ["plan_tier"],
+)
+
+entitlement_denials_total = Counter(
+    "entitlement_denials_total",
+    "Count of entitlement denials by feature and plan",
+    ["feature", "plan"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",
@@ -116,7 +134,8 @@ def log_security_event(event: Dict[str, Any]) -> None:
 def log_billing_event(event: str, **kwargs) -> None:
     """Emit a structured billing event log."""
     from datetime import datetime, timezone
-    
+
+    billing_events_total.labels(event=event).inc()
     logger = logging.getLogger("billing")
     logger.info(json.dumps({
         "event": event,

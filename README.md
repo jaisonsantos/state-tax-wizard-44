@@ -78,8 +78,11 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
 
 ### Environment variables
 
-- `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The smoke tests default to `demo-hmac-secret` but you should override it once secrets are rotated.
+- `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The security smoke defaults to `demo-hmac-secret` but you should override it once secrets are rotated.
 - `REDIS_URL` (optional) configures the distributed rate limiter. When running via Docker Compose the API service automatically connects to the bundled Redis container; set `REDIS_URL=redis://redis:6379/0` if you provision Redis yourself.
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` enable live billing flows; when unset the API returns `503` with `code="billing_unconfigured"` and smokes/Newman exit gracefully.
+- `STRIPE_PRICE_ID_STARTER`, `STRIPE_PRICE_ID_PRO`, and `STRIPE_PRICE_ID_PLUS` map plan tiers to Stripe price IDs. Populate them once products exist in your Stripe dashboard.
+- `SMOKE_BILLING_PLAN` selects which plan tier the billing smoke exercises (defaults to `pro`).
 - `HMAC_MAX_SKEW_SECONDS` and `HMAC_REPLAY_TTL_SECONDS` remain tunable via `.env`.
 
 ## Frontend development
@@ -129,6 +132,18 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```
   Requires the Docker stack with PostgreSQL running (`make up migrate seed`).
   Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
+- Billing smoke (Stripe checkout/portal & graceful degradation):
+
+  ```sh
+  make billing-smoke
+  ```
+  When Stripe variables are unset the script prints `⚠ SKIP: billing_unconfigured`; otherwise it asserts entitlements, usage, checkout, and portal APIs respond successfully.
+- Newman billing folder (optional, requires Postman env JSON with Stripe keys):
+
+  ```sh
+  make newman-billing
+  ```
+  Skips automatically when `docs/postman/local.postman_environment.json` is absent or Stripe credentials are not configured.
 - Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
 
   ```sh
@@ -157,5 +172,5 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 
 ## Roadmap status
 
-- **Current stage**: Milestone 4 — Security Hardening is complete (distributed rate limiting, secret rotation UX, replay protection, and observability are live).
-- **Next focus**: Milestone 5 — Billing/Stripe integration (subscription sync, entitlements, and billing telemetry). Track work-in-progress in the release plan backlog as items are promoted. 【F:docs/backlog/00_release_plan.md†L40-L120】
+- **Current stage**: Milestone 5 — Billing/Stripe integration is complete (subscriptions, usage enforcement, checkout/portal flows, and billing telemetry ship with evidence).
+- **Next focus**: Milestone 6 — Platform integrations alpha (WooCommerce/Shopify connectors and SDK hardening). Track progress in the release plan backlog as items graduate to in-progress. 【F:docs/backlog/00_release_plan.md†L120-L190】

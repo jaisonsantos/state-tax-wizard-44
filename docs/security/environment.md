@@ -39,6 +39,10 @@ configuration. The key variables are:
 | `SMOKE_EMAIL` | `smoke-tester@example.com` | User email used by the smoke test. |
 | `SMOKE_PASSWORD` | `change-me` | Password used by the smoke test. |
 | `SMOKE_HMAC_SECRET` | `demo-hmac-secret` | HMAC secret consumed by `make security-smoke`; override when rotating store secrets. |
+| `SMOKE_BILLING_PLAN` | `pro` | Plan tier exercised by `make billing-smoke`. |
+| `STRIPE_SECRET_KEY` | _(unset)_ | Enables billing endpoints; when empty the API returns `503 billing_unconfigured`. |
+| `STRIPE_WEBHOOK_SECRET` | _(unset)_ | Signature used to verify Stripe webhooks. |
+| `STRIPE_PRICE_ID_STARTER/PRO/PLUS` | _(unset)_ | Plan → price ID mapping used when creating Checkout sessions. |
 | `HMAC_MAX_SKEW_SECONDS` | `300` | Allowed clock drift (± seconds) for signed `/v1/fees/apply` requests. |
 | `HMAC_REPLAY_TTL_SECONDS` | `600` | Time-to-live for nonce records used to detect replays. |
 
@@ -140,3 +144,15 @@ Validates HMAC signing, timestamp skew, and replay protection.
    - Assert the initial apply succeeds, a replay attempt returns `409` with `detail.code = replay_detected`, and a stale timestamp yields `401`.
    - Print summary output including the replay/stale status codes.
 5. On failure, inspect the exit message and check `security` logs or Prometheus counters via `/metrics`.
+
+## Runbook: make billing-smoke
+
+Validates billing endpoints end-to-end or emits a skip when Stripe is not configured.
+
+1. Ensure the stack is running and seeded (`make migrate && make seed`).
+2. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_ID_*` when exercising the full Stripe flow. Leave them unset to confirm graceful degradation.
+3. Execute `make billing-smoke`.
+4. Output shows either:
+   - `✓` lines summarising entitlements, usage, checkout session ID, and portal URL when Stripe is configured, or
+   - `⚠ SKIP: Stripe billing not configured (billing_unconfigured returned).`
+5. Evidence is written to `docs/certification/EVIDENCE/billing_smoke.txt`.

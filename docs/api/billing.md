@@ -2,33 +2,19 @@
 
 ## Overview
 
-> ⚠️ **Implementation pending:** the billing endpoints described below are not
-> yet functional. The current backend returns `503 billing_unconfigured`, and
-> migrations/models must be repaired before these contracts can be exercised.
-
-The Billing API manages subscription lifecycle, entitlements, and usage tracking for the State Tax Wizard platform.
-
-## Authentication
-
-All endpoints require Bearer token authentication:
-
-```text
-Authorization: Bearer {access_token}
-```
+The Billing API manages subscription lifecycle, usage tracking, checkout/portal flows, and Stripe webhook ingestion. When Stripe credentials are not configured the API responds with `503` and `detail.code = "billing_unconfigured"`; the frontend, smoke tests, and Newman collection treat this as a skipped run.
 
 ## Endpoints
 
-### Get Entitlements
+### `GET /v1/billing/entitlements`
 
-Get current plan and feature entitlements for a store.
+Returns the current plan tier, feature entitlements, and Stripe metadata for a store.
 
-**Endpoint**: `GET /v1/billing/entitlements`
+| Query parameter | Type | Required | Description |
+| --------------- | ---- | -------- | ----------- |
+| `store_id` | UUID | ✅ | Target store identifier |
 
-**Parameters**:
-
-- `store_id` (query, required): Store UUID
-
-**Response**: `200 OK` (planned)
+**Response `200 OK`**
 
 ```json
 {
@@ -36,8 +22,9 @@ Get current plan and feature entitlements for a store.
   "provider": "stripe",
   "status": "active",
   "trial_ends_at": null,
-  "current_period_end": "2025-11-01T00:00:00Z",
   "cancel_at_period_end": false,
+  "current_period_start": "2025-01-01T00:00:00+00:00",
+  "current_period_end": "2025-02-01T00:00:00+00:00",
   "features": [
     "basic_reports",
     "advanced_reports",
@@ -53,49 +40,50 @@ Get current plan and feature entitlements for a store.
 }
 ```
 
-**Errors**:
+**Error responses**
 
-- `401 Unauthorized`: Invalid or missing token
-- `403 Forbidden`: Not authorized for this store
+| Status | Payload |
+| ------ | ------- |
+| `401 Unauthorized` | Missing/invalid bearer token |
+| `403 Forbidden` | Authenticated user not scoped to the store |
+| `503 Service Unavailable` | `{ "detail": { "code": "billing_unconfigured", "message": "Stripe integration not configured" } }` |
 
 ---
 
-### Get Usage
+### `GET /v1/billing/usage`
 
-Get current billing period usage statistics.
+Returns usage metrics for the store's current billing period.
 
-**Endpoint**: `GET /v1/billing/usage`
+**Query parameters**: same as the entitlements endpoint.
 
-**Parameters**:
-
-- `store_id` (query, required): Store UUID
-
-**Response**: `200 OK` (planned)
+**Response `200 OK`**
 
 ```json
 {
+  "plan": "pro",
+  "status": "active",
   "transactions_used": 4523,
   "transactions_limit": 10000,
   "unlimited": false,
   "percentage_used": 45.23,
-  "period_start": "2025-10-01T00:00:00Z",
-  "period_end": "2025-11-01T00:00:00Z"
+  "period_start": "2025-10-01T00:00:00+00:00",
+  "period_end": "2025-11-01T00:00:00+00:00"
 }
 ```
 
+Errors mirror `/v1/billing/entitlements`, including graceful `503 billing_unconfigured` responses when Stripe is not configured.
+
 ---
 
-### Create Checkout Session
+### `POST /v1/billing/create-checkout-session`
 
-Create a Stripe Checkout Session for subscription upgrade.
+Creates a Stripe Checkout session for subscription upgrades.
 
-**Endpoint**: `POST /v1/billing/create-checkout-session`
+| Query parameter | Type | Required | Description |
+| --------------- | ---- | -------- | ----------- |
+| `store_id` | UUID | ✅ | Store initiating the upgrade |
 
-**Parameters**:
-
-- `store_id` (query, required): Store UUID
-
-**Request Body**:
+**Request body**
 
 ```json
 {
@@ -105,280 +93,70 @@ Create a Stripe Checkout Session for subscription upgrade.
 }
 ```
 
-**Fields**:
-
-- `plan_tier`: One of `starter`, `pro`, `plus`
-- `success_url`: URL to redirect after successful payment
-- `cancel_url`: URL to redirect if user cancels
-
-**Response**: `200 OK` (planned)
+**Response `200 OK`**
 
 ```json
 {
-  "session_id": "cs_test_...",
-  "checkout_url": "https://checkout.stripe.com/pay/cs_test_..."
+  "session_id": "cs_test_a1B2c3",
+  "url": "https://checkout.stripe.com/pay/cs_test_a1B2c3"
 }
 ```
 
-**Usage**:
+**Error responses**
 
-```javascript
-// Redirect user to checkout
-const response = await fetch(
-  "/v1/billing/create-checkout-session?store_id=...",
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      plan_tier: "pro",
-      success_url: `${window.location.origin}/billing/success`,
-      cancel_url: `${window.location.origin}/billing`,
-    }),
-  },
-);
-
-const { checkout_url } = await response.json();
-window.location.href = checkout_url;
-```
-
-**Errors**:
-
-- `400 Bad Request`: Invalid plan tier
-- `401 Unauthorized`: Invalid or missing token
-- `403 Forbidden`: Not authorized for this store
+- `400 Bad Request` — unsupported plan tier.
+- `401/403` — auth failures, as above.
+- `503 Service Unavailable` — Stripe credentials or price IDs missing.
 
 ---
 
-### Create Portal Session
+### `POST /v1/billing/create-portal-session`
 
-Create a Stripe Customer Portal session for self-service subscription management.
+Opens the Stripe Customer Portal for self-service plan management.
 
-**Endpoint**: `POST /v1/billing/create-portal-session`
+| Query parameter | Type | Required | Description |
+| --------------- | ---- | -------- | ----------- |
+| `store_id` | UUID | ✅ | Store requesting the portal session |
+| `return_url` | URL | ✅ | Destination after the customer exits the portal |
 
-**Parameters**:
-
-- `store_id` (query, required): Store UUID
-- `return_url` (query, required): URL to return to after portal
-
-**Response**: `200 OK` (planned)
+**Response `200 OK`**
 
 ```json
 {
-  "portal_url": "https://billing.stripe.com/session/..."
+  "portal_url": "https://billing.stripe.com/p/session/test123"
 }
 ```
 
-**Usage**:
-
-```javascript
-const response = await fetch(
-  `/v1/billing/create-portal-session?store_id=...&return_url=${encodeURIComponent(window.location.href)}`,
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  },
-);
-
-const { portal_url } = await response.json();
-window.location.href = portal_url;
-```
-
-**Errors**:
-
-- `400 Bad Request`: Store has no Stripe customer
-- `401 Unauthorized`: Invalid or missing token
-- `403 Forbidden`: Not authorized for this store
+**Error responses**: `400` when the store lacks a Stripe customer, `401/403` for auth issues, and `503 billing_unconfigured` when Stripe is disabled.
 
 ---
 
-### Stripe Webhooks
+### `POST /v1/billing/webhooks/stripe`
 
-Process Stripe webhook events (internal endpoint).
+Ingests Stripe webhooks. Requests are verified with `stripe.Webhook.construct_event` using `STRIPE_WEBHOOK_SECRET`.
 
-**Endpoint**: `POST /v1/billing/webhooks/stripe`
+- Successful processing always returns `200 OK` (Stripe handles retries on non-2xx responses).
+- Signature failures return `400` with `detail = "Invalid signature"` and increment `billing_events_total{event="webhook_invalid_signature"}`.
+- Unknown event types log `billing_events_total{event="webhook_ignored"}`.
 
-> Pending implementation — backend startup currently fails before
-> webhook handlers can run.
+**Supported events**
 
-**Headers**:
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
 
-- `stripe-signature`: Webhook signature for verification
-
-**Events Processed**:
-
-- `customer.subscription.created` - New subscription created
-- `customer.subscription.updated` - Subscription status/plan changed
-- `customer.subscription.deleted` - Subscription canceled
-- `invoice.paid` - Payment successful, billing period updated
-- `invoice.payment_failed` - Payment failed, grace period started
-
-**Response**: `200 OK`
-
-```json
-{
-  "status": "success"
-}
-```
-
-**Note**: This endpoint is called by Stripe, not by frontend code.
+Each handler updates the `subscriptions` table, records an audit log, and keeps Prometheus counters (`billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`) in sync.
 
 ---
 
-## Plan Tiers
+## Metrics
 
-### Starter
+Billing surfaces the following Prometheus metrics:
 
-- **Price**: Free trial / $29/month
-- **Transactions**: 1,000/month
-- **Features**:
-  - Basic reports
-  - Fee calculation
+- `billing_events_total{event}` — counts webhook and API events (checkout created, portal session, unconfigured skips, invalid signatures).
+- `checkout_sessions_created_total{plan_tier}` — increments whenever a Checkout session is created successfully.
+- `entitlement_denials_total{feature,plan}` — increments when plan restrictions prevent access (feature gating or transaction limits).
 
-### Pro
-
-- **Price**: $99/month
-- **Transactions**: 10,000/month
-- **Features**:
-  - All Starter features
-  - Advanced reports (CO DR 1786, MN Summary)
-  - Analytics dashboard
-
-### Plus
-
-- **Price**: $299/month
-- **Transactions**: Unlimited
-- **Features**:
-  - All Pro features
-  - Platform integrations (WooCommerce, Shopify)
-  - Priority support
-
----
-
-## Rate Limits
-
-All billing endpoints are rate-limited:
-
-- **Authenticated requests**: 120 requests/minute per store
-- **Webhook endpoint**: 1000 requests/minute (Stripe retry logic)
-
-Rate limit headers included in responses:
-
-```text
-X-RateLimit-Limit: 120
-X-RateLimit-Remaining: 115
-X-RateLimit-Reset: 1696118400
-```
-
----
-
-## Error Responses
-
-### Transaction Limit Exceeded
-
-When a store exceeds their monthly transaction limit:
-
-```json
-{
-  "detail": {
-    "code": "transaction_limit_exceeded",
-    "message": "Monthly transaction limit of 1000 exceeded. Please upgrade your plan.",
-    "current_usage": 1001,
-    "limit": 1000
-  }
-}
-```
-
-**HTTP Status**: `403 Forbidden`
-
-**Frontend Handling**:
-
-- Display upgrade prompt
-- Link to checkout session for higher tier
-- Show current usage stats
-
----
-
-## Observability
-
-### Audit Logs
-
-All billing events are logged to `audit_logs` table with action `stripe_webhook`:
-
-```sql
-
-```
-
-```sql
-SELECT
-  timestamp,
-  payload->>'event_type' AS event,
-  payload->>'subscription_id' AS subscription,
-  payload->>'plan_tier' AS plan
-FROM audit_logs
-WHERE action = 'stripe_webhook'
-ORDER BY timestamp DESC;
-```
-
-### Prometheus Metrics
-
-- `billing_events_total{event}` - Count of webhook events
-- `checkout_sessions_created_total{plan_tier}` - Checkout sessions by tier
-- `entitlement_denials_total{feature, plan}` - Feature access denials
-
----
-
-## Testing
-
-### Test Mode
-
-All Stripe operations use test mode keys by default in development.
-
-**Test Cards**:
-
-- Success: `4242 4242 4242 4242`
-- Decline: `4000 0000 0000 0002`
-
-**Webhook Testing**:
-
-Use Stripe CLI to forward webhooks locally:
-
-```bash
-stripe listen --forward-to localhost:8000/v1/billing/webhooks/stripe
-```
-
-### Integration Tests
-
-```python
-# Test checkout session creation
-response = client.post(
-    "/v1/billing/create-checkout-session",
-    params={"store_id": store_id},
-    json={
-        "plan_tier": "pro",
-        "success_url": "https://example.com/success",
-        "cancel_url": "https://example.com/cancel",
-    },
-    headers={"Authorization": f"Bearer {token}"},
-)
-assert response.status_code == 200
-assert "checkout_url" in response.json()
-```
-
----
-
-## Migration Guide
-
-For stores migrating from trial to paid plans:
-
-1. User initiates upgrade from UI
-2. Frontend calls `/v1/billing/create-checkout-session`
-3. User completes payment on Stripe Checkout
-4. Webhook `customer.subscription.created` updates database
-5. User redirected to `success_url`
-6. Frontend refetches `/v1/billing/entitlements` to show new plan
-7. Transaction limits automatically updated
+These appear in `/metrics` alongside existing security and fee counters and are captured in `docs/certification/EVIDENCE/metrics_dump.txt`.

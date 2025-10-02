@@ -56,30 +56,7 @@ security-smoke: ## Smoke test HMAC + rate limiting
 
 billing-smoke: ## Smoke test billing endpoints (requires Stripe configuration)
 	@echo "==> Testing billing endpoints..."
-	@if docker-compose exec -T api sh -c 'test -n "$$STRIPE_SECRET_KEY"'; then \
-		docker-compose exec -T api python -c "\
-import os, sys; \
-from app.core.config import settings; \
-from sqlalchemy.orm import Session; \
-from app.db.database import SessionLocal; \
-from app.services.entitlement_service import EntitlementService; \
-from app.services.stripe_service import StripeService; \
-print('✓ STRIPE_SECRET_KEY configured'); \
-db = SessionLocal(); \
-try: \
-    sub = EntitlementService.get_subscription(db, 'demo-store-1'); \
-    print(f'✓ Subscription retrieved: plan={sub.plan_tier}, status={sub.status}'); \
-    limits = EntitlementService.get_plan_limits(sub.plan_tier); \
-    print(f'✓ Plan limits: {limits}'); \
-    usage = EntitlementService.get_current_usage(db, 'demo-store-1'); \
-    print(f'✓ Usage: {usage[\"transactions_used\"]}/{usage[\"transactions_limit\"]}'); \
-    print('✓ Billing smoke tests PASSED'); \
-finally: \
-    db.close(); \
-"; \
-	else \
-		echo "⚠ SKIP: STRIPE_SECRET_KEY not set (billing endpoints will return 503 billing_unconfigured)"; \
-	fi
+	docker-compose exec -T api python smoke_test.py --billing-only
 
 clean: ## Remove all containers and volumes
 	docker-compose down -v

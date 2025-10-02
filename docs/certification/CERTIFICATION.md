@@ -2,9 +2,9 @@
 
 ## Summary
 
-- Pytest suite (including new rate-limiter and rotation coverage) passes locally, confirming analytics, fee flows, HMAC edge cases, and regression guards. 【F:backend/tests/test_fee_security.py†L1-L340】【F:backend/tests/test_rate_limiter.py†L1-L40】
+- Pytest suite (including billing/webhook coverage) passes locally, confirming analytics, fee flows, Stripe entitlements, HMAC edge cases, and regression guards. 【F:backend/tests/test_fee_security.py†L1-L340】【F:backend/tests/test_billing_api.py†L1-L200】
 - Distributed rate limiting, secret rotation UX/API, and timezone-aware logging are implemented and validated by smoke tests and Prometheus counters, closing the remaining M4 follow-ups. 【F:backend/app/security/rate_limit.py†L1-L146】【F:backend/app/routers/store_settings.py†L1-L155】【F:backend/smoke_test.py†L1-L360】
-- Documentation, Postman, and Makefile targets were refreshed to reflect the new workflows and CI automation. 【F:docs/security/hmac.md†L1-L120】【F:docs/postman/state-tax-wizard.postman_collection.json†L470-L540】【F:Makefile†L1-L110】
+- Documentation, Postman, and Makefile targets were refreshed to reflect the new workflows and CI automation (security + billing slices). 【F:docs/security/hmac.md†L1-L120】【F:docs/postman/README.md†L1-L160】【F:Makefile†L1-L90】
 
 > Consulte o [STATUS.md](../../STATUS.md) e os dossiês de milestones ([Milestone 2](../backlog/12_milestone_02_next_steps.md), [Milestone 3](../backlog/13_milestone_03_frontend_polish.md), [Milestone 4](../backlog/14_milestone_04_security.md)) para contexto expandido.
 
@@ -35,6 +35,14 @@
 - Alembic guardian migration enforces the processed nonce indexes across environments and downgrades cleanly. 【F:backend/alembic/versions/20251001_ensure_unique_nonce_index.py†L1-L40】
 - HMAC guide and observability catalog document the rotation endpoint, Redis rate limits, and new Prometheus counters to avoid drift. 【F:docs/security/hmac.md†L1-L120】【F:docs/security/observability.md†L1-L160】
 
-## Outstanding Follow-ups Before M5
+### Milestone 5 – Billing & Stripe Integration **(Pass)**
 
-- Extend ops/runbook docs with guidance on supplying `REDIS_URL`, secure secret storage, and billing environment variables ahead of the next slice. 【F:README.md†L80-L133】【F:docs/postman/README.md†L1-L140】
+- `/v1/billing/entitlements` and `/v1/billing/usage` expose live plan metadata, usage limits, and graceful `503 billing_unconfigured` handling. 【F:backend/app/routers/billing.py†L1-L120】
+- Stripe services manage customers, checkout sessions, portal sessions, and webhooks; Prometheus counters (`billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`) track activity. 【F:backend/app/services/stripe_service.py†L1-L220】【F:backend/app/observability.py†L10-L140】
+- Entitlement enforcement blocks fee application when limits are exceeded and logs denials with low-cardinality labels. 【F:backend/app/services/entitlement_service.py†L1-L200】【F:backend/app/routers/fees.py†L90-L160】
+- Frontend billing page consumes the new APIs, surfaces usage meters, trial messaging, plan upgrades, and portal access with error handling. 【F:src/pages/Billing.tsx†L1-L420】【F:src/lib/api.ts†L440-L520】
+- Smoke (`make billing-smoke`), Newman, docs, and certification evidence capture the completed Stripe flow with skip semantics for unconfigured environments. 【F:backend/smoke_test.py†L280-L360】【F:docs/certification/EVIDENCE/billing_smoke.txt†L1-L5】【F:docs/billing/stripe.md†L1-L160】
+
+## Outstanding Follow-ups Before M6
+
+- Extend ops/runbook docs with guidance for platform integrations (WooCommerce/Shopify) and SDK distribution as Milestone 6 work begins. 【F:docs/backlog/16_milestone_06_integrations.md†L1-L120】

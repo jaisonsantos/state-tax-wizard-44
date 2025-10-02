@@ -20,6 +20,7 @@ SMOKE_METRICS_URL = os.environ.get("SMOKE_METRICS_URL")
 SMOKE_EMAIL = os.environ.get("SMOKE_EMAIL", "smoke-tester@example.com")
 SMOKE_PASSWORD = os.environ.get("SMOKE_PASSWORD", "change-me")
 SMOKE_HMAC_SECRET = os.environ.get("SMOKE_HMAC_SECRET", "demo-hmac-secret")
+BILLING_PLAN_FOR_CHECKOUT = os.environ.get("SMOKE_BILLING_PLAN", "pro")
 
 
 class SmokeFailure(RuntimeError):
@@ -79,6 +80,29 @@ def update_settings(
     )
     _raise_for_status(response, "settings update")
     return response.json()
+
+
+def _refresh_hmac_secret(
+    client: httpx.Client,
+    headers: Dict[str, str],
+    store_id: str,
+) -> str:
+    """Rotate the HMAC secret so the smoke test always has the latest value."""
+
+    response = client.post(
+        f"{API_BASE_URL}/v1/stores/{store_id}/hmac/rotate",
+        headers=headers,
+        timeout=20.0,
+    )
+    _raise_for_status(response, "rotate HMAC secret")
+    payload = response.json()
+    secret = payload.get("hmac_secret")
+    if not isinstance(secret, str) or len(secret) < 32:
+        raise SmokeFailure("Rotate secret response missing hmac_secret")
+
+    global SMOKE_HMAC_SECRET
+    SMOKE_HMAC_SECRET = secret
+    return secret
 
 
 def quote_fees(
@@ -278,11 +302,102 @@ def fetch_analytics(
     return data
 
 
+def _handle_billing_unconfigured(response: httpx.Response) -> bool:
+    if response.status_code != 503:
+        return False
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return False
+
+    detail = payload.get("detail")
+    if isinstance(detail, dict) and detail.get("code") == "billing_unconfigured":
+        print("⚠ SKIP: Stripe billing not configured (billing_unconfigured returned).")
+        return True
+    return False
+
+
+def run_billing_only_smoke() -> Dict[str, Any]:
+    with httpx.Client() as client:
+        login_payload = login(client)
+        store_id = login_payload["stores"][0]["id"]
+        headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        entitlements_response = client.get(
+            f"{API_BASE_URL}/v1/billing/entitlements",
+            params={"store_id": store_id},
+            headers=headers,
+            timeout=20.0,
+        )
+        if _handle_billing_unconfigured(entitlements_response):
+            return {"skipped": True}
+        _raise_for_status(entitlements_response, "entitlements")
+        entitlements = entitlements_response.json()
+
+        usage_response = client.get(
+            f"{API_BASE_URL}/v1/billing/usage",
+            params={"store_id": store_id},
+            headers=headers,
+            timeout=20.0,
+        )
+        if _handle_billing_unconfigured(usage_response):
+            return {"skipped": True}
+        _raise_for_status(usage_response, "usage")
+        usage = usage_response.json()
+
+        checkout_response = client.post(
+            f"{API_BASE_URL}/v1/billing/create-checkout-session",
+            params={"store_id": store_id},
+            headers=headers,
+            json={
+                "plan_tier": BILLING_PLAN_FOR_CHECKOUT,
+                "success_url": "https://example.com/billing/success",
+                "cancel_url": "https://example.com/billing/cancel",
+            },
+            timeout=30.0,
+        )
+        if _handle_billing_unconfigured(checkout_response):
+            return {"skipped": True}
+        _raise_for_status(checkout_response, "create checkout session")
+        checkout_payload = checkout_response.json()
+
+        portal_response = client.post(
+            f"{API_BASE_URL}/v1/billing/create-portal-session",
+            params={"store_id": store_id, "return_url": "https://example.com/billing"},
+            headers=headers,
+            timeout=30.0,
+        )
+        if _handle_billing_unconfigured(portal_response):
+            return {"skipped": True}
+        _raise_for_status(portal_response, "create portal session")
+        portal_payload = portal_response.json()
+
+    print("Billing smoke completed successfully.")
+    print(f"Plan: {entitlements['plan']} status={entitlements['status']}")
+    print(
+        "Usage: "
+        f"{usage['transactions_used']}/"
+        f"{usage.get('transactions_limit') or 'unlimited'} transactions"
+    )
+    print(f"Checkout session id: {checkout_payload.get('session_id')}")
+    print(f"Portal URL prefix: {portal_payload.get('portal_url', '')[:32]}")
+
+    return {
+        "entitlements": entitlements,
+        "usage": usage,
+        "checkout": checkout_payload,
+        "portal": portal_payload,
+    }
+
+
 def run_full_smoke() -> Dict[str, Any]:
     with httpx.Client() as client:
         login_payload = login(client)
         store_id = login_payload["stores"][0]["id"]
         headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        _refresh_hmac_secret(client, headers, store_id)
 
         update_settings(client, headers, store_id, enable_mn=False, enable_co=True, absorb_fee=False)
 
@@ -352,6 +467,8 @@ def run_security_only_smoke() -> Dict[str, Any]:
         login_payload = login(client)
         store_id = login_payload["stores"][0]["id"]
         headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        _refresh_hmac_secret(client, headers, store_id)
 
         base_order_id = "smoke-security-order"
         apply_result, meta = apply_fees(
@@ -610,12 +727,22 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
         action="store_true",
         help="Only execute HMAC validation smoke checks",
     )
+    parser.add_argument(
+        "--billing-only",
+        action="store_true",
+        help="Only execute billing subscription validation",
+    )
     parsed_args = parser.parse_args()
 
     try:
         selected = [
             flag
-            for flag in (parsed_args.analytics_only, parsed_args.reports_only, parsed_args.security_only)
+            for flag in (
+                parsed_args.analytics_only,
+                parsed_args.reports_only,
+                parsed_args.security_only,
+                parsed_args.billing_only,
+            )
             if flag
         ]
         if len(selected) > 1:
@@ -626,6 +753,8 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
             run_security_only_smoke()
         elif parsed_args.reports_only:
             run_reports_only_smoke()
+        elif parsed_args.billing_only:
+            run_billing_only_smoke()
         else:
             run_full_smoke()
     except SmokeFailure as exc:

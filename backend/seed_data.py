@@ -45,6 +45,14 @@ def ensure_store(
         db.add(store)
         db.flush()
 
+    demo_customer_id = f"cus_demo_{str(store.id).replace('-', '')[:14]}"
+    demo_subscription_id = f"sub_demo_{str(store.id).replace('-', '')[:14]}"
+
+    if not store.stripe_customer_id:
+        store.stripe_customer_id = demo_customer_id
+    if not store.stripe_subscription_id:
+        store.stripe_subscription_id = demo_subscription_id
+
     if not store.settings:
         settings = StoreSetting(
             store_id=store.id,
@@ -74,9 +82,12 @@ def ensure_store(
             plan=plan,
             status="trialing" if plan == "starter" else "active",
             trial_end=now + timedelta(days=14) if plan == "starter" else None,
+            current_period_start=now - timedelta(days=15),
             current_period_end=now + timedelta(days=30),
             plan_tier=plan,
             cancel_at_period_end=False,
+            stripe_customer_id=store.stripe_customer_id,
+            stripe_subscription_id=store.stripe_subscription_id,
         )
         db.add(subscription)
     else:
@@ -87,6 +98,12 @@ def ensure_store(
             if sub.plan != plan:
                 sub.plan = plan
             sub.cancel_at_period_end = sub.cancel_at_period_end or False
+            if not sub.current_period_start:
+                sub.current_period_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            if store.stripe_customer_id and not sub.stripe_customer_id:
+                sub.stripe_customer_id = store.stripe_customer_id
+            if store.stripe_subscription_id and not sub.stripe_subscription_id:
+                sub.stripe_subscription_id = store.stripe_subscription_id
 
     return store
 
