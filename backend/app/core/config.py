@@ -1,9 +1,11 @@
 from typing import Optional
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     database_url: str = "postgresql+psycopg://user:pass@postgres:5432/rdf"
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
@@ -18,9 +20,8 @@ class Settings(BaseSettings):
     redis_url: Optional[str] = None
     rate_limit_window_seconds: int = 60
     rate_limit_limit: int = 120
-    
-    class Config:
-        env_file = ".env"
+    vite_api_base_url: Optional[str] = None
+    smoke_hmac_secret: Optional[str] = "demo-hmac-secret"
 
 
 settings = Settings()
