@@ -26,6 +26,7 @@ from ..schema.fees import (
 )
 from ..security.hmac import enforce_hmac
 from ..security.rate_limit import rate_limiter
+from ..services.entitlement_service import EntitlementService
 from ..services.fee_service import (
     DEFAULT_LABELS,
     FeeCalculationResult,

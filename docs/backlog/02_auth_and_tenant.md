@@ -1,11 +1,13 @@
 # Epic 02 — Authentication & Tenant Isolation
 
 ## Context
+
 Multi-tenant SaaS requires reliable authentication and authorization for each
 store. The MVP currently seeds a demo store and issues JWTs without checking
 store-level claims, leaving critical security gaps.
 
 ## Current Status
+
 - ✅ `POST /api/auth/login` creates/retrieves a user and returns JWT + stores.
 - ✅ `GET /api/me` returns the authenticated user and linked stores.
 - ✅ All `/api/v1/**` endpoints require bearer tokens and verify store access
@@ -16,6 +18,7 @@ store-level claims, leaving critical security gaps.
   the new endpoint.
 
 ## Acceptance Criteria
+
 1. **Secure JWTs**: Tokens include `sub`, `exp`, and `stores` claim (array of
    UUIDs). Tokens expire within configurable TTL (default 24h).
 2. **Authorization Dependency**: FastAPI dependency that validates the bearer
@@ -29,6 +32,7 @@ store-level claims, leaving critical security gaps.
    a sequence diagram showing login → token issuance → authorized request.
 
 ## Deliverables
+
 - Updated `core/security.py` and router dependencies enforcing authorization.
 - Frontend state management for selected store (context or Zustand store).
 - Session token persistence with explicit logout endpoint and metrics/logs.
@@ -38,11 +42,13 @@ store-level claims, leaving critical security gaps.
   - Sequence: [Auth Flow](../diagrams/auth_flow.mermaid)
 
 ## Validation
+
 - Backend pytest suite passes with new authorization tests.
 - Manual smoke tests fail when omitting `Authorization` or using a store not in
   the token claims.
 
 ## Definition of Done
+
 - All production routers import and use the shared authorization dependency;
   automated lint/test checks fail if the dependency is absent.
 - JWT configuration, rotation process, and environment variables documented in
@@ -55,4 +61,5 @@ store-level claims, leaving critical security gaps.
   claims do not match the target store.
 
 ## Dependencies
+
 - Relies on Epic 01 documentation for environment variables (JWT secret, TTL).

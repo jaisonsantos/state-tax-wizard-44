@@ -7,21 +7,25 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Milestone 0 — Foundations (Week 0)
+
 - ✅ Epic 01 concluído (`docs/security/environment.md`, `docs/security/data-model.md`, `docs/security/observability.md`, `make smoke`).
 - Rituais de engenharia e checklist de PR definidos.
 
 ## Milestone 1 — Secure Core APIs (Weeks 1–2)
+
 - Epic 02 (auth/tenant) entregue.
 - ✅ Store settings (Epic 03) via `/v1/stores/{id}/settings`.
 - Frontend (Epic 05) usando claims de auth para seletor de loja.
 - ✅ Sessões persistidas em `session_tokens`, logout com revogação, menu de conta exposto.
 
 ## Milestone 2 — Reporting Confidence (Weeks 3–4)
+
 - ✅ Telemetria de export (Epic 04) + auditoria (`report_export`) + métricas.
 - ✅ MN/CO: CSV/JSON, nomes de anexos por cabeçalho, histórico na UI.
 - ✅ Playwright/Newman/pytest cobrindo 422, headers e evidências.
 
 ## Milestone 3 — Frontend Polish & Analytics (Weeks 5–6)
+
 - ✅ `/v1/analytics/overview` com KPIs, feed com cursor, snapshot de contadores.
 - ✅ Dashboard consome analytics; menu de conta mostra metadados de sessão.
 - QA: smoke `make analytics-smoke`, testes e2e do dashboard.
@@ -30,6 +34,7 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Milestone 4 — Security & Rate Limiting (Weeks 7–8)
+
 **Escopo (Epic 08)**
 - HMAC para chamadas sensíveis (incl. timestamp/nonce) e **replay protection**.
 - **Rate limiting** por IP/rota/tenant (limites default + overrides).
@@ -49,6 +54,7 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Milestone 5 — Billing & Stripe Integration (Weeks 9–10)
+
 **Escopo (Epic 07)**
 - **Customer lifecycle** (criação/sync), **Checkout** e **Billing Portal**.
 - **Webhooks Stripe** (invoice/checkout/subscription) em modo seguro.
@@ -68,6 +74,7 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Milestone 6 — Platform Integrations Alpha (Weeks 11–12)
+
 **Escopo (Epic 06)**
 - **WooCommerce plugin** (admin, store-key, mapeamento de carrinho).
 - **Shopify app POC** (limitations: sem Plus → via app proxy/Function).
@@ -84,6 +91,7 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Milestone 7 — Webhooks & Order Lifecycle (Weeks 13–14)
+
 **Escopo (Epic 09)**
 - Infra de **webhooks de pedidos** (emitir/consumir), **reversals** e **cancellations**.
 - **Idempotency** nos endpoints de lifecycle e reconciliação.
@@ -101,6 +109,7 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Milestone 8 — Production Readiness & Launch (Weeks 15–16)
+
 **Escopo**
 - Infra & observability (dashboards, logs centralizados, backups).
 - **Performance & load** (metas p95/p99), hardening de segurança e revisão externa.
@@ -117,5 +126,6 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 ---
 
 ## Notas de Planejamento
+
 - Cada milestone deve encerrar com **demo, revisão de stakeholders e atualização dos docs** (linkando PRs, evidências e métricas).
 - Itens que “escaparem” são reprojetados no próximo milestone com critério claro de aceitação.

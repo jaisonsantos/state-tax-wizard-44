@@ -93,6 +93,7 @@ Validates the end-to-end experience using seeded data.
    - Download both the Minnesota summary (JSON) and Colorado DR-1786 (CSV)
      reports.
 4. Success output resembles:
+
    ```
    Smoke test completed successfully.
    MN quote lines: 1
@@ -126,6 +127,7 @@ runbooks:
 - `frontend.yml` performs `npm install`, `npm run typecheck`, and `npm run build`.
 - The smoke test can be invoked in CI by running `make up`, `make migrate`,
   `make seed`, and `make smoke` sequentially on a runner with Docker access.
+
 ## Runbook: make security-smoke
 
 Validates HMAC signing, timestamp skew, and replay protection.
@@ -138,4 +140,3 @@ Validates HMAC signing, timestamp skew, and replay protection.
    - Assert the initial apply succeeds, a replay attempt returns `409` with `detail.code = replay_detected`, and a stale timestamp yields `401`.
    - Print summary output including the replay/stale status codes.
 5. On failure, inspect the exit message and check `security` logs or Prometheus counters via `/metrics`.
-

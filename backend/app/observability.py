@@ -113,6 +113,18 @@ def log_security_event(event: Dict[str, Any]) -> None:
     logger.info(json.dumps(event, default=str))
 
 
+def log_billing_event(event: str, **kwargs) -> None:
+    """Emit a structured billing event log."""
+    from datetime import datetime, timezone
+    
+    logger = logging.getLogger("billing")
+    logger.info(json.dumps({
+        "event": event,
+        **kwargs,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }, default=str))
+
+
 def ensure_request_id(request_id: str | None) -> str:
     """Ensure every request has a stable identifier."""
 

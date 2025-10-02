@@ -3,18 +3,22 @@
 _[← Milestone 5 — Billing](15_milestone_05_billing.md) • [Milestone 7 — Webhooks →](17_milestone_07_webhooks.md)_
 
 ## Stage Validation Summary
+
 - **Backend fee endpoints ready**: `/v1/fees/quote` and `/v1/fees/apply` accept structured payloads with item details ([`backend/app/routers/fees.py`](../../backend/app/routers/fees.py)).
 - **Security foundation in place**: HMAC verification and rate limiting protect API endpoints (Milestone 4).
 - **Audit logging captures decisions**: All fee operations logged with full context ([`backend/app/services/audit_repository.py`](../../backend/app/services/audit_repository.py)).
 - **Remaining gap**: No WooCommerce plugin or Shopify app exists; integrations only tested via Postman/API.
 
 ## Next Development Objective
+
 Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout fee injection, providing real merchant value and validating API contracts against production e-commerce flows.
 
 ## Implementation Plan
 
 ### 1. WooCommerce Plugin Foundation
+
 - Create directory structure `integrations/woocommerce/`:
+
   ```
   woocommerce/
   ├── state-tax-wizard.php          # Main plugin file
@@ -49,6 +53,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Logs success/failure to `wp_tax_wizard_logs`.
 
 ### 2. WooCommerce Admin Settings
+
 - Create WordPress admin menu: "State Tax Wizard" under WooCommerce.
 - Settings page fields:
   - API Base URL (default: `https://api.statetaxwizard.com`).
@@ -66,6 +71,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - "View Details" button shows full API request/response JSON.
 
 ### 3. WooCommerce Fee Injection
+
 - Hook: `add_action('woocommerce_cart_calculate_fees', 'inject_retail_delivery_fee', 10)`.
 - Logic:
   - Check if delivery address matches enabled jurisdictions (MN zip >= 55000, CO enabled).
@@ -78,6 +84,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Display admin notice if API credentials invalid.
 
 ### 4. WooCommerce Order Persistence
+
 - Hook: `add_action('woocommerce_checkout_order_processed', 'persist_fee_order', 10, 1)`.
 - Logic:
   - Extract order ID, items, final fee amount, customer address.
@@ -90,6 +97,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Show API response status and timestamp.
 
 ### 5. WooCommerce Testing & Packaging
+
 - **PHPUnit Tests** (`tests/test-fee-calculator.php`):
   - Mock WooCommerce cart items and API responses.
   - Test quote parsing, HMAC signature generation, error handling.
@@ -102,6 +110,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Check logs page displays order history.
   - Test error scenarios (invalid HMAC, API timeout, non-applicable state).
 - **Packaging Script** (`package.sh`):
+
   ```bash
   #!/bin/bash
   rm -rf dist/
@@ -113,7 +122,9 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Version number sourced from plugin header.
 
 ### 6. Shopify App Foundation
+
 - Create directory structure `integrations/shopify/`:
+
   ```
   shopify/
   ├── app/
@@ -141,6 +152,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Liquid theme displays fee in cart summary.
 
 ### 7. Shopify Product-Fee Injection
+
 - **Approach**: Since Shopify doesn't support dynamic fees via app proxy at checkout (requires Shopify Plus for Checkout Extensions), use "Fee Product" method:
   - App creates hidden product "Retail Delivery Fee" in merchant's store.
   - App proxy endpoint calculates fee via `/v1/fees/quote`.
@@ -150,6 +162,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
 - Document limitation in README: "Standard Shopify accounts require fee displayed as product line item; Shopify Plus merchants can use native fee extensions."
 
 ### 8. Shopify Webhook Handler
+
 - **Webhook Event**: `orders/create`.
 - Endpoint: `/webhooks/orders` with HMAC verification (Shopify signature, not State Tax Wizard).
 - Logic:
@@ -160,6 +173,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
 - Idempotency: Check if order already processed via metafield before calling `/apply`.
 
 ### 9. Shopify App Setup Documentation
+
 - **README.md** (`integrations/shopify/README.md`):
   - Prerequisites: Shopify Partner account, Node.js 18+.
   - Local development setup with Shopify CLI (`shopify app dev`).
@@ -174,7 +188,9 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Test checkout with Minnesota/Colorado addresses.
 
 ### 10. Integration SDK & Shared Helpers
+
 - Create `integrations/sdk/` directory:
+
   ```
   sdk/
   ├── typescript/
@@ -204,6 +220,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Document in `integrations/sdk/examples/` with sample code for common scenarios.
 
 ### 11. Integration Testing
+
 - **WooCommerce CI** (`.github/workflows/woocommerce.yml`):
   - Lint PHP code (`phpcs`, `phpstan`).
   - Run PHPUnit tests against WooCommerce test framework.
@@ -218,6 +235,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Store video in repo or link to cloud storage for milestone review.
 
 ### 12. Documentation & Enablement
+
 - Create `docs/integrations/` directory:
   - `woocommerce.md`: Installation, configuration, troubleshooting.
   - `shopify.md`: Setup guide, webhook configuration, theme integration.
@@ -231,6 +249,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
   - Note WooCommerce alpha available for testing, Shopify POC functional.
 
 ### 13. Operations & Support
+
 - Extend `docs/security/environment.md`:
   - Document integration-specific environment variables.
   - Note CORS configuration if frontend integrations call API directly.
@@ -255,6 +274,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
 | Support | Playbook, monitoring, escalation procedures | Support team |
 
 ## Exit Criteria Checklist
+
 - [ ] WooCommerce plugin code complete with fee calculator and order sync.
 - [ ] WooCommerce admin settings page functional with API validation.
 - [ ] WooCommerce logs page displays last 50 fee decisions.
@@ -273,6 +293,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
 - [ ] Support playbook covers common integration issues.
 
 ## Integration Validation Scenarios
+
 1. **WooCommerce Quote**: Add products to cart with MN address → Fee appears in cart totals.
 2. **WooCommerce Apply**: Complete checkout → Order synced to API, fee logged.
 3. **WooCommerce Error Handling**: API timeout → Checkout completes without fee, error logged.
@@ -283,6 +304,7 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
 8. **SDK Usage**: TypeScript SDK generates valid HMAC → API accepts request.
 
 ## Rollout Plan
+
 1. **Week 11 Day 1-2**: WooCommerce plugin foundation and fee calculator.
 2. **Week 11 Day 3-4**: WooCommerce admin settings and order sync.
 3. **Week 11 Day 5**: WooCommerce testing and packaging.
@@ -292,11 +314,13 @@ Deliver **WooCommerce Plugin** and **Shopify App POC** to enable native checkout
 7. **Week 12 Day 5**: CI workflows, documentation, demo recording.
 
 ## Dependencies
+
 - Requires Milestone 4 completion (HMAC verification ready).
 - Requires Milestone 5 partial (entitlements for gating integration features).
 - Access to WooCommerce test site and Shopify Partner account.
 
 ## Success Metrics
+
 - **WooCommerce Adoption**: >10 merchants install plugin during alpha.
 - **Shopify POC**: >3 Shopify stores complete test checkout flow.
 - **API Reliability**: >99% of integration requests succeed.

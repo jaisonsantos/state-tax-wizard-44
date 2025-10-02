@@ -73,6 +73,7 @@ GET /api/v1/analytics/overview
 ```
 
 ### Notes
+
 - `metric_cards` always includes percentage deltas relative to the preceding window so the frontend can render trend indicators without additional math.
 - `recent_decisions.items` only surfaces `fee_apply` and `fee_reverse` audit events so the dashboard feed stays focused on fee decisions. Other audit types remain available through the `/api/v1/audit` endpoint.
 - `recent_decisions.next_cursor` is `null` when the requested window has no additional audit rows. Pass the cursor value back to continue fetching history without an ever-increasing offset.
@@ -81,6 +82,7 @@ GET /api/v1/analytics/overview
 - Successful responses increment the `analytics_dashboard_loaded_total{store_id="..."}` counter and emit a structured `analytics_dashboard_loaded` log entry for auditability. See [`docs/security/observability.md`](../security/observability.md) for field definitions.
 
 ### Error responses
+
 - `401 Unauthorized` — The request is missing a valid `Authorization: Bearer <token>` header.
 - `403 Forbidden` — The session does not have access to the requested `store_id`.
 - `422 Unprocessable Entity` — Validation errors (e.g., missing `store_id` or an invalid cursor token).

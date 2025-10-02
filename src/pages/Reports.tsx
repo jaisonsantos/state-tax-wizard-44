@@ -68,7 +68,7 @@ export default function Reports() {
         const rows: ReportHistoryRow[] = response.items
           .filter((item) => item.action === "report_export")
           .map((item) => {
-            const payload = item.payload ?? {};
+            const payload = item.payload as any ?? {};
             const rowCount = typeof payload.row_count === "number" ? payload.row_count : undefined;
 
             return {
@@ -129,7 +129,7 @@ export default function Reports() {
       const rows: ReportHistoryRow[] = response.items
         .filter((item) => item.action === "report_export")
         .map((item) => {
-          const payload = item.payload ?? {};
+          const payload = item.payload as any ?? {};
           const rowCount = typeof payload.row_count === "number" ? payload.row_count : undefined;
 
           return {

@@ -181,6 +181,7 @@ export interface AuditLogPayloadLine {
   amount_cents: number;
   reason_codes: string[];
   rule_version: string;
+  absorbed?: boolean;
 }
 
 export interface AuditLogPayload {
@@ -407,11 +408,6 @@ class ApiClient {
     return this.request<RulesResponse>('/v1/rules');
   }
 
-  // Billing methods
-  async getEntitlements(storeId: string): Promise<Entitlements> {
-    return this.request<Entitlements>(`/v1/billing/entitlements?store_id=${storeId}`);
-  }
-
   // Reports methods
   async downloadCOReport(storeId: string, fromDate: string, toDate: string): Promise<DownloadResult> {
     const url = `${this.baseURL}/v1/reports/co/dr1786?store_id=${storeId}&from_date=${fromDate}&to_date=${toDate}`;
@@ -484,6 +480,31 @@ class ApiClient {
     return this.request<AnalyticsOverviewResponse>(
       `/v1/analytics/overview?${params.toString()}`,
     );
+  }
+
+  // Billing methods
+  async getEntitlements(storeId: string): Promise<any> {
+    const params = new URLSearchParams({ store_id: storeId });
+    return this.request<any>(`/v1/billing/entitlements?${params.toString()}`);
+  }
+
+  async getUsage(storeId: string): Promise<any> {
+    const params = new URLSearchParams({ store_id: storeId });
+    return this.request<any>(`/v1/billing/usage?${params.toString()}`);
+  }
+
+  async createCheckoutSession(storeId: string, planTier: string, successUrl: string, cancelUrl: string): Promise<{ session_id: string; url: string }> {
+    return this.request<{ session_id: string; url: string }>(`/v1/billing/create-checkout-session?store_id=${storeId}`, {
+      method: 'POST',
+      body: JSON.stringify({ plan_tier: planTier, success_url: successUrl, cancel_url: cancelUrl }),
+    });
+  }
+
+  async createPortalSession(storeId: string, returnUrl: string): Promise<{ portal_url: string }> {
+    const params = new URLSearchParams({ store_id: storeId, return_url: returnUrl });
+    return this.request<{ portal_url: string }>(`/v1/billing/create-portal-session?${params.toString()}`, {
+      method: 'POST',
+    });
   }
 }
 

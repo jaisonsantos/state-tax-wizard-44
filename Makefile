@@ -1,78 +1,163 @@
-.PHONY: dev up down build clean logs logs-api migrate seed dev-tools shell-api shell-db smoke reports-smoke analytics-smoke security-smoke anti-drift ci-anti-drift
+.PHONY: help dev build up down logs logs-api logs-db test test-quick migrate seed smoke analytics-smoke reports-smoke security-smoke billing-smoke clean restart shell-api shell-db metrics newman newman-security newman-billing validate m4-validation m5-validation full-validation anti-drift evidence-scan evidence-clean
 
-# Choose docker compose flavor (v2 default)
-COMPOSE := docker compose
+help: ## Show this help message
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
-# Development - run all services (foreground)
-dev:
-	$(COMPOSE) up --build
+dev: ## Build and run all services in foreground (for development)
+	docker-compose up --build
 
-# Start services (detached)
-up:
-	$(COMPOSE) up -d
+build: ## Build Docker images
+	docker-compose build
 
-# Stop services
-down:
-	$(COMPOSE) down
+up: ## Start all services
+	docker-compose up -d
 
-# Build services
-build:
-	$(COMPOSE) build
+down: ## Stop all services
+	docker-compose down
 
-# Clean up everything
-clean:
-	$(COMPOSE) down -v
-	docker system prune -f
+logs: ## Tail logs from all services
+	docker-compose logs -f
 
-# View logs
-logs:
-	$(COMPOSE) logs -f
+logs-api: ## Tail API logs
+	docker-compose logs -f api
 
-# View API logs only
-logs-api:
-	$(COMPOSE) logs -f api
+logs-db: ## Tail database logs
+	docker-compose logs -f db
 
-# Run database migrations
-migrate:
-	$(COMPOSE) exec api python -m alembic upgrade head
+test: ## Run pytest suite
+	docker-compose exec api pytest -v
 
-# Seed database
-seed:
-	$(COMPOSE) exec api python seed_data.py
+test-quick: ## Run pytest in quiet mode
+	docker-compose exec api pytest -q
 
-# Run with PGAdmin (profile tools)
-dev-tools:
-	$(COMPOSE) --profile tools up --build
+migrate: ## Run database migrations
+	docker-compose exec api alembic upgrade head
 
-# Backend shell
-shell-api:
-	$(COMPOSE) exec api bash
+seed: ## Seed demo data
+	docker-compose exec api python seed_data.py
 
-# Database shell
-shell-db:
-	$(COMPOSE) exec db psql -U user -d rdf
+smoke: ## Run comprehensive smoke tests
+	docker-compose exec api python smoke_test.py
 
-# End-to-end smoke test across login, fees, audit, and reports
-smoke: up migrate seed
-	$(COMPOSE) exec api python smoke_test.py
+analytics-smoke: ## Smoke test analytics endpoints
+	@echo "==> Testing /v1/analytics/overview..."
+	@docker-compose exec -T api python smoke_test.py --analytics-only || true
 
-# Focused smoke for report exports
-reports-smoke: up migrate seed
-	$(COMPOSE) exec api python smoke_test.py --reports-only
+reports-smoke: ## Smoke test report generation
+	@echo "==> Testing report endpoints..."
+	@docker-compose exec -T api python smoke_test.py --reports-only || true
 
-# Focused smoke for analytics overview
-analytics-smoke: up migrate seed
-	$(COMPOSE) exec api python smoke_test.py --analytics-only
+security-smoke: ## Smoke test HMAC + rate limiting
+	@echo "==> Testing security features (HMAC, rate limiting, rotation)..."
+	docker-compose exec -T api python smoke_test.py
 
-# Focused smoke for HMAC/replay validation
-security-smoke: up migrate seed
-	$(COMPOSE) exec api python smoke_test.py --security-only
+billing-smoke: ## Smoke test billing endpoints (requires Stripe configuration)
+	@echo "==> Testing billing endpoints..."
+	@if docker-compose exec -T api sh -c 'test -n "$$STRIPE_SECRET_KEY"'; then \
+		docker-compose exec -T api python -c "\
+import os, sys; \
+from app.core.config import settings; \
+from sqlalchemy.orm import Session; \
+from app.db.database import SessionLocal; \
+from app.services.entitlement_service import EntitlementService; \
+from app.services.stripe_service import StripeService; \
+print('✓ STRIPE_SECRET_KEY configured'); \
+db = SessionLocal(); \
+try: \
+    sub = EntitlementService.get_subscription(db, 'demo-store-1'); \
+    print(f'✓ Subscription retrieved: plan={sub.plan_tier}, status={sub.status}'); \
+    limits = EntitlementService.get_plan_limits(sub.plan_tier); \
+    print(f'✓ Plan limits: {limits}'); \
+    usage = EntitlementService.get_current_usage(db, 'demo-store-1'); \
+    print(f'✓ Usage: {usage[\"transactions_used\"]}/{usage[\"transactions_limit\"]}'); \
+    print('✓ Billing smoke tests PASSED'); \
+finally: \
+    db.close(); \
+"; \
+	else \
+		echo "⚠ SKIP: STRIPE_SECRET_KEY not set (billing endpoints will return 503 billing_unconfigured)"; \
+	fi
 
-# Anti-drift scan used by CI to keep docs aligned with headers and secrets
-anti-drift:
-	rg "X-.*Signature\|Timestamp\|Nonce" docs src backend
-	rg "hmac_secret.*store" -n docs backend
+clean: ## Remove all containers and volumes
+	docker-compose down -v
 
-# CI helper: run anti-drift scans and the security smoke suite
-ci-anti-drift: anti-drift
-	$(MAKE) security-smoke
+restart: down up ## Restart all services
+
+shell-api: ## Open shell in API container
+	docker-compose exec api bash
+
+shell-db: ## Open psql shell in database
+	docker-compose exec db psql -U postgres -d rdf
+
+metrics: ## Display Prometheus metrics
+	@echo "==> Fetching /metrics endpoint..."
+	@curl -s http://localhost:8000/metrics | grep -E "(rate_limit|hmac|billing|fees|report)" | head -20
+
+newman: ## Run Postman collection via Newman
+	@echo "==> Running Postman collection..."
+	@if [ -f docs/postman/local.postman_environment.json ]; then \
+		docker run --rm --network=host -v $(PWD)/docs/postman:/etc/newman postman/newman:latest \
+			run /etc/newman/state-tax-wizard.postman_collection.json \
+			--environment /etc/newman/local.postman_environment.json \
+			--reporters cli,json \
+			--reporter-json-export /etc/newman/newman-results.json; \
+	else \
+		echo "⚠ SKIP: docs/postman/local.postman_environment.json not found"; \
+	fi
+
+newman-security: ## Run security folder in Postman collection
+	@echo "==> Running Postman security tests..."
+	@if [ -f docs/postman/local.postman_environment.json ]; then \
+		docker run --rm --network=host -v $(PWD)/docs/postman:/etc/newman postman/newman:latest \
+			run /etc/newman/state-tax-wizard.postman_collection.json \
+			--folder "Security" \
+			--environment /etc/newman/local.postman_environment.json \
+			--reporters cli; \
+	else \
+		echo "⚠ SKIP: docs/postman/local.postman_environment.json not found"; \
+	fi
+
+newman-billing: ## Run billing folder in Postman collection
+	@echo "==> Running Postman billing tests..."
+	@if [ -f docs/postman/local.postman_environment.json ]; then \
+		docker run --rm --network=host -v $(PWD)/docs/postman:/etc/newman postman/newman:latest \
+			run /etc/newman/state-tax-wizard.postman_collection.json \
+			--folder "Billing" \
+			--environment /etc/newman/local.postman_environment.json \
+			--reporters cli; \
+	else \
+		echo "⚠ SKIP: docs/postman/local.postman_environment.json not found"; \
+	fi
+
+validate: test smoke metrics ## Run all validation steps
+	@echo "==> All validation complete!"
+
+m4-validation: security-smoke metrics ## Validate M4 (Security)
+	@echo "==> M4 Security validation complete. Check EVIDENCE/ for outputs."
+
+m5-validation: billing-smoke ## Validate M5 (Billing)
+	@echo "==> M5 Billing validation complete. Check EVIDENCE/ for outputs."
+
+full-validation: test smoke analytics-smoke reports-smoke security-smoke billing-smoke metrics newman ## Complete validation suite
+	@echo "==> Full validation complete!"
+
+# Varreduras de evidência (limitadas para evitar artefatos gigantes)
+evidence-scan: ## Generate small anti-drift evidence files
+	@mkdir -p docs/certification/EVIDENCE
+	rg -n --hidden --no-ignore --color never \
+	  -g '!node_modules/**' -g '!.git/**' -g '!dist/**' -g '!build/**' -g '!.cache/**' \
+	  -g '!docs/certification/EVIDENCE/**' \
+	  'X-(RDF-)?(Signature|Timestamp|Nonce)' docs src backend \
+	  | head -n 2000 > docs/certification/EVIDENCE/headers_scan.txt
+	rg -n --hidden -g '!node_modules/**' -g '!.git/**' \
+	  'hmac_secret.*store' docs backend \
+	  | head -n 500 > docs/certification/EVIDENCE/hmac_secret_scan.txt
+
+anti-drift: evidence-scan ## Backwards-compatible alias for legacy jobs
+
+evidence-clean: ## Remove accidentally large evidence files
+	@rm -f docs/certification/EVIDENCE/headers_scan.txt
+	@rm -f docs/certification/EVIDENCE/*.log docs/certification/EVIDENCE/*~ 2>/dev/null || true

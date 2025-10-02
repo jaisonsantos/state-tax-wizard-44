@@ -3,14 +3,17 @@
 This guide explains how to run the State Tax Wizard API collection from Postman or Newman so you can validate the HTTP surface area alongside automated checks.
 
 ## Prerequisites
+
 - Running instance of the backend (e.g., via `make dev` or `uvicorn backend.app.main:app --reload`).
 - Postman Desktop/CLI **or** Node.js 18+ with [`newman`](https://www.npmjs.com/package/newman) installed globally:
+
   ```sh
   npm install --global newman
   ```
 - Network access from your workstation to the API host defined in `{{base_url}}`.
 
 ## Environment variables
+
 The collection expects the following collection variables:
 
 | Variable | Purpose | Default |
@@ -26,6 +29,7 @@ The collection expects the following collection variables:
 When running in Postman, set `base_url` manually if your API is not on `localhost`. The login request will automatically populate `token` and `store_id` via the test script. For Newman, you can override defaults with an environment JSON file or `--env-var` flags.
 
 ## Execution order
+
 1. **Auth / Login** — generates a JWT and seeds the collection variables.
 2. **Monitoring** requests — confirm health checks and metrics respond without authentication.
 3. **Protected endpoints** — run quote/apply/audit/report requests after the login step so the `Authorization` header is populated.
@@ -41,6 +45,7 @@ Running requests in this sequence ensures dependent variables are always availab
 When executing the collection in CI, set `--env-var evidence_dir=<path>` so the analytics and report scripts can log where JSON/CSV payloads are stored. Each test writes a message such as `evidence_path=<dir>/analytics-overview.json` or `evidence_path=<dir>/mn-summary.json` to the Newman console for traceability. The logout script also removes `token` and `store_id`, which keeps chained Newman jobs from accidentally reusing stale credentials. The same variable can point to an artifact directory inside your CI workspace.
 
 ## Negative checks
+
 To validate error handling, exercise at least the following scenarios after a successful login run:
 - Re-run a protected request (e.g., **Fees / Quote**) with the `Authorization` header removed to confirm a `401 Unauthorized` response.
 - Call **Auth / Login** with an invalid password to ensure the API returns the expected `401` error payload and does not overwrite the cached token.
@@ -54,6 +59,7 @@ To validate error handling, exercise at least the following scenarios after a su
 Document the responses in your test evidence to show both happy-path and guardrail coverage.
 
 ## Example Newman command
+
 Run the full collection against a local backend using Newman:
 
 ```sh

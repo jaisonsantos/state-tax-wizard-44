@@ -3,17 +3,20 @@
 _[← Milestone 6 — Integrations](16_milestone_06_integrations.md) • [Milestone 8 — Launch →](18_milestone_08_launch.md)_
 
 ## Stage Validation Summary
+
 - **Platform integrations functional**: WooCommerce plugin and Shopify app send order data to `/v1/fees/apply` (Milestone 6).
 - **Audit logging captures decisions**: All fee applications logged with context ([`backend/app/services/audit_repository.py`](../../backend/app/services/audit_repository.py)).
 - **HMAC verification in place**: Webhook endpoints can validate request signatures (Milestone 4).
 - **Remaining gap**: No webhook ingestion for refunds/cancellations, no reversal logic for `order_fees`, reporting doesn't account for reversed transactions.
 
 ## Next Development Objective
+
 Deliver **Order Lifecycle Management** by implementing webhook handlers for Shopify/WooCommerce order events, reversal logic for refunds/cancellations, and reporting alignment to ensure accurate tax liability ledgering.
 
 ## Implementation Plan
 
 ### 1. Webhook Infrastructure
+
 - Create unified webhook router `backend/app/routers/webhooks.py`:
   - `/v1/webhooks/shopify` (POST): Handles Shopify webhook events.
   - `/v1/webhooks/woocommerce` (POST): Handles WooCommerce webhook events.
@@ -27,6 +30,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Log parsed event to `audit_logs` with `event_type: webhook_received`.
 
 ### 2. Shopify Webhook Events
+
 - **Supported Events**:
   - `orders/create`: Order placed (already handled by Milestone 6 for fee application).
   - `orders/paid`: Payment confirmed, update order status if needed.
@@ -38,6 +42,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - `process_refund_created(event)`: Calculate refund amount, call partial reversal if fee included.
 - **Idempotency**:
   - Store processed webhook IDs in `webhook_events` table:
+
     ```sql
     CREATE TABLE webhook_events (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,6 +57,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Before processing, check if `event_id` exists; skip if duplicate.
 
 ### 3. WooCommerce Webhook Events
+
 - **Supported Events**:
   - `order.created`: Order placed (already handled for fee application).
   - `order.updated`: Status change, check if cancelled/refunded.
@@ -65,10 +71,12 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Webhook references WC order ID, query `order_fees` to find matching record.
 
 ### 4. Reversal Logic
+
 - Create `/v1/fees/revert` endpoint (internal use + webhook processing):
   - **Input**: `order_fee_id` or `external_order_id`, `reason` (cancelled/refunded/deleted).
   - **Output**: Confirmation of reversal with updated `order_fee` record.
 - Update `order_fees` table schema:
+
   ```sql
   ALTER TABLE order_fees
     ADD COLUMN status VARCHAR(50) DEFAULT 'applied',
@@ -89,10 +97,12 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
 - **Authorization**: Reversal endpoint requires admin role or valid webhook signature.
 
 ### 5. Reporting Alignment
+
 - Update report generation to exclude reversed fees:
   - **Minnesota Summary JSON** (`backend/app/routers/reports.py`):
     - Filter `order_fees` WHERE `status = 'applied'` or include separate reversal section.
     - Add `reversals` array to JSON output:
+
       ```json
       {
         "reporting_period": {...},
@@ -118,6 +128,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Display reversal rate in dashboard insights.
 
 ### 6. Webhook Configuration Documentation
+
 - Create `docs/webhooks/shopify.md`:
   - **Setup Instructions**:
     - Navigate to Shopify Admin → Settings → Notifications → Webhooks.
@@ -142,6 +153,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Useful for debugging and testing reversal logic.
 
 ### 7. Idempotency & Error Handling
+
 - **Duplicate Event Protection**:
   - Check `webhook_events` table before processing.
   - If `event_id` exists, return `200 OK` with `{"status": "already_processed"}`.
@@ -155,6 +167,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Provide admin endpoint to manually reprocess failed events.
 
 ### 8. QA Scenarios (Epic 09 Matrix)
+
 - **MN Matrix E**: Order placed → Fee applied → Order cancelled → Webhook triggers reversal → Report excludes reversed fee.
 - **MN Matrix F**: Order placed → Fee applied → Partial refund (1 of 2 items) → Webhook triggers partial reversal → Report shows reduced fee.
 - **CO Matrix M**: Colorado order → Fee applied → Refund issued → DR-1786 CSV shows reversal row.
@@ -170,6 +183,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Invalid signature → 401 Unauthorized, event not processed.
 
 ### 9. Automated Testing
+
 - Create `backend/tests/fixtures/webhooks/`:
   - `shopify_order_cancelled.json`, `shopify_refund_created.json`.
   - `woocommerce_order_updated_cancelled.json`, `woocommerce_order_refunded.json`.
@@ -187,6 +201,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
 - Integration test: Send real webhook to local API, verify DB state.
 
 ### 10. Monitoring & Alerts
+
 - **Prometheus Metrics**:
   - `webhook_events_received_total`: Counter by platform, event_type.
   - `webhook_processing_duration_seconds`: Histogram by platform, event_type.
@@ -204,6 +219,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - `ReversalAnomalyDetection`: Reversal rate >20% (unusual merchant behavior).
 
 ### 11. Documentation Updates
+
 - Update `docs/api/fees.md`:
   - Add `/v1/fees/revert` endpoint documentation.
   - Describe reversal request/response schema.
@@ -221,6 +237,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
   - Troubleshooting common issues.
 
 ### 12. Operations Runbook
+
 - Create `docs/webhooks/operations.md`:
   - **Monitoring**: Dashboards to watch, alert thresholds.
   - **Failed Events**: How to query `failed_webhook_events`, manual reprocessing steps.
@@ -244,6 +261,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
 | Monitoring | Prometheus metrics, Grafana dashboards, alerts | DevOps team |
 
 ## Exit Criteria Checklist
+
 - [ ] Webhook endpoints accept and verify Shopify/WooCommerce signatures.
 - [ ] Event parsing routes to correct service (order cancelled, refund created).
 - [ ] Idempotency prevents duplicate processing via `webhook_events` table.
@@ -262,6 +280,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
 - [ ] Failed webhook events table and manual reprocessing tested.
 
 ## Webhook Lifecycle Validation Scenarios
+
 1. **Shopify Cancellation**: Order created → Fee applied → Order cancelled → Webhook received → Fee reversed → Report excludes fee.
 2. **Shopify Refund**: Order fulfilled → Refund issued → Webhook received → Partial reversal calculated → Analytics updated.
 3. **WooCommerce Cancellation**: Order placed → Admin cancels → Webhook received → Fee reversed → Audit log created.
@@ -272,6 +291,7 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
 8. **Webhook Replay**: Missed event during downtime → Operator runs replay script → Event processed successfully.
 
 ## Rollout Plan
+
 1. **Week 13 Day 1-2**: Webhook router and signature verification.
 2. **Week 13 Day 3**: Event parsing and idempotency infrastructure.
 3. **Week 13 Day 4**: Reversal service implementation.
@@ -283,11 +303,13 @@ Deliver **Order Lifecycle Management** by implementing webhook handlers for Shop
 9. **Week 14 Day 5**: Staging deployment and webhook configuration with test stores.
 
 ## Dependencies
+
 - Requires Milestone 6 completion (integrations sending order data).
 - Requires Milestone 4 completion (HMAC verification foundation).
 - Access to test stores for webhook setup (Shopify, WooCommerce).
 
 ## Success Metrics
+
 - **Webhook Reliability**: >99.5% of webhook events processed successfully.
 - **Reversal Accuracy**: 100% of cancelled/refunded orders reflected in reports.
 - **Idempotency**: Zero duplicate reversals due to webhook retries.

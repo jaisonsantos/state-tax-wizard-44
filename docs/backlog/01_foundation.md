@@ -1,12 +1,14 @@
 # Epic 01 — Platform Foundations & Observability
 
 ## Context
+
 The MVP requires a stable foundation: reproducible environments, seeded data,
 and baseline observability (health, metrics, structured logs). This epic groups
 the work needed to guarantee developers and operators can reliably run the
 stack and inspect system health.
 
 ## Current Status
+
 - ✅ Docker Compose definitions for API, frontend, and Postgres.
 - ✅ Alembic migrations + deterministic `seed_data.py` covering demo stores,
   users, rules, and subscriptions.
@@ -18,6 +20,7 @@ stack and inspect system health.
   and report flows.
 
 ## Acceptance Criteria
+
 1. **Environment Guide**: `docs/security/environment.md` (or equivalent) explains how to
    bootstrap dev and CI environments, including environment variables,
    migrations, and seed expectations.
@@ -33,16 +36,19 @@ stack and inspect system health.
    works end-to-end using seeded data.
 
 ## Deliverables
+
 - `docs/security/environment.md`
 - `docs/security/data-model.md`
 - `docs/security/observability.md`
 - Updated `Makefile` targets and documentation references.
 
 ## Validation
+
 - Run `make smoke` successfully against a fresh database.
 - Link to documentation reviewed/approved by stakeholders.
 
 ## Definition of Done
+
 - `docs/security/environment.md`, `docs/security/data-model.md`, and `docs/security/observability.md`
   checked into source control with diagrams or tables as applicable.
 - `make smoke` target (and CI equivalent) executes end-to-end without manual
@@ -53,4 +59,5 @@ stack and inspect system health.
   to validation evidence.
 
 ## Dependencies
+
 - None; this epic underpins all others and should be executed first.

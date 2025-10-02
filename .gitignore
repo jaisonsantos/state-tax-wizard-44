@@ -51,3 +51,9 @@ env/
 .coverage
 coverage.xml
 htmlcov/
+
+# Evidências/artefatos grandes
+docs/certification/EVIDENCE/*.txt
+docs/certification/EVIDENCE/*.log
+!docs/certification/EVIDENCE/.gitkeep
+!docs/certification/EVIDENCE/README.md

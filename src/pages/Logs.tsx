@@ -73,7 +73,7 @@ export default function Logs() {
           reasonCode: reasonCodes[0] || log.action.toUpperCase(),
           deliveryMethod: log.payload.delivery_method || "Unknown",
           status: log.payload.status || (log.action === "fee_apply" ? "applied" : "recorded"),
-          absorbed: firstLine?.absorbed ?? Boolean(log.payload.absorbed),
+          absorbed: firstLine?.absorbed ?? Boolean((log.payload as any).absorbed),
         };
       });
 

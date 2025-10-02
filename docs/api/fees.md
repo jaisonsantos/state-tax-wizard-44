@@ -59,4 +59,3 @@ reasons `DELIVERY_CANCELLED` or `RETURN_POST_DELIVERY`.
 
 Each call writes an audit log (`action="fee_reverse"`) and emits structured log
 entries so downstream systems can reconcile refunds.
-
