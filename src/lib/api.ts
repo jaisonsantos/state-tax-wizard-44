@@ -163,6 +163,45 @@ export interface Entitlements {
   status: string;
 }
 
+export interface BillingLimits {
+  transactions_per_month: number | null;
+  advanced_reports: boolean;
+  analytics_dashboard: boolean;
+  integrations: boolean;
+}
+
+export interface BillingEntitlements {
+  plan: string;
+  provider: string;
+  status: string;
+  trial_ends_at: string | null;
+  cancel_at_period_end: boolean;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  features: string[];
+  limits: BillingLimits;
+}
+
+export interface BillingUsage {
+  plan: string;
+  status: string;
+  transactions_used: number;
+  transactions_limit: number | null;
+  unlimited: boolean;
+  percentage_used: number;
+  period_start: string | null;
+  period_end: string | null;
+}
+
+export interface BillingCheckoutSession {
+  session_id: string;
+  url: string;
+}
+
+export interface BillingPortalSession {
+  portal_url: string;
+}
+
 export interface RuleVersionResponse {
   jurisdiction: string;
   version: string;
@@ -483,26 +522,26 @@ class ApiClient {
   }
 
   // Billing methods
-  async getEntitlements(storeId: string): Promise<any> {
+  async getEntitlements(storeId: string): Promise<BillingEntitlements> {
     const params = new URLSearchParams({ store_id: storeId });
-    return this.request<any>(`/v1/billing/entitlements?${params.toString()}`);
+    return this.request<BillingEntitlements>(`/v1/billing/entitlements?${params.toString()}`);
   }
 
-  async getUsage(storeId: string): Promise<any> {
+  async getUsage(storeId: string): Promise<BillingUsage> {
     const params = new URLSearchParams({ store_id: storeId });
-    return this.request<any>(`/v1/billing/usage?${params.toString()}`);
+    return this.request<BillingUsage>(`/v1/billing/usage?${params.toString()}`);
   }
 
-  async createCheckoutSession(storeId: string, planTier: string, successUrl: string, cancelUrl: string): Promise<{ session_id: string; url: string }> {
-    return this.request<{ session_id: string; url: string }>(`/v1/billing/create-checkout-session?store_id=${storeId}`, {
+  async createCheckoutSession(storeId: string, planTier: string, successUrl: string, cancelUrl: string): Promise<BillingCheckoutSession> {
+    return this.request<BillingCheckoutSession>(`/v1/billing/create-checkout-session?store_id=${storeId}`, {
       method: 'POST',
       body: JSON.stringify({ plan_tier: planTier, success_url: successUrl, cancel_url: cancelUrl }),
     });
   }
 
-  async createPortalSession(storeId: string, returnUrl: string): Promise<{ portal_url: string }> {
+  async createPortalSession(storeId: string, returnUrl: string): Promise<BillingPortalSession> {
     const params = new URLSearchParams({ store_id: storeId, return_url: returnUrl });
-    return this.request<{ portal_url: string }>(`/v1/billing/create-portal-session?${params.toString()}`, {
+    return this.request<BillingPortalSession>(`/v1/billing/create-portal-session?${params.toString()}`, {
       method: 'POST',
     });
   }

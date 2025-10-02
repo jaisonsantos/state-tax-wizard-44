@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from ..core.config import settings
 from ..core.deps import AuthContext, assert_store_access, get_auth_context
 from ..db.database import get_db
 from ..models.models import AuditLog, OrderFee, Store, StoreSetting
@@ -116,7 +117,7 @@ async def apply_fees(
 
     rate_limiter.check(str(request.store_id), "apply")
 
-    settings = (
+    store_settings = (
         db.query(StoreSetting)
         .filter(StoreSetting.store_id == request.store_id)
         .first()
@@ -126,7 +127,7 @@ async def apply_fees(
     enforce_hmac(
         headers=http_request.headers,
         body=raw_body,
-        settings_model=settings,
+        settings_model=store_settings,
         store_id=str(request.store_id),
         db=db,
     )
@@ -136,6 +137,9 @@ async def apply_fees(
         OrderFee.order_id == request.order_id,
         OrderFee.status == "applied",
     ).all()
+
+    if not existing_lines and settings.stripe_secret_key:
+        EntitlementService.enforce_transaction_limit(db, str(request.store_id))
 
     quote_request = FeeQuoteRequest(
         store_id=request.store_id,
@@ -156,7 +160,7 @@ async def apply_fees(
             FeeLine(
                 jurisdiction=order_fee.jurisdiction,
                 amount_cents=order_fee.amount_cents,
-                display_name=_resolve_display_name(order_fee, settings),
+                display_name=_resolve_display_name(order_fee, store_settings),
                 rule_version=order_fee.rule_version,
                 reason_codes=order_fee.reason_codes or [],
                 absorbed=order_fee.absorbed,

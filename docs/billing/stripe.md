@@ -1,166 +1,59 @@
 # Stripe Billing Integration
 
-This document describes the intended Stripe billing integration for the State Tax Wizard platform.
+This guide documents how the application integrates with Stripe for subscription lifecycle management, how to configure environments, and how to validate the flows in test mode.
 
-> ⚠️ **Current state:** the Stripe workflow is not yet implemented. The API still
-> returns `billing_unconfigured`, migrations fail, and the services described
-> below represent the target architecture rather than working behaviour.
+## Products, prices & environment variables
 
-## Overview
+1. Create three recurring products in the Stripe Dashboard: **Starter**, **Pro**, and **Plus**.
+2. Create monthly prices for each product and capture their price IDs.
+3. Populate the following environment variables (see `.env.example` for placeholders):
 
-The platform plans to use Stripe for subscription management with three tiers:
+   ```bash
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   STRIPE_PRICE_ID_STARTER=price_...
+   STRIPE_PRICE_ID_PRO=price_...
+   STRIPE_PRICE_ID_PLUS=price_...
+   ```
 
-- **Starter** – 1,000 transactions/month, basic reports
-- **Pro** – 10,000 transactions/month, advanced reports & analytics
-- **Plus** – Unlimited transactions, integrations & priority support
+4. Restart the API container after updating the `.env` file so settings reload. Without these values the API returns `503 billing_unconfigured` and the billing smoke skips automatically.
 
-## Environment Configuration
+## Test-mode workflow
 
-### Required Environment Variables
+1. Launch the stack: `make up migrate seed`.
+2. Run `make billing-smoke`:
+   - With Stripe configured it validates entitlements, usage, checkout session creation, and portal session creation.
+   - Without Stripe variables it prints `⚠ SKIP: Stripe billing not configured`.
+3. Use Stripe test cards (e.g., `4242 4242 4242 4242`, any future expiry/CVC) when completing Checkout Sessions.
+4. The Customer Portal allows upgrades/downgrades and cancellation in test mode. Changes propagate immediately to `subscriptions` and surface via the `/v1/billing/entitlements` endpoint.
+5. Replay webhooks with the Stripe CLI if required:
 
-```bash
-# Stripe API keys
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+   ```bash
+   stripe listen --forward-to localhost:8000/api/v1/billing/webhooks/stripe
+   ```
 
-# Stripe product price IDs
-STRIPE_PRICE_ID_STARTER=price_...
-STRIPE_PRICE_ID_PRO=price_...
-STRIPE_PRICE_ID_PLUS=price_...
-```
-
-### Stripe Dashboard Setup
-
-1. **Create products** (Stripe Dashboard → Products) for Starter, Pro, and Plus subscriptions.
-2. **Copy price IDs** from each product and map them to the environment variables above.
-3. **Configure a webhook** (Developers → Webhooks):
-   - Endpoint URL: `https://your-domain.com/v1/billing/webhooks/stripe`
-   - Events to listen for:
-     - `customer.subscription.created`
-     - `customer.subscription.updated`
-     - `customer.subscription.deleted`
-     - `invoice.paid`
-     - `invoice.payment_failed`
-   - Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
-
-## Testing
-
-### Test Cards
-
-Use Stripe test mode cards:
-
-- Success: `4242 4242 4242 4242`
-- Decline: `4000 0000 0000 0002`
-- 3D Secure: `4000 0025 0000 3155`
-
-Any future expiration date and CVC value works.
-
-### Test Clock
-
-1. Stripe Dashboard → Developers → Test Clocks
-2. Create a test clock and attach it to a test customer
-3. Advance the clock to simulate renewals or payment failures
-
-## API Endpoints
-
-### Get Entitlements *(not yet available)*
-
-> Currently returns `503 billing_unconfigured`.
-
-```http
-GET /v1/billing/entitlements?store_id={store_id}
-Authorization: Bearer {token}
-```
-
-Returns current plan, features, and limits.
-
-### Get Usage *(not yet available)*
-
-> Currently returns `503 billing_unconfigured`.
-
-```http
-GET /v1/billing/usage?store_id={store_id}
-Authorization: Bearer {token}
-```
-
-Returns transaction usage for the current billing period.
-
-### Create Checkout Session *(not yet available)*
-
-> Currently returns `503 billing_unconfigured`.
-
-```http
-POST /v1/billing/create-checkout-session?store_id={store_id}
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "plan_tier": "pro",
-  "success_url": "https://app.example.com/billing/success",
-  "cancel_url": "https://app.example.com/billing"
-}
-```
-
-Returns a `checkout_url` for redirecting the customer to Stripe Checkout.
-
-### Create Customer Portal Session *(not yet available)*
-
-> Currently returns `503 billing_unconfigured`.
-
-```http
-POST /v1/billing/create-portal-session?store_id={store_id}&return_url={url}
-Authorization: Bearer {token}
-```
-
-Returns a `portal_url` for self-service subscription management.
-
-## Webhook Processing
-
-Stripe webhooks will be posted to `/v1/billing/webhooks/stripe` and verified using `STRIPE_WEBHOOK_SECRET`.
-
-- Acknowledge with `200 OK`
-- Log failures while still returning `200 OK` so Stripe handles retries
-- Process idempotently to avoid duplicate subscription updates
-
-### Events to handle
-
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-- `invoice.paid`
-- `invoice.payment_failed`
-
-## Entitlement Enforcement
-
-Transaction limits will be enforced in the fees service:
-
-```python
-from app.services.entitlement_service import EntitlementService
-
-EntitlementService.enforce_transaction_limit(db, store_id)
-```
-
-An exceeded limit should return:
-
-```json
-{
-  "detail": {
-    "code": "transaction_limit_exceeded",
-    "message": "Monthly transaction limit of 1000 exceeded. Please upgrade your plan.",
-    "current_usage": 1001,
-    "limit": 1000
-  }
-}
-```
-
-Frontend handling should prompt for upgrades and link to a checkout session.
+   The application verifies signatures with `STRIPE_WEBHOOK_SECRET` and updates metrics/audit logs for every processed event.
 
 ## Observability
 
-- Audit logs will capture `stripe_webhook` events with plan and customer identifiers.
-- Prometheus metrics to expose: `billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`.
+Billing activity emits metrics and logs alongside the existing fee/security signals:
 
----
+- `billing_events_total{event}` tracks checkout sessions, portal sessions, webhook outcomes, and skips.
+- `checkout_sessions_created_total{plan_tier}` increments on successful upgrade requests.
+- `entitlement_denials_total{feature,plan}` captures plan gated features (advanced reports, unlimited transactions, etc.).
+- Structured `billing` logs detail checkout sessions, portal hand-offs, webhook processing, and transaction limit violations.
 
-This integration guide will be updated once the Stripe implementation is complete.
+All billing metrics appear in `/metrics` and are captured in `docs/certification/EVIDENCE/metrics_dump.txt`.
+
+## Frontend & Postman
+
+- The Billing page (`/billing`) consumes `/v1/billing/entitlements` and `/v1/billing/usage` to render the plan card, usage meter, trial banner, and CTA buttons. Errors from Stripe (including `billing_unconfigured`) are surfaced to the operator with actionable messaging.
+- The Postman collection contains a **Billing** folder that exercises entitlements, usage, checkout, portal, and webhook sample requests. When Stripe is unconfigured the tests echo `BILLING_SKIPPED=true` so CI can treat the run as informational.
+
+## Evidence & automation
+
+- `make billing-smoke` stores console output in `docs/certification/EVIDENCE/billing_smoke.txt`.
+- Newman output (when configured) lives in `docs/certification/EVIDENCE/newman_billing.txt`.
+- UI screenshots for billing and Settings/HMAC rotation are stored under `docs/certification/EVIDENCE/screens/`.
+
+With these steps Milestone 5 (Billing/Stripe) is fully operational in test mode and ready for sandboxes or pilot stores.

@@ -8,11 +8,17 @@ from sqlalchemy.orm import Session
 
 from ..core.config import settings
 from ..models.models import Store, Subscription
+from ..observability import checkout_sessions_created_total, log_billing_event
 
 logger = logging.getLogger(__name__)
 
-# Configure Stripe API key
-stripe.api_key = settings.stripe_secret_key
+def _ensure_api_key() -> None:
+    """Ensure Stripe is configured before making API calls."""
+
+    if not settings.stripe_secret_key:
+        raise RuntimeError("Stripe integration not configured")
+    if stripe.api_key != settings.stripe_secret_key:
+        stripe.api_key = settings.stripe_secret_key
 
 
 class StripeService:
@@ -88,7 +94,8 @@ class StripeService:
         store_id: str,
         price_id: str,
         success_url: str,
-        cancel_url: str
+        cancel_url: str,
+        plan_tier: str,
     ) -> dict:
         """Create Stripe Checkout Session for subscription.
         
@@ -103,6 +110,7 @@ class StripeService:
             Dict with session_id and checkout_url
         """
         try:
+            _ensure_api_key()
             store = db.query(Store).filter(Store.id == store_id).first()
             if not store:
                 raise ValueError(f"Store {store_id} not found")
@@ -126,11 +134,20 @@ class StripeService:
                 metadata={"store_id": store_id}
             )
             
+            checkout_sessions_created_total.labels(plan_tier=plan_tier).inc()
+            log_billing_event(
+                "checkout_session_created",
+                store_id=store_id,
+                plan_tier=plan_tier,
+                session_id=session.id,
+            )
+
             logger.info(f"Created checkout session {session.id} for store {store_id}")
-            
+
             return {
                 "session_id": session.id,
-                "checkout_url": session.url
+                "url": session.url,
+                "customer_id": customer_id,
             }
             
         except stripe.error.StripeError as e:
@@ -154,17 +171,28 @@ class StripeService:
             Portal URL
         """
         try:
+            _ensure_api_key()
             store = db.query(Store).filter(Store.id == store_id).first()
             if not store or not store.stripe_customer_id:
                 raise ValueError(f"Store {store_id} has no Stripe customer")
-            
+
             session = stripe.billing_portal.Session.create(
                 customer=store.stripe_customer_id,
                 return_url=return_url
             )
-            
+
+            log_billing_event(
+                "portal_session_created",
+                store_id=store_id,
+                customer_id=store.stripe_customer_id,
+                portal_session=session.id,
+            )
+
             logger.info(f"Created portal session for store {store_id}")
-            return session.url
+            return {
+                "portal_url": session.url,
+                "portal_session_id": session.id,
+            }
             
         except stripe.error.StripeError as e:
             logger.error(f"Stripe error creating portal session: {e}")
@@ -182,6 +210,7 @@ class StripeService:
             Updated Subscription or None
         """
         try:
+            _ensure_api_key()
             store = db.query(Store).filter(Store.id == store_id).first()
             if not store or not store.stripe_subscription_id:
                 return None

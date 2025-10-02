@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CreditCard, ExternalLink, CheckCircle, AlertTriangle, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient, ApiError } from "@/lib/api";
+import { apiClient, ApiError, BillingEntitlements, BillingUsage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const plans = [
@@ -57,8 +57,8 @@ const plans = [
 ];
 
 export default function Billing() {
-  const [entitlements, setEntitlements] = useState<any>(null);
-  const [usage, setUsage] = useState<any>(null);
+  const [entitlements, setEntitlements] = useState<BillingEntitlements | null>(null);
+  const [usage, setUsage] = useState<BillingUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -343,7 +343,7 @@ export default function Billing() {
                 <div>
                   <h4 className="font-medium mb-2">Next Billing Date</h4>
                   <p className="text-sm text-muted-foreground">
-                    {isTrialing && entitlements.trial_ends_at
+                  {isTrialing && entitlements.trial_ends_at
                       ? `Trial ends: ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
                       : entitlements.current_period_end
                       ? new Date(entitlements.current_period_end).toLocaleDateString()

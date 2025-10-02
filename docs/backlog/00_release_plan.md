@@ -53,7 +53,9 @@ Este plano organiza os épicos em incrementos entregáveis. Cada milestone dura 
 
 ---
 
-## Milestone 5 — Billing & Stripe Integration (Weeks 9–10)
+## Milestone 5 — Billing & Stripe Integration (Weeks 9–10) ✅
+
+Status: Completed. Evidence and write-up in [`docs/certification/M5_COMPLETION.md`](../certification/M5_COMPLETION.md).
 
 **Escopo (Epic 07)**
 - **Customer lifecycle** (criação/sync), **Checkout** e **Billing Portal**.

@@ -1,0 +1,17 @@
+{
+  "id": "evt_123",
+  "type": "customer.subscription.created",
+  "data": {
+    "object": {
+      "id": "sub_123",
+      "customer": "cus_123",
+      "status": "active",
+      "current_period_start": 1730419200,
+      "current_period_end": 1733011200,
+      "cancel_at_period_end": false,
+      "metadata": {
+        "plan_tier": "pro"
+      }
+    }
+  }
+}
