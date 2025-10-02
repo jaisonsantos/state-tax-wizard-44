@@ -1,6 +1,7 @@
 # Milestone 4 – Security Hardening Slice (Replay-Resistant HMAC)
 
 ## Delivery Snapshot
+
 The replay-resistant HMAC slice is now merged. `/v1/fees/apply` enforces timestamp and nonce validation backed by a persistent replay store, smoke and pytest cover the failure paths, Prometheus surfaces security counters, and the developer experience is documented end-to-end (API docs, UI copy, Postman scripts, and the dedicated HMAC guide).
 
 - ✅ Backend guardrails: constant-time signature comparison, timestamp skew enforcement, nonce TTL, metrics/logging, and Alembic migrations for `processed_nonces` plus `hmac_secret_rotated_at`.
@@ -14,6 +15,7 @@ The sections below remain for reference when onboarding new contributors or expa
 ## Change Breakdown by Area
 
 ### Backend (FastAPI)
+
 1. **Signature validation module**
    - Create `backend/app/security/hmac.py` with helpers to parse headers (`X-RDF-Signature`, `X-RDF-Timestamp`, `X-RDF-Nonce`) and perform constant-time comparisons.
    - Enforce an adjustable time skew window (default ±300s) via settings module; reject stale/future timestamps.
@@ -41,6 +43,7 @@ The sections below remain for reference when onboarding new contributors or expa
    - DoD: metrics exported under `/metrics`; structured logs recorded in tests via caplog.
 
 ### Frontend (React)
+
 1. **Error handling**
    - Update API error surface (e.g., toast helpers) to detect 401/403/409 from HMAC and show actionable copy where relevant (Settings playground, fee apply flows if exposed).
    - DoD: manual/automated test ensures toast surfaces `Replay detected` or `Signature expired` message.
@@ -50,15 +53,18 @@ The sections below remain for reference when onboarding new contributors or expa
    - DoD: Verified via UI snapshot/screenshot; docs cross-link in UI guide.
 
 ### Data & Seeds
+
 - Populate `hmac_secret` and `hmac_secret_rotated_at` for demo stores to unblock smoke/Postman tests.
 - Seed sample processed nonces (optional) mainly for expiry tests.
 - DoD: Running `python backend/seed_data.py` creates secrets and prints instructions on retrieving them.
 
 ### Observability
+
 - Update `docs/security/observability.md` with new counters/log fields; include alerting recommendation (failure ratio, replay spikes).
 - DoD: Document references match metric names; example payloads include `event=\"hmac_validation_failed\"`.
 
 ### Automation & QA
+
 1. **Pytest**
    - Expand `test_fee_security.py` for timestamp/nonce success and failure, replay detection, and TTL expiry.
    - Add fixture for overriding skew/TTL to keep tests fast.
@@ -78,17 +84,20 @@ The sections below remain for reference when onboarding new contributors or expa
    - Optional: add integration scenario behind flag verifying Settings displays HMAC details (can be deferred if UI change minimal).
 
 ### Documentation
+
 - Refresh `docs/backlog/milestone_04_security.md` intro/status to acknowledge existing HMAC hook and clarify new goals (timestamp/nonce, replay store, metrics).
 - Create `docs/security/hmac.md` describing header contract, sample signing code (JS/Python), rotation steps, and troubleshooting.
 - Update `docs/security/ui-guide.md` session/security sections if UI surfaces HMAC status.
 - DoD: Docs merged with references from PR description; links validated via `markdownlint`/manual check.
 
 ### Makefile & CI
+
 - Add `security-smoke` target invoking `python smoke_test.py --security-only` (after updating script).
 - Ensure CI instructions mention when to run (README/testing section + PR template if applicable).
 - DoD: `make security-smoke` runnable locally after `make up migrate seed`.
 
 ## Definition of Done Summary
+
 - All new counters/logs observable via `/metrics` and structured logs.
 - Pytest, smoke (`--security-only`), and Newman security folder succeed locally.
 - Docs/Postman/README reflect timestamp/nonce requirements.
@@ -96,12 +105,14 @@ The sections below remain for reference when onboarding new contributors or expa
 - PR includes evidence snippets: pytest output, smoke command, Newman run.
 
 ## Risks & Mitigations
+
 - **Time skew false positives**: Provide configurable skew and document syncing clocks (mention `ntpd` guidance) to reduce support load.
 - **Nonce table growth**: Implement TTL cleanup per request and document periodic job/cron for production; consider asynchronous cleanup follow-up.
 - **Secret exposure in logs**: Ensure logging avoids printing raw signatures/secrets; audit log statements before merge.
 - **CI determinism**: Tests relying on wall clock must freeze time (use `freezegun` or manual patching) to prevent flakes.
 
 ## Validation Strategy
+
 - `pytest backend/tests/test_fee_security.py -q`
 - `python backend/smoke_test.py --security-only`
 - `newman run docs/postman/state-tax-wizard.postman_collection.json --folder "Security" --env-var base_url=...`

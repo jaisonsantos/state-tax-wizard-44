@@ -416,11 +416,16 @@ export default function Settings() {
             </p>
           </div>
           {lastRotatedSecret && (
-            <div className="space-y-3 rounded-md border border-primary/40 bg-primary/5 p-4">
-              <p className="text-sm font-medium text-primary-foreground">
+            <div className="space-y-3 rounded-md border border-sky-300 bg-sky-100 p-4 text-sky-900">
+              <p className="text-sm font-medium">
                 New secret generated — copy it now. This value will not be shown again.
               </p>
-              <Textarea value={lastRotatedSecret} readOnly rows={3} className="font-mono text-xs" />
+              <Textarea
+                value={lastRotatedSecret}
+                readOnly
+                rows={3}
+                className="font-mono text-xs bg-white text-sky-900"
+              />
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" size="sm" onClick={handleCopySecret}>
                   <Copy className="mr-2 h-4 w-4" /> Copy secret

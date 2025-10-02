@@ -3,6 +3,7 @@
 _[← Milestone 3 — Frontend Polish](13_milestone_03_frontend_polish.md) • [Milestone 5 — Billing →](15_milestone_05_billing.md)_
 
 ## Stage Validation Summary
+
 - **Auth foundation ready**: JWT-based authentication with session tokens persisted in `session_tokens` table, logout revokes active sessions ([`backend/app/routers/auth.py`](../../backend/app/routers/auth.py)).
 - **Store scoping enforced**: All fee endpoints validate store ownership via `AuthService.validate_store_access` ([`backend/app/core/security.py`](../../backend/app/core/security.py)).
 - **Observability in place**: Prometheus counters and structured logs capture fee operations and auth events ([`backend/app/observability.py`](../../backend/app/observability.py)).
@@ -11,11 +12,13 @@ _[← Milestone 3 — Frontend Polish](13_milestone_03_frontend_polish.md) • [
 - **Remaining gap**: Document production guidance for Redis/HMAC secrets in the ops runbook; security code changes are complete.
 
 ## Next Development Objective
+
 Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugin requests, per-store rate limiting, replay protection, and comprehensive security logging to prepare the platform for production traffic.
 
 ## Implementation Plan
 
 ### 1. HMAC Signature Verification
+
 - Extend existing `store_settings.hmac_secret` support with a `hmac_secret_rotated_at` timestamp so rotations are auditable.
 - Generate secrets during onboarding/settings update when absent and expose rotation endpoint/flow if required.
 - Create `backend/app/security/hmac.py` helpers that:
@@ -26,12 +29,14 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Document signature generation algorithm in `docs/security/hmac.md` with code examples for WooCommerce/Shopify integrations.
 
 ### 2. Replay Protection
+
 - Store processed nonces in a PostgreSQL `processed_nonces` table with a 10 minute TTL (SQLite-compatible for tests).
 - Validation checks nonce uniqueness before processing request and purges expired rows opportunistically.
 - Return `409 Conflict` for replayed requests with clear error message.
 - Add Prometheus counter `hmac_replay_attempts_total` with labels for store and endpoint.
 
 ### 3. Rate Limiting Infrastructure
+
 - Replace the existing in-memory limiter with a distributed solution (e.g., `slowapi` or `fastapi-limiter`).
 - Configure Redis backend for shared quotas across API instances and document local fallbacks.
 - Implement `RateLimitMiddleware` in `backend/app/security/rate_limit.py`:
@@ -41,6 +46,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Add Prometheus counter `rate_limit_exceeded_total` by store, endpoint, and limit type.
 
 ### 4. Security Logging & Monitoring
+
 - Extend structured logging to capture security events:
   - `hmac_validation_failed`: Invalid signature, expired timestamp, replayed nonce.
   - `rate_limit_exceeded`: Store ID, endpoint, current limit, window.
@@ -53,6 +59,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Integrate with observability dashboard (Grafana/Prometheus) per `docs/security/observability.md`.
 
 ### 5. Secrets Management Documentation
+
 - Create `docs/security/secrets.md` covering:
   - **JWT Secret**: Rotation procedure (generate new secret, support dual validation period, phase out old secret).
   - **HMAC Secrets**: Per-store generation via secure random, storage encrypted at rest, rotation triggers regeneration and notification to integration.
@@ -62,10 +69,12 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Include sample rotation exercise log for audit trail.
 
 ### 6. Database Migration
+
 - Create Alembic migration `backend/alembic/versions/202504010001_security_hardening.py`:
   - Add `store_settings.hmac_secret_rotated_at` (timestamp with time zone, nullable) while keeping existing `hmac_secret`.
   - Ensure historical rows populate `hmac_secret_rotated_at` with `now()` when a secret exists.
   - Create table `processed_nonces`:
+
     ```sql
     CREATE TABLE processed_nonces (
       nonce VARCHAR(128) PRIMARY KEY,
@@ -78,6 +87,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
   - Add periodic cleanup job for expired nonces (via cron or background task).
 
 ### 7. Integration SDK Updates
+
 - Update `backend/app/schema/store_settings.py` to include `hmac_enabled` boolean flag.
 - Create client library helpers (TypeScript/Python) for integrations:
   - `generateHMACSignature(secret, payload, timestamp, nonce)`: Produces signature string.
@@ -85,6 +95,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Provide sample code snippets in `docs/integrations/hmac-client-examples.md`.
 
 ### 8. Automated Testing
+
 - Add pytest fixtures for HMAC-signed requests in `backend/tests/conftest.py`.
 - Create `backend/tests/test_hmac_security.py`:
   - Valid signature acceptance.
@@ -99,6 +110,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Add load test using `locust` or `k6` to verify rate limiting under concurrent load.
 
 ### 9. Frontend Security Enhancements
+
 - Update `src/lib/api.ts` to handle 429 responses with user-friendly toast messages.
 - Add retry logic with exponential backoff for rate-limited requests (optional, document in settings).
 - Display security status in Settings page:
@@ -107,6 +119,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
   - Button to regenerate HMAC secret (with confirmation dialog).
 
 ### 10. Operations Runbook
+
 - Extend `docs/security/environment.md` with security configuration:
   - Required environment variables: `REDIS_URL`, `JWT_SECRET`, `HMAC_ALGORITHM` (default HS256).
   - Feature flags: `ENABLE_HMAC_VERIFICATION`, `ENABLE_RATE_LIMITING` (default true in production).
@@ -128,6 +141,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 | Integration SDK | Client libraries with HMAC helpers, sample code | Integration team |
 
 ## Exit Criteria Checklist
+
 - [ ] HMAC middleware deployed and enforced on `/v1/fees/*` endpoints with feature flag.
 - [ ] Rate limiting active with per-store quotas, 429 responses include proper headers.
 - [ ] Replay protection prevents duplicate nonce processing (Redis or DB-backed).
@@ -144,6 +158,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - [ ] Secrets rotation drill performed in staging and documented with screenshots.
 
 ## Security Validation Scenarios
+
 1. **HMAC Success**: Valid signature with correct timestamp/nonce → 200 OK.
 2. **HMAC Failure - Invalid Signature**: Tampered body or wrong secret → 401 Unauthorized.
 3. **HMAC Failure - Expired Timestamp**: Request older than 5 minutes → 401 Unauthorized.
@@ -154,6 +169,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 8. **Secret Rotation**: Old secret rejected after rotation grace period (5 minutes).
 
 ## Rollout Plan
+
 1. **Week 7 Day 1-2**: HMAC middleware implementation and unit tests.
 2. **Week 7 Day 3-4**: Rate limiting infrastructure and Redis integration.
 3. **Week 7 Day 5**: Database migration and security logging.
@@ -163,11 +179,13 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 7. **Week 8 Day 5**: Staging deployment and rotation drill.
 
 ## Dependencies
+
 - Requires Milestone 3 completion (analytics and session management stable).
 - Redis instance for rate limiting and nonce storage (or PostgreSQL fallback).
 - Access to staging environment for security testing and rotation exercises.
 
 ## Success Metrics
+
 - **HMAC Validation**: >99.9% of legitimate requests succeed, 100% of tampered requests rejected.
 - **Rate Limiting**: Zero false positives (legitimate traffic under quota never blocked).
 - **Security Incidents**: Response time <15 minutes from detection to secret rotation.

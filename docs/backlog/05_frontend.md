@@ -1,11 +1,13 @@
 # Epic 05 — Frontend Experience & Admin Console
 
 ## Context
+
 Merchants interact primarily through the React dashboard. The MVP ships with
 placeholder data and manual flows that must be tied to real backend behavior
 and polished for GA.
 
 ## Current Status
+
 - ✅ Pages scaffolded: Dashboard, Onboarding, Settings/Playground, Reports,
   Logs, Billing, Help.
 - ✅ Settings page can trigger quote/apply demos using seeded store.
@@ -23,6 +25,7 @@ and polished for GA.
   last activity, store scope) returned by the enriched `GET /api/me` endpoint.
 
 ## Acceptance Criteria
+
 1. **Store Context**: Implement global store selector (header or modal) that
    reads from `/api/me` and drives API requests.
 2. **Settings Persistence**: Integrate with backend endpoints to read/update
@@ -36,17 +39,20 @@ and polished for GA.
    Tailwind classes) in `docs/security/ui-guide.md`.
 
 ## Deliverables
+
 - Frontend state management updates (React Query/Zustand contexts).
 - API client additions in `src/lib/api.ts` for new endpoints.
 - UI/UX guidelines doc.
 - Optional: Storybook or Chromatic setup for critical components.
 
 ## Validation
+
 - Cypress or Playwright smoke covering login → settings toggle → quote apply →
   logs view.
 - Manual acceptance using QA scenarios (MN/CO) via the playground.
 
 ## Definition of Done
+
 - Global store selector UX validated with multiple seeded stores and reflected
   in automated UI tests.
 - Settings persistence confirmed via API assertions and visual regression
@@ -58,5 +64,6 @@ and polished for GA.
 - Epic status updated to link to design artifacts and QA evidence.
 
 ## Dependencies
+
 - Epic 02 for multi-store awareness.
 - Epic 03 for settings persistence and analytics data sources.

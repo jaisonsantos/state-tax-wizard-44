@@ -1,16 +1,19 @@
 # Epic 06 — Platform Integrations (WooCommerce & Shopify)
 
 ## Context
+
 Native integrations unlock real merchant value. The MVP spec outlines a Woo
 plugin and a Shopify proof of concept, but neither is implemented.
 
 ## Current Status
+
 - ❌ WooCommerce plugin code absent (UI references only).
 - ❌ Shopify integration (app proxy/product-fee) not started.
 - ⚠️ Backend endpoints assume payload shape from integrations but lack HMAC
   verification (covered by security epic).
 
 ## Acceptance Criteria
+
 1. **WooCommerce Plugin**:
    - PHP plugin repository under `integrations/woocommerce/` with hooks for
      `woocommerce_cart_calculate_fees` and order persistence via `/fees/apply`.
@@ -27,17 +30,20 @@ plugin and a Shopify proof of concept, but neither is implemented.
    (validate items, compute hashes) reused by both platforms.
 
 ## Deliverables
+
 - `integrations/` directory with platform-specific code and README files.
 - Automated tests: PHPUnit for Woo plugin business logic; Jest (or Vitest) for
   Shopify app proxy.
 - CI workflow to lint/test integration projects.
 
 ## Validation
+
 - Manual walkthrough using WooCommerce local dev environment (documented in
   README) verifying fee injection.
 - Shopify test store using developer preview to validate product-fee flow.
 
 ## Definition of Done
+
 - Integration repositories packaged with versioned ZIP/TGZ artifacts attached to
   the release or CI run.
 - End-to-end demo videos (or screenshots) captured for Woo checkout and Shopify
@@ -50,4 +56,5 @@ plugin and a Shopify proof of concept, but neither is implemented.
   docs.
 
 ## Dependencies
+
 - Requires Epic 03 absorb fee support and Epic 08 security (HMAC) for production.

@@ -1,6 +1,7 @@
 # Defects & Improvement Opportunities
 
 ## 1. Operations playbook for secret & Redis config (Severity: Low)
+
 - **Description:** Infrastructure docs still need to explain how to provide `REDIS_URL` and rotated HMAC secrets in non-demo environments so operators can reproduce the smoke/CI setup.
 - **Evidence:** README/Postman guides reference the secrets but do not prescribe vault/backfill steps. 【F:README.md†L80-L130】【F:docs/postman/README.md†L1-L140】
 - **Recommendation:** Extend deployment docs with environment variable tables, credential storage guidance, and a reminder to rotate the secret after provisioning.

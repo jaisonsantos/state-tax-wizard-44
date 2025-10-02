@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CreditCard, ExternalLink, CheckCircle, AlertTriangle, Calendar, DollarSign } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CreditCard, ExternalLink, CheckCircle, AlertTriangle, Calendar, TrendingUp, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const plans = [
@@ -16,7 +16,7 @@ const plans = [
     price: 29,
     description: "Perfect for small businesses",
     features: [
-      "Up to 1,000 orders/month",
+      "Up to 1,000 transactions/month",
       "Basic compliance reports",
       "Email support",
       "MN & CO coverage"
@@ -25,11 +25,11 @@ const plans = [
   },
   {
     name: "pro",
-    displayName: "Pro", 
+    displayName: "Pro",
     price: 49,
     description: "Most popular for growing stores",
     features: [
-      "Up to 10,000 orders/month", 
+      "Up to 10,000 transactions/month",
       "Advanced analytics & reports",
       "Priority support",
       "MN & CO coverage",
@@ -44,9 +44,9 @@ const plans = [
     price: 99,
     description: "For enterprise-scale operations",
     features: [
-      "Unlimited orders",
+      "Unlimited transactions",
       "White-label reports",
-      "Dedicated account manager", 
+      "Dedicated account manager",
       "SLA guarantee",
       "MN & CO coverage",
       "Custom integrations",
@@ -56,36 +56,13 @@ const plans = [
   }
 ];
 
-const invoiceHistory = [
-  {
-    id: "inv_001",
-    date: "2024-09-01",
-    amount: "$49.00",
-    plan: "Pro",
-    status: "paid",
-    provider: "shopify"
-  },
-  {
-    id: "inv_002", 
-    date: "2024-08-01",
-    amount: "$49.00",
-    plan: "Pro",
-    status: "paid",
-    provider: "shopify"
-  },
-  {
-    id: "inv_003",
-    date: "2024-07-01", 
-    amount: "$29.00",
-    plan: "Starter",
-    status: "paid", 
-    provider: "stripe"
-  }
-];
-
 export default function Billing() {
   const [entitlements, setEntitlements] = useState<any>(null);
+  const [usage, setUsage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
   const { toast } = useToast();
   const { selectedStoreId: storeId } = useAuth();
 
@@ -93,21 +70,29 @@ export default function Billing() {
     const initializeData = async () => {
       if (!storeId) {
         setEntitlements(null);
+        setUsage(null);
         setLoading(false);
+        setError(null);
         return;
       }
 
       setLoading(true);
+      setError(null);
       try {
-        const entitlementsData = await apiClient.getEntitlements(storeId);
+        const [entitlementsData, usageData] = await Promise.all([
+          apiClient.getEntitlements(storeId),
+          apiClient.getUsage(storeId)
+        ]);
         setEntitlements(entitlementsData);
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to load billing information",
-          variant: "destructive",
-        });
+        setUsage(usageData);
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "billing_unconfigured") {
+          setError("Billing system not configured. Contact support to enable Stripe integration.");
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load billing information");
+        }
         setEntitlements(null);
+        setUsage(null);
       } finally {
         setLoading(false);
       }
@@ -116,18 +101,91 @@ export default function Billing() {
     initializeData();
   }, [storeId, toast]);
 
-  const handleShopifyBilling = (planName: string) => {
-    toast({
-      title: "Shopify Billing",
-      description: `You'll be redirected to Shopify to approve the ${planName} plan subscription`,
-    });
+  const handleUpgrade = async (planName: string) => {
+    if (!storeId) {
+      toast({
+        title: "Error",
+        description: "No store selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCheckoutLoading(planName);
+    try {
+      const origin = window.location.origin;
+      const response = await apiClient.createCheckoutSession(
+        storeId,
+        planName,
+        `${origin}/billing?success=true`,
+        `${origin}/billing?canceled=true`
+      );
+
+      if (response.url) {
+        window.open(response.url, '_blank');
+        toast({
+          title: "Checkout opened",
+          description: "Complete your subscription in the new tab",
+        });
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "billing_unconfigured") {
+        toast({
+          title: "Billing unavailable",
+          description: "Stripe integration not configured. Contact support.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to create checkout session",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setCheckoutLoading(null);
+    }
   };
 
-  const handleStripeBilling = (planName: string) => {
-    toast({
-      title: "Stripe Checkout",
-      description: `Opening secure checkout for ${planName} plan`,
-    });
+  const handleManageSubscription = async () => {
+    if (!storeId) {
+      toast({
+        title: "Error",
+        description: "No store selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPortalLoading(true);
+    try {
+      const origin = window.location.origin;
+      const response = await apiClient.createPortalSession(storeId, `${origin}/billing`);
+
+      if (response.portal_url) {
+        window.open(response.portal_url, '_blank');
+        toast({
+          title: "Customer portal opened",
+          description: "Manage your subscription in the new tab",
+        });
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "billing_unconfigured") {
+        toast({
+          title: "Billing unavailable",
+          description: "Stripe integration not configured. Contact support.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to open portal",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setPortalLoading(false);
+    }
   };
 
   const getPlanBadge = (planName: string) => {
@@ -139,21 +197,19 @@ export default function Billing() {
 
   const getTrialDaysLeft = () => {
     if (!entitlements?.trial_ends_at) return 0;
-    
+
     const trialEnd = new Date(entitlements.trial_ends_at);
     const now = new Date();
     const diffTime = trialEnd.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     return Math.max(0, diffDays);
   };
 
-  const currentPlan = useMemo(
-    () => plans.find((p) => p.name === entitlements?.plan) || plans[0],
-    [entitlements],
-  );
+  const currentPlan = plans.find((p) => p.name === entitlements?.plan) || plans[0];
   const trialDaysLeft = getTrialDaysLeft();
   const isTrialing = entitlements?.status === "trialing";
+  const usagePercentage = usage?.unlimited ? 0 : usage?.percentage_used || 0;
 
   if (loading) {
     return (
@@ -177,6 +233,14 @@ export default function Billing() {
         </p>
       </div>
 
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       {!storeId && (
         <Card>
           <CardContent className="p-6">
@@ -192,19 +256,19 @@ export default function Billing() {
 
       {/* Trial Status */}
       {storeId && isTrialing && trialDaysLeft > 0 && (
-        <Card className="bg-primary-muted border-primary/20">
+        <Card className="bg-primary/5 border-primary/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Calendar className="h-6 w-6 text-primary" />
                 <div>
-                  <h3 className="font-semibold text-primary">Free Trial Active</h3>
-                  <p className="text-sm text-primary/80">
+                  <h3 className="font-semibold text-foreground">Free Trial Active</h3>
+                  <p className="text-sm text-muted-foreground">
                     {trialDaysLeft} days remaining. Activate a plan to unlock production features.
                   </p>
                 </div>
               </div>
-              <Button>
+              <Button onClick={() => handleUpgrade(currentPlan.name)}>
                 Choose Plan
               </Button>
             </div>
@@ -212,56 +276,104 @@ export default function Billing() {
         </Card>
       )}
 
-      {/* Current Subscription */}
-      {storeId && (
+      {/* Current Subscription + Usage */}
+      {storeId && entitlements && (
         <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Current Subscription
-          </CardTitle>
-        </CardHeader>
-        
-        <CardContent>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold">{currentPlan.displayName} Plan</h3>
-              <p className="text-muted-foreground">
-                Billed via {entitlements?.provider === "shopify" ? "Shopify" : "Stripe"}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold">${currentPlan.price}/mo</div>
-              <Badge className={isTrialing ? "bg-primary text-primary-foreground" : "bg-success text-success-foreground"}>
-                <CheckCircle className="h-3 w-3 mr-1" />
-                {isTrialing ? "Trial" : "Active"}
-              </Badge>
-            </div>
-          </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Current Subscription
+            </CardTitle>
+          </CardHeader>
 
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="grid gap-3 md:grid-cols-2">
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-medium mb-2">Billing Method</h4>
-                <p className="text-sm text-muted-foreground">
-                  {entitlements?.provider === "shopify" 
-                    ? "Charges appear on your monthly Shopify invoice"
-                    : "Secure billing via Stripe with VAT handling"
-                  }
+                <h3 className="text-lg font-semibold">{currentPlan.displayName} Plan</h3>
+                <p className="text-muted-foreground">
+                  Billed via {entitlements.provider === "shopify" ? "Shopify" : "Stripe"}
                 </p>
               </div>
-              <div>
-                <h4 className="font-medium mb-2">Next Billing Date</h4>
-                <p className="text-sm text-muted-foreground">
-                  {isTrialing && entitlements?.trial_ends_at 
-                    ? `Trial ends: ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
-                    : "November 1, 2024"
-                  }
-                </p>
+              <div className="text-right">
+                <div className="text-2xl font-bold">${currentPlan.price}/mo</div>
+                <Badge className={isTrialing ? "bg-primary text-primary-foreground" : "bg-success text-success-foreground"}>
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  {isTrialing ? "Trial" : entitlements.status || "Active"}
+                </Badge>
               </div>
             </div>
-          </div>
-        </CardContent>
+
+            {usage && (
+              <div className="p-4 bg-muted rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="font-medium">Usage This Period</h4>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {usage.unlimited
+                      ? `${usage.transactions_used} transactions (Unlimited)`
+                      : `${usage.transactions_used} / ${usage.transactions_limit} transactions`}
+                  </span>
+                </div>
+                {!usage.unlimited && (
+                  <Progress value={usagePercentage} className="h-2" />
+                )}
+                {!usage.unlimited && usagePercentage >= 80 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      You've used {Math.round(usagePercentage)}% of your monthly quota. Consider upgrading to avoid service interruption.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <h4 className="font-medium mb-2">Billing Method</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {entitlements.provider === "shopify"
+                      ? "Charges appear on your monthly Shopify invoice"
+                      : "Secure billing via Stripe with VAT handling"}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Next Billing Date</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {isTrialing && entitlements.trial_ends_at
+                      ? `Trial ends: ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
+                      : entitlements.current_period_end
+                      ? new Date(entitlements.current_period_end).toLocaleDateString()
+                      : "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {entitlements.provider === "stripe" && (
+              <Button
+                variant="outline"
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="w-full"
+              >
+                {portalLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Opening Portal...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Manage Subscription
+                  </>
+                )}
+              </Button>
+            )}
+          </CardContent>
         </Card>
       )}
 
@@ -273,19 +385,22 @@ export default function Billing() {
             Select the plan that best fits your business needs. All plans include 14-day free trial.
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <div className="grid gap-6 md:grid-cols-3">
             {plans.map((plan) => (
-              <div key={plan.name} className={`relative border rounded-lg p-6 ${
-                plan.popular ? 'border-primary shadow-lg' : 'border-border'
-              }`}>
+              <div
+                key={plan.name}
+                className={`relative border rounded-lg p-6 ${
+                  plan.popular ? "border-primary shadow-lg" : "border-border"
+                }`}
+              >
                 {plan.popular && (
                   <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
                     Most Popular
                   </Badge>
                 )}
-                
+
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
                     {plan.displayName}
@@ -310,24 +425,19 @@ export default function Billing() {
                 <Button
                   className="w-full"
                   variant={entitlements && plan.name === entitlements.plan ? "outline" : "default"}
-                  disabled={entitlements && plan.name === entitlements.plan}
-                  onClick={() => {
-                    if (!storeId) {
-                      toast({
-                        title: "Select a store",
-                        description: "Choose a store before updating plan details.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    if (entitlements?.provider === "shopify") {
-                      handleShopifyBilling(plan.displayName);
-                    } else {
-                      handleStripeBilling(plan.displayName);
-                    }
-                  }}
+                  disabled={!storeId || (entitlements && plan.name === entitlements.plan) || checkoutLoading === plan.name}
+                  onClick={() => handleUpgrade(plan.name)}
                 >
-                  {entitlements && plan.name === entitlements.plan ? "Current Plan" : "Select Plan"}
+                  {checkoutLoading === plan.name ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : entitlements && plan.name === entitlements.plan ? (
+                    "Current Plan"
+                  ) : (
+                    "Select Plan"
+                  )}
                 </Button>
               </div>
             ))}
@@ -337,65 +447,19 @@ export default function Billing() {
             <h4 className="font-medium mb-2">Billing Information</h4>
             <div className="grid gap-4 md:grid-cols-2 text-sm text-muted-foreground">
               <div>
-                <strong>Shopify Merchants:</strong> Billing is handled by Shopify. 
-                You'll confirm this subscription in your Shopify Admin and charges 
+                <strong>Shopify Merchants:</strong> Billing is handled by Shopify.
+                You'll confirm this subscription in your Shopify Admin and charges
                 appear on your monthly Shopify invoice.
               </div>
               <div>
-                <strong>WooCommerce Merchants:</strong> Secure billing via Stripe. 
-                EU B2B customers with valid VAT numbers are reverse-charged. 
+                <strong>WooCommerce Merchants:</strong> Secure billing via Stripe.
+                EU B2B customers with valid VAT numbers are reverse-charged.
                 Invoices include VAT details as required.
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Invoice History */}
-      {storeId && (
-        <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Billing History
-          </CardTitle>
-          <CardDescription>
-            Your recent invoices and payment history
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice ID</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoiceHistory.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-mono text-sm">{invoice.id}</TableCell>
-                  <TableCell>{invoice.date}</TableCell>
-                  <TableCell>{invoice.plan}</TableCell>
-                  <TableCell className="font-medium">{invoice.amount}</TableCell>
-                  <TableCell className="capitalize">{invoice.provider}</TableCell>
-                  <TableCell>
-                    <Badge className="bg-success text-success-foreground">
-                      {invoice.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

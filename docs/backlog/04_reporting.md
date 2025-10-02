@@ -1,10 +1,12 @@
 # Epic 04 — Reporting & Compliance Exports
 
 ## Context
+
 Compliance for MN and CO hinges on accurate CSV/JSON exports. While endpoints
 exist, gaps remain in JSON output, validations, and documentation for auditors.
 
 ## Current Status
+
 - ✅ `/api/v1/reports/co/dr1786` returns CSV aggregations.
 - ✅ `/api/v1/reports/mn/summary` returns CSV.
 - ✅ MN JSON format now returns structured output with parity checks captured in [`backend/tests/test_mn_report_json.py`](../../backend/tests/test_mn_report_json.py) and aligned to the documented schema in [`docs/reports/mn_summary.md`](../reports/mn_summary.md).
@@ -14,6 +16,7 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
 - ✅ Invalid-format attempts now emit failure telemetry/audit rows, and JSON downloads ship with `Content-Disposition` filenames so browsers store them consistently.
 
 ## Acceptance Criteria
+
 1. **JSON Output**: `/reports/mn/summary?format=json` returns structured JSON
    matching documented schema (counts, totals, absorbed metrics).
 2. **Schema Documentation**: Publish CSV column dictionaries and JSON schema
@@ -26,16 +29,19 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
    capturing user and filters.
 
 ## Deliverables
+
 - Backend schema updates in `schemas/reports.py`.
 - Documentation: [`docs/reports/mn_summary.md`](../reports/mn_summary.md),
   [`docs/reports/co_dr1786.md`](../reports/co_dr1786.md).
 - Playwright (or Vitest) test to ensure download button triggers API call.
 
 ## Validation
+
 - Automated tests run in CI verifying CSV and JSON outputs.
 - Manual verification using QA matrix sample dates.
 
 ## Definition of Done
+
 - CSV/JSON schemas versioned in `docs/reports/` with examples generated from the
   seeded database and linked from release notes.
 - Contract tests fail if headers or JSON keys regress; CI pipeline blocks merge
@@ -47,4 +53,5 @@ exist, gaps remain in JSON output, validations, and documentation for auditors.
 - Epic status updated, citing the test fixtures used for validation.
 
 ## Dependencies
+
 - Depends on Epic 02 for authenticated audit trail and user attribution.

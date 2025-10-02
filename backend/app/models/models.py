@@ -51,6 +51,8 @@ class Store(Base):
     country = Column(String(2), nullable=False, default="US")
     state = Column(String(2), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    stripe_customer_id = Column(String(255), unique=True, nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True)
 
     # Relationships
     settings = relationship("StoreSetting", back_populates="store", uselist=False)
@@ -135,6 +137,11 @@ class Subscription(Base):
     status = Column(String(20), nullable=False)
     trial_end = Column(DateTime(timezone=True), nullable=True)
     current_period_end = Column(DateTime(timezone=True), nullable=True)
+    stripe_subscription_id = Column(String(255), unique=True, nullable=True)
+    stripe_customer_id = Column(String(255), nullable=True)
+    plan_tier = Column(String(50), nullable=False, default="starter")
+    cancel_at_period_end = Column(Boolean, nullable=False, default=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     store = relationship("Store", back_populates="subscriptions")

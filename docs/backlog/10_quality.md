@@ -1,11 +1,13 @@
 # Epic 10 — Quality Engineering & Continuous Delivery
 
 ## Context
+
 The MVP ships with backend pytest coverage and basic frontend build checks, but
 lacks comprehensive automated testing, contract validation, and release
 confidence tooling.
 
 ## Current Status
+
 - ✅ GitHub Actions run backend pytest and frontend build/typecheck.
 - ✅ Report CSV contracts covered via `backend/tests/test_report_contracts.py` and golden fixtures in `backend/tests/fixtures/reports/`.
 - ⚠️ No Playwright/Cypress end-to-end coverage.
@@ -14,6 +16,7 @@ confidence tooling.
 - ❌ No automated dependency vulnerability scanning or supply-chain monitoring.
 
 ## Acceptance Criteria
+
 1. **Automated QA Checklist**: Convert the QA matrices into actionable test
    cases with status tracking (`docs/qa/checklist.md`).
 2. **End-to-End Suite**: Playwright (or Cypress) tests covering login, quote,
@@ -26,16 +29,19 @@ confidence tooling.
    tagging releases and publishing Docker images.
 
 ## Deliverables
+
 - New tests under `backend/tests/` and `src/tests/` (or `tests/e2e/`).
 - CI workflow updates adding e2e job and security scanning.
 - Documentation for QA processes.
 - Postman/Newman execution guidance captured in [`docs/postman/README.md`](../postman/README.md) and referenced from release evidence.
 
 ## Validation
+
 - CI must pass with new jobs enabled.
 - QA checklist reviewed and signed off prior to release.
 
 ## Definition of Done
+
 - QA checklist lives in source control with version history and is referenced in
   each milestone’s exit criteria.
 - E2E suite recorded in CI artifacts (videos/logs) and required for merge via
@@ -49,5 +55,6 @@ confidence tooling.
 - Epic status updated with coverage metrics and open follow-ups (if any).
 
 ## Dependencies
+
 - Depends on Epic 04 reporting output and Epic 05 frontend stability for e2e
   coverage.

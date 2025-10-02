@@ -3,17 +3,20 @@
 _[← Milestone 4 — Security](14_milestone_04_security.md) • [Milestone 6 — Integrations →](16_milestone_06_integrations.md)_
 
 ## Stage Validation Summary
+
 - **Mock billing endpoint live**: `/v1/billing/entitlements` returns hardcoded plan data for UI development ([`backend/app/routers/billing.py`](../../backend/app/routers/billing.py)).
 - **Frontend billing page exists**: Displays static pricing tables and mock subscription history ([`src/pages/Billing.tsx`](../../src/pages/Billing.tsx)).
 - **Auth foundation ready**: User context available for linking subscriptions to stores ([`backend/app/core/security.py`](../../backend/app/core/security.py)).
 - **Remaining gap**: Real Stripe integration (customers, subscriptions, webhooks), entitlement enforcement, and Customer Portal links are not implemented.
 
 ## Next Development Objective
+
 Deliver **Monetization via Stripe** by implementing full subscription lifecycle management, webhook processing for billing events, entitlement enforcement across API/UI, and self-service upgrade/downgrade flows.
 
 ## Implementation Plan
 
 ### 1. Stripe Customer Lifecycle
+
 - Install `stripe` Python package in `backend/requirements.txt`.
 - Add Stripe configuration to `backend/app/core/config.py`:
   - `STRIPE_SECRET_KEY` (env var, separate test/prod keys).
@@ -27,6 +30,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Add `stripe_customer_id` (varchar(255), nullable, unique).
   - Add `stripe_subscription_id` (varchar(255), nullable).
 - Create `subscriptions` table:
+
   ```sql
   CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,6 +48,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   ```
 
 ### 2. Checkout & Portal Integration
+
 - Create `/v1/billing/create-checkout-session` endpoint:
   - Input: `plan_tier` (starter/pro/plus), `success_url`, `cancel_url`.
   - Creates Stripe Checkout Session for subscription, returns `session_id` and `checkout_url`.
@@ -60,6 +65,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Display current plan badge and next billing date from `/v1/billing/entitlements`.
 
 ### 3. Webhook Processing
+
 - Create `/v1/billing/webhooks/stripe` endpoint:
   - Verify signature using `stripe.Webhook.construct_event`.
   - Handle key events:
@@ -79,6 +85,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - `event_data`: JSON snapshot of webhook payload.
 
 ### 4. Entitlement Enforcement
+
 - Create `backend/app/services/entitlement_service.py`:
   - `get_plan_limits(plan_tier)`: Returns dict with limits:
     - `starter`: 1000 transactions/month, basic reports only.
@@ -96,6 +103,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Disable UI elements for features beyond current plan (with upgrade CTA).
 
 ### 5. Real Entitlements Endpoint
+
 - Update `/v1/billing/entitlements`:
   - Replace mock data with real subscription from `subscriptions` table.
   - Return: `plan_tier`, `status`, `current_period_end`, `limits` object, `features` array.
@@ -105,6 +113,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Calculates from `order_fees` table where `created_at >= current_period_start`.
 
 ### 6. Stripe Products & Prices Setup
+
 - Document in `docs/billing/stripe-setup.md`:
   - Create three products in Stripe dashboard: Starter, Pro, Plus.
   - Create monthly recurring prices for each product.
@@ -116,6 +125,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Outputs status report for operations team.
 
 ### 7. Automated Testing
+
 - Create `backend/tests/fixtures/stripe/` directory with sample webhook payloads:
   - `subscription_created.json`, `subscription_updated.json`, `invoice_paid.json`.
 - Create `backend/tests/test_stripe_webhooks.py`:
@@ -134,6 +144,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Validates local state syncs correctly (requires Stripe test API key).
 
 ### 8. Frontend Billing Flow
+
 - Update `src/pages/Billing.tsx`:
   - Fetch real entitlements from updated endpoint.
   - Display current plan badge (Starter/Pro/Plus) with status indicator.
@@ -148,6 +159,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
 - Toast notifications for successful upgrade/downgrade.
 
 ### 9. Documentation
+
 - Create `docs/billing/stripe.md`:
   - Environment variable reference (secret key, webhook secret, price IDs).
   - Webhook endpoint URL configuration in Stripe dashboard.
@@ -159,6 +171,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   - Describe entitlements schema and usage endpoint.
   - Authentication requirements and rate limits.
 - Add billing workflow diagram to `docs/diagrams/billing_flow.mermaid`:
+
   ```mermaid
   sequenceDiagram
     User->>Frontend: Click "Upgrade to Pro"
@@ -178,6 +191,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
   ```
 
 ### 10. Operations & Rollout
+
 - Extend `docs/security/environment.md`:
   - Document `STRIPE_SECRET_KEY` setup (test vs production keys).
   - Webhook endpoint URL for Stripe dashboard: `https://api.yourdomain.com/v1/billing/webhooks/stripe`.
@@ -202,6 +216,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
 | Stripe Config | Products/prices setup, webhook endpoint registration | Operations team |
 
 ## Exit Criteria Checklist
+
 - [ ] Stripe service creates customers and stores `customer_id` in database.
 - [ ] Checkout endpoint generates valid Stripe Sessions and redirects users.
 - [ ] Customer Portal endpoint provides self-service subscription management.
@@ -222,6 +237,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
 - [ ] Prometheus metrics track checkout sessions, webhook events, entitlement denials.
 
 ## Billing Workflow Validation Scenarios
+
 1. **New Subscription**: User upgrades to Pro → Checkout → Payment → Webhook updates DB → Entitlements unlocked.
 2. **Failed Payment**: Invoice payment fails → Webhook marks past_due → User sees warning, features remain active during grace period.
 3. **Cancellation**: User cancels via Portal → Subscription ends at period_end → Downgrade to Starter at renewal.
@@ -230,6 +246,7 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
 6. **Webhook Retry**: Webhook fails (500 error) → Stripe retries → Duplicate event ignored via idempotency.
 
 ## Rollout Plan
+
 1. **Week 9 Day 1-2**: Stripe service implementation and customer creation.
 2. **Week 9 Day 3-4**: Checkout and portal endpoints, frontend integration.
 3. **Week 9 Day 5**: Subscriptions table migration and webhook endpoint skeleton.
@@ -239,11 +256,13 @@ Deliver **Monetization via Stripe** by implementing full subscription lifecycle 
 7. **Week 10 Day 5**: Staging deployment, test mode validation, documentation completion.
 
 ## Dependencies
+
 - Requires Milestone 4 completion (security and rate limiting stable).
 - Stripe account with test mode access for development.
 - Frontend routing supports redirect flows (success_url, cancel_url).
 
 ## Success Metrics
+
 - **Checkout Conversion**: >80% of initiated checkouts complete payment.
 - **Webhook Reliability**: 99.9% of webhook events processed successfully.
 - **Entitlement Accuracy**: Zero unauthorized access to gated features.

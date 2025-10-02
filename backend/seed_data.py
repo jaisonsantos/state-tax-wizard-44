@@ -75,8 +75,18 @@ def ensure_store(
             status="trialing" if plan == "starter" else "active",
             trial_end=now + timedelta(days=14) if plan == "starter" else None,
             current_period_end=now + timedelta(days=30),
+            plan_tier=plan,
+            cancel_at_period_end=False,
         )
         db.add(subscription)
+    else:
+        # keep existing subscription metadata aligned with plan changes
+        for sub in store.subscriptions:
+            if not sub.plan_tier:
+                sub.plan_tier = sub.plan
+            if sub.plan != plan:
+                sub.plan = plan
+            sub.cancel_at_period_end = sub.cancel_at_period_end or False
 
     return store
 

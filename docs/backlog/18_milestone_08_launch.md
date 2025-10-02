@@ -3,6 +3,7 @@
 _[← Milestone 7 — Webhooks](17_milestone_07_webhooks.md) • [Backlog Overview →](README.md)_
 
 ## Stage Validation Summary
+
 - **Core features complete**: Fee engine, reporting, analytics, billing, integrations, and webhooks implemented (Milestones 1-7).
 - **Security hardened**: HMAC verification, rate limiting, session management, and secrets rotation in place (Milestone 4).
 - **Platform integrations functional**: WooCommerce plugin and Shopify app tested with alpha merchants (Milestone 6).
@@ -10,11 +11,13 @@ _[← Milestone 7 — Webhooks](17_milestone_07_webhooks.md) • [Backlog Overvi
 - **Remaining gap**: Production infrastructure, comprehensive testing, release automation, and launch readiness validation not finalized.
 
 ## Next Development Objective
+
 Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-end testing, finalizing documentation, conducting security audit, and preparing rollout procedures for production deployment.
 
 ## Implementation Plan
 
 ### 1. Infrastructure & DevOps
+
 - **Production Environment Setup**:
   - Provision production database (PostgreSQL 16 with replication, automated backups).
   - Deploy API to cloud platform (AWS ECS, Google Cloud Run, or similar) with auto-scaling.
@@ -45,6 +48,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Create PagerDuty/Opsgenie integration for critical alerts.
 
 ### 2. Comprehensive Testing
+
 - **Backend Unit Test Coverage**:
   - Ensure >90% code coverage for all backend modules.
   - Run coverage report: `pytest --cov=backend/app --cov-report=html`.
@@ -74,6 +78,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Conduct internal security audit following `docs/security/audit-checklist.md`.
 
 ### 3. Security Audit & Compliance
+
 - **Security Audit Checklist** (`docs/security/audit-checklist.md`):
   - [ ] JWT secrets rotated and stored securely.
   - [ ] HMAC secrets unique per store, encrypted at rest.
@@ -95,6 +100,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Address findings and document remediation in audit report.
 
 ### 4. Documentation Finalization
+
 - **User-Facing Documentation**:
   - **Getting Started Guide** (`docs/user-guide/getting-started.md`):
     - Account creation and store setup.
@@ -130,6 +136,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
     - Deployment architecture (cloud services, networking).
 
 ### 5. Release Automation
+
 - **Versioning Strategy**:
   - Adopt semantic versioning (semver): `MAJOR.MINOR.PATCH` (e.g., `1.0.0` for MVP launch).
   - Tag releases in Git: `git tag -a v1.0.0 -m "MVP Launch"`.
@@ -159,6 +166,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Automate updates using conventional commit messages and release-please or similar tool.
 
 ### 6. Beta Testing & Feedback
+
 - **Beta Program**:
   - Recruit 10-20 beta merchants (mix of WooCommerce and Shopify users).
   - Provide beta testing guide with tasks to complete:
@@ -178,6 +186,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Net Promoter Score (NPS) > 50 from beta testers.
 
 ### 7. Performance Optimization
+
 - **Backend Optimizations**:
   - Add database indexes on frequently queried columns:
     - `order_fees.store_id`, `order_fees.created_at`, `order_fees.status`.
@@ -196,6 +205,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Implement request timeouts and circuit breakers for external dependencies.
 
 ### 8. Customer Support Preparation
+
 - **Support Documentation**:
   - Create internal support knowledge base with common issues and resolutions.
   - Document escalation procedures (when to involve engineering).
@@ -210,6 +220,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Conduct mock support scenarios (e.g., merchant reports incorrect fee calculation).
 
 ### 9. Legal & Compliance
+
 - **Terms of Service & Privacy Policy**:
   - Draft Terms of Service covering usage, liability, data handling.
   - Create Privacy Policy complying with GDPR, CCPA (consult legal counsel).
@@ -224,6 +235,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
   - Disclaimer: "State Tax Wizard assists with fee calculation; merchants remain responsible for filing."
 
 ### 10. Launch Day Procedures
+
 - **Pre-Launch Checklist** (Day -1):
   - [ ] Deploy to production and verify all services running.
   - [ ] Smoke test critical flows (login, fee calculation, report export).
@@ -258,6 +270,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
 | Launch | Pre-launch checklist, monitoring, post-launch review | Product + Engineering |
 
 ## Exit Criteria Checklist
+
 - [ ] Production infrastructure deployed with auto-scaling and backups.
 - [ ] CI/CD pipelines automate deployment with rollback capability.
 - [ ] Backend test coverage >90%, all tests pass.
@@ -279,6 +292,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
 - [ ] Post-launch retrospective scheduled for Day +7.
 
 ## Launch Validation Scenarios
+
 1. **New User Signup**: Create account → Onboarding flow → Configure first store → Install integration.
 2. **First Order**: Process order with MN address → Fee calculated → Order synced → Audit log created.
 3. **Report Export**: Generate MN summary → Download JSON → Verify accuracy → Upload to state portal.
@@ -289,6 +303,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
 8. **Incident Response**: Critical bug discovered → Team paged → Hotfix deployed within 1 hour → Postmortem published.
 
 ## Rollout Plan
+
 1. **Week 15 Day 1**: Infrastructure provisioning and CI/CD pipeline setup.
 2. **Week 15 Day 2-3**: Comprehensive testing (unit, integration, e2e, load).
 3. **Week 15 Day 4**: Security audit and penetration testing.
@@ -299,12 +314,14 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
 8. **Week 16 Day 5**: MVP Launch Day → Monitoring → Post-launch review.
 
 ## Dependencies
+
 - Requires Milestones 1-7 completion (all core features functional).
 - Access to production cloud environment and DNS configuration.
 - Legal review of Terms of Service and Privacy Policy.
 - Beta testers recruited and onboarded.
 
 ## Success Metrics
+
 - **Launch Success**: Zero critical bugs within first 48 hours.
 - **Uptime**: 99.9% API availability in first month.
 - **User Adoption**: >50 merchants onboarded within first week.
@@ -313,6 +330,7 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
 - **NPS Score**: Net Promoter Score >40 from early adopters.
 
 ## Post-Launch Roadmap (Milestone 9+)
+
 - **Milestone 9 — Scaling & Optimization**: Multi-region deployment, caching improvements, analytics enhancements.
 - **Milestone 10 — Additional States**: Expand fee rules to support more jurisdictions (NY, WA, CA).
 - **Milestone 11 — Advanced Features**: Custom rule builder, automated filing assistance, mobile app.

@@ -3,6 +3,7 @@
 State Tax Wizard is a full-stack demo application that showcases a configurable fee engine for U.S. state taxes. It combines a FastAPI backend with a React frontend to simulate fee calculations, audit logging, and observability for demo stores.
 
 ## Features
+
 - **FastAPI backend** with JWT authentication, seeded demo data, idempotent fee application, and replay-protected HMAC signing on `/v1/fees/apply`.
 - **Fee rules for Minnesota and Colorado** that persist `OrderFee` records and structured `AuditLog` entries.
 - **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request, store, and security context.
@@ -10,6 +11,7 @@ State Tax Wizard is a full-stack demo application that showcases a configurable 
 - **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
 
 ## Project structure
+
 ```
 backend/                # FastAPI application, Alembic migrations, tests, and seed script
 src/                    # React frontend (Vite + TypeScript + Tailwind)
@@ -18,95 +20,117 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
 ```
 
 ## Prerequisites
+
 - Python 3.11+
 - Node.js 18+ and npm
 - Docker & Docker Compose (for the recommended local stack)
 
 ## Getting started (Docker Compose)
+
 1. Copy `.env.example` to `.env` if you need to override defaults.
 2. Start the stack:
+
    ```sh
    make dev
    ```
    This launches the API, frontend, and supporting services. The frontend is available at <http://localhost:5173>, and the API at <http://localhost:8000>.
 3. Apply database migrations and seed demo data (the login flow will also ensure the seed store exists):
+
    ```sh
    make migrate
    make seed
    ```
 4. Stop the stack when you are done:
+
    ```sh
    make down
    ```
 
 ## Backend development
+
 1. Create and activate a virtual environment.
 2. Install dependencies:
+
    ```sh
    pip install -r backend/requirements.txt
    ```
 3. Set `DATABASE_URL` (defaults to PostgreSQL when running via Docker; SQLite is supported for tests):
+
    ```sh
    export DATABASE_URL=sqlite:///./dev.db
    ```
 4. Run migrations and seed data:
+
    ```sh
    alembic upgrade head
    python backend/seed_data.py
    ```
 5. Start the FastAPI server:
+
    ```sh
    uvicorn backend.app.main:app --reload
    ```
 
 ### Prometheus metrics & logs
+
 - Prometheus metrics are exposed at `/metrics`.
 - Application logs are JSON-formatted and include fields such as `request_id`, `store_id`, `jurisdiction`, and `reason_codes`.
 
 ### Environment variables
+
 - `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The smoke tests default to `demo-hmac-secret` but you should override it once secrets are rotated.
 - `REDIS_URL` (optional) configures the distributed rate limiter. When running via Docker Compose the API service automatically connects to the bundled Redis container; set `REDIS_URL=redis://redis:6379/0` if you provision Redis yourself.
 - `HMAC_MAX_SKEW_SECONDS` and `HMAC_REPLAY_TTL_SECONDS` remain tunable via `.env`.
 
 ## Frontend development
+
 1. Install dependencies:
+
    ```sh
    npm install
    ```
 2. Start the development server:
+
    ```sh
    npm run dev
    ```
 3. The React app consumes the backend API at `VITE_API_URL` (configure via `.env` or defaults to `/api`).
 
 ## Testing
+
 - Backend tests:
+
   ```sh
   pytest -q
   ```
   Ensure `APP_ENV=dev` (default) so SQLite-based tests auto-create tables, or
   pre-create the schema when running against another environment.
 - Frontend type-check:
+
   ```sh
   npm run typecheck
   ```
 - Frontend build:
+
   ```sh
   npm run build
   ```
 - Report export smoke (requires Docker services running):
+
   ```sh
   make reports-smoke
   ```
   Set `SMOKE_METRICS_URL` when the Prometheus endpoint is exposed on a separate
   host; otherwise the smoke test derives `/metrics` from `SMOKE_API_BASE_URL`.
 - Security smoke (validates HMAC signing and replay protection):
+
   ```sh
   make security-smoke
   ```
   Requires the Docker stack with PostgreSQL running (`make up migrate seed`).
   Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
 - Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
+
   ```sh
   ENABLE_REPORT_DOWNLOAD_TEST=1 npm run test:e2e
   ```
@@ -114,11 +138,13 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
 The Playwright script is disabled by default so CI pipelines can opt in once headless downloads are stable. When the environment variable is not set the command exits early after printing a skip message.
 
 ## Continuous integration
+
 GitHub Actions workflows are provided under `.github/workflows/`:
 - `backend.yml` spins up PostgreSQL with Docker Compose, installs backend dependencies, applies migrations, and runs `pytest`.
 - `frontend.yml` installs Node dependencies, runs the TypeScript type-check, and builds the production bundle.
 
 ## Additional resources
+
 - API reference: visit <http://localhost:8000/api/docs> for the automatically generated Swagger UI (the legacy `/docs` path now redirects here).
 - Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
@@ -130,5 +156,6 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Guia de interface: consulte [`docs/security/ui-guide.md`](docs/security/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
 
 ## Roadmap status
+
 - **Current stage**: Milestone 4 — Security Hardening is complete (distributed rate limiting, secret rotation UX, replay protection, and observability are live).
 - **Next focus**: Milestone 5 — Billing/Stripe integration (subscription sync, entitlements, and billing telemetry). Track work-in-progress in the release plan backlog as items are promoted. 【F:docs/backlog/00_release_plan.md†L40-L120】

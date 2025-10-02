@@ -3,6 +3,7 @@
 _[← Milestone 2 — Next Steps](12_milestone_02_next_steps.md) • [Milestone 4 — Security →](14_milestone_04_security.md)_
 
 ## Stage Validation Summary
+
 - **Reporting confidence shipped**: `ReportService.observe_export` captures success
   and failure telemetry and persists audit rows for each export
   ([`backend/app/services/report_service.py`](../../backend/app/services/report_service.py)).
@@ -20,12 +21,14 @@ _[← Milestone 2 — Next Steps](12_milestone_02_next_steps.md) • [Milestone 
   dashboard and header.
 
 ## Status Update
+
 Milestone 3 core scope shipped: the dashboard now consumes live analytics
 telemetry, account/session metadata renders in the header, and automation covers
 analytics smoke flows. The notes below capture the historical plan and can be
 used for future enhancements (trend visualisations, alerting, etc.).
 
 ## Remaining Enhancements
+
 Future iterations can build on this foundation by layering trend
 visualisations, alerting, or deeper analytics exploration. The historical plan
 is retained below as guidance when prioritising follow-up work.
@@ -33,6 +36,7 @@ is retained below as guidance when prioritising follow-up work.
 ## Historical Implementation Notes
 
 ### 1. Backend Analytics Surface
+
 - Introduce `/v1/analytics/overview` router that aggregates fee counts, absorbed
   totals, and recent audit activity per store by querying `OrderFee` and
   `AuditLog` data and snapshotting Prometheus counters for exports.
@@ -45,6 +49,7 @@ is retained below as guidance when prioritising follow-up work.
   dependency injection to avoid scraping `/metrics` directly.
 
 ### 2. Frontend Dashboard & Session Polish
+
 - Replace the hard-coded KPI array in `src/pages/Dashboard.tsx` with data fetched
   from the new analytics endpoint (using React Query hooks inside
   `src/lib/api.ts`).
@@ -57,6 +62,7 @@ is retained below as guidance when prioritising follow-up work.
   updated docs.
 
 ### 3. Data & Seeding
+
 - Update `backend/seed_data.py` so demo stores include enough fee/audit history
   for dashboard visualizations (e.g., multiple days of activity, absorbed vs
   shown counts).
@@ -64,6 +70,7 @@ is retained below as guidance when prioritising follow-up work.
   history pagination.
 
 ### 4. Observability & Metrics
+
 - Expand `docs/security/observability.md` with the analytics payload contract and the
   Prometheus counters that back each dashboard widget.
 - Emit structured logs (`analytics_dashboard_loaded`) whenever the frontend
@@ -72,6 +79,7 @@ is retained below as guidance when prioritising follow-up work.
   concern.
 
 ### 5. Automation & QA
+
 - Add backend pytest coverage for the analytics service (per-store filtering,
   cursor behavior, Prometheus counter snapshots, authorization failures).
 - Extend Playwright to capture dashboard load, KPI refresh, and history
@@ -83,6 +91,7 @@ is retained below as guidance when prioritising follow-up work.
   structure, wiring it into CI once stable.
 
 ### 6. Documentation & Enablement
+
 - Document dashboard usage patterns and session metadata in `docs/security/ui-guide.md`
   with fresh screenshots (capture via the frontend once the feature ships).
 - Add API contract details to `docs/api` (e.g., new `analytics.md`) describing
@@ -93,6 +102,7 @@ is retained below as guidance when prioritising follow-up work.
   for analytics UI/endpoint changes.
 
 ### 7. Operations & Rollout
+
 - Provide a short operations runbook entry (`docs/security/environment.md`) describing
   feature flags (if any), environment variables required for analytics, and how
   to backfill historical counters.
@@ -111,6 +121,7 @@ is retained below as guidance when prioritising follow-up work.
 | Operations | Runbook updates, deployment steps, monitoring alerts | DevOps |
 
 ## Exit Criteria Checklist
+
 - [x] `/v1/analytics/overview` documented, tested, and guarded by tenant auth.
 - [x] Dashboard renders live data with explicit loading, empty, and error states.
 - [x] Account dropdown surfaces session metadata sourced from `session_tokens`.

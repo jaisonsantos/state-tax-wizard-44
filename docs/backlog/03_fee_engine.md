@@ -1,12 +1,14 @@
 # Epic 03 — Fee Engine, Quote & Apply APIs
 
 ## Context
+
 The fee engine is the core differentiator. It must evaluate Minnesota and
 Colorado delivery fees, support idempotent application, and emit rich audit
 trails. The MVP already implements the basic logic but needs hardening and
 extensibility.
 
 ## Current Status
+
 - ✅ `POST /api/v1/fees/quote` calculates MN/CO fees with seeded rule versions.
 - ✅ `POST /api/v1/fees/apply` persists fees idempotently per jurisdiction.
 - ✅ Audit logs capture fee application events with request payloads.
@@ -18,6 +20,7 @@ extensibility.
 - ✅ `decision_latency_ms` histogram labels decisions by route, jurisdiction, and outcome for observability dashboards.
 
 ## Acceptance Criteria
+
 1. **Rule Version Service**: Background job or CLI to ingest new CO periods and
    flag MN changes. Rules endpoint exposes `effective_from`/`effective_to` and
    `is_latest` boolean.
@@ -32,17 +35,20 @@ extensibility.
    under `docs/rules/` with examples.
 
 ## Deliverables
+
 - Updated services (`services/fees.py`, etc.) and schemas for new fields.
 - Migration if new columns required (e.g., storing absorb flag in `order_fees`).
 - CLI/cron script for rule ingestion (`scripts/update_rules.py`).
 - Documentation in `docs/rules/mn.md` and `docs/rules/co.md`.
 
 ## Validation
+
 - Unit tests covering each branch of the decision tables.
 - End-to-end test ensuring absorb_fee true hides line items but still persists.
 - Observability validated via `curl /metrics` showing updated histograms.
 
 ## Definition of Done
+
 - Rule ingestion job scheduled (or documented manual run) with fixtures proving
   a new Colorado period flows from database → quote/apply → reports. ✅ (Documented via the July 2024 CO window import using `scripts/update_rules.py`.)
 - Absorb fee behavior recorded in audit logs and persisted in `order_fees`
@@ -54,6 +60,7 @@ extensibility.
 - Epic status annotated with the date/time of the last rule refresh validation. ✅ Updated July 2024 following the CO-2025H1 schedule load.
 
 ## Dependencies
+
 - Requires Epic 02 authorization to ensure store-specific settings are respected.
 - Coordinates with Epic 05 (frontend) to display new reason codes and absorb
   behavior.
