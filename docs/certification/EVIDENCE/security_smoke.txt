@@ -1,0 +1,7 @@
+Security smoke completed successfully.
+Initial apply lines: 1
+Replay attempt rejected with 409.
+Stale timestamp rejected with 401.
+Rate limiter throttled quote traffic as expected.
+HMAC secret rotation generated a new secret and invalidated the previous one.
+Metrics confirmed: hmac_validation_failures_total(stale_timestamp)=1.0, hmac_replay_attempts_total=1.0, rate_limit_throttles_total=1.0

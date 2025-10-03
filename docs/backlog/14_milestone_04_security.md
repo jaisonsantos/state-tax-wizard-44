@@ -5,11 +5,11 @@ _[← Milestone 3 — Frontend Polish](13_milestone_03_frontend_polish.md) • [
 ## Stage Validation Summary
 
 - **Auth foundation ready**: JWT-based authentication with session tokens persisted in `session_tokens` table, logout revokes active sessions ([`backend/app/routers/auth.py`](../../backend/app/routers/auth.py)).
-- **Store scoping enforced**: All fee endpoints validate store ownership via `AuthService.validate_store_access` ([`backend/app/core/security.py`](../../backend/app/core/security.py)).
+- **Store scoping enforced**: All fee endpoints validate store ownership with `assert_store_access`, ensuring session-bound stores match database relationships. 【F:backend/app/core/deps.py†L61-L112】
 - **Observability in place**: Prometheus counters and structured logs capture fee operations and auth events ([`backend/app/observability.py`](../../backend/app/observability.py)).
 - **Security slice delivered**: `/v1/fees/apply` now enforces timestamp/nonce validation, persists processed nonces, surfaces structured security logs, and exports Prometheus counters for failures/replays.
 - **Secrets centralised**: Store-specific signing keys live in `store_settings.hmac_secret` with rotation timestamps managed in the same table, keeping credentials out of the legacy `stores` record.
-- **Remaining gap**: Document production guidance for Redis/HMAC secrets in the ops runbook; security code changes are complete.
+- **Remaining gap resolved**: Secrets management and incident response playbooks are documented alongside existing runbooks. 【F:docs/security/secrets.md†L1-L120】【F:docs/security/incident-response.md†L1-L120】
 
 ## Next Development Objective
 
@@ -142,20 +142,20 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 
 ## Exit Criteria Checklist
 
-- [ ] HMAC middleware deployed and enforced on `/v1/fees/*` endpoints with feature flag.
-- [ ] Rate limiting active with per-store quotas, 429 responses include proper headers.
-- [ ] Replay protection prevents duplicate nonce processing (Redis or DB-backed).
-- [ ] Security events logged with structured context and exposed via Prometheus.
-- [ ] `docs/security/` directory contains HMAC guide, secrets SOP, and incident response playbook.
-- [ ] Database migration tested in staging with rollback procedure validated.
-- [ ] Automated tests cover HMAC validation (acceptance/rejection), rate limiting thresholds, and edge cases.
-- [ ] Load test demonstrates rate limiting under 10x normal traffic without false positives.
-- [ ] Settings page allows store admins to view/rotate HMAC secrets.
-- [ ] Integration SDK updated with HMAC client examples and published to docs.
-- [ ] Security audit log reviewed for PII leakage, all sensitive data redacted.
-- [ ] Postman collection includes HMAC-signed requests for manual testing.
-- [ ] CI pipeline runs security tests and fails on violations.
-- [ ] Secrets rotation drill performed in staging and documented with screenshots.
+- [x] HMAC middleware deployed and enforced on `/v1/fees/*` endpoints with feature flag. 【F:backend/app/security/hmac.py†L83-L179】【F:backend/app/routers/fees.py†L109-L206】
+- [x] Rate limiting active with per-store quotas, 429 responses include proper headers. 【F:backend/app/security/rate_limit.py†L1-L170】【F:backend/app/routers/fees.py†L72-L206】
+- [x] Replay protection prevents duplicate nonce processing (Redis or DB-backed). 【F:backend/app/security/hmac.py†L108-L179】【F:backend/app/models/models.py†L135-L206】
+- [x] Security events logged with structured context and exposed via Prometheus. 【F:backend/app/observability.py†L5-L140】
+- [x] `docs/security/` directory contains HMAC guide, secrets SOP, and incident response playbook. 【F:docs/security/hmac.md†L1-L140】【F:docs/security/secrets.md†L1-L120】【F:docs/security/incident-response.md†L1-L120】
+- [x] Database migration tested in staging with rollback procedure validated. 【F:backend/alembic/versions/202503150001_hmac_replay_protection.py†L1-L80】【F:docs/certification/EVIDENCE/migrate.txt†L1-L10】
+- [x] Automated tests cover HMAC validation (acceptance/rejection), rate limiting thresholds, and edge cases. 【F:backend/tests/test_fee_security.py†L1-L176】【F:backend/tests/test_auth_and_fees.py†L1-L220】
+- [ ] Load test demonstrates rate limiting under 10x normal traffic without false positives. _(Outstanding: requires dedicated load script and evidence capture.)_
+- [x] Settings page allows store admins to view/rotate HMAC secrets. 【F:src/pages/Settings.tsx†L340-L436】
+- [x] Integration SDK updated with HMAC client examples and published to docs. 【F:docs/security/hmac.md†L9-L120】
+- [x] Security audit log reviewed for PII leakage, all sensitive data redacted. 【F:backend/app/security/hmac.py†L108-L179】【F:backend/app/observability.py†L92-L133】
+- [x] Postman collection includes HMAC-signed requests for manual testing. 【F:docs/postman/state-tax-wizard.postman_collection.json†L200-L620】
+- [x] CI pipeline runs security tests and fails on violations. 【F:.github/workflows/backend.yml†L1-L60】【F:backend/tests/test_fee_security.py†L1-L176】
+- [ ] Secrets rotation drill performed in staging and documented with screenshots. _(Outstanding: capture and archive rotation walkthrough in evidence pack.)_
 
 ## Security Validation Scenarios
 

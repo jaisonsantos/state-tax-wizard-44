@@ -50,6 +50,7 @@ class Store(Base):
     domain = Column(String(255), nullable=False)
     country = Column(String(2), nullable=False, default="US")
     state = Column(String(2), nullable=True)
+    contact_email = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     stripe_customer_id = Column(String(255), unique=True, nullable=True)
     stripe_subscription_id = Column(String(255), nullable=True)

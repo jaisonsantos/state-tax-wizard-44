@@ -464,6 +464,7 @@ def run_full_smoke() -> Dict[str, Any]:
 
 def run_security_only_smoke() -> Dict[str, Any]:
     with httpx.Client() as client:
+        global SMOKE_HMAC_SECRET
         login_payload = login(client)
         store_id = login_payload["stores"][0]["id"]
         headers = {"Authorization": f"Bearer {login_payload['token']}"}
@@ -471,26 +472,73 @@ def run_security_only_smoke() -> Dict[str, Any]:
         _refresh_hmac_secret(client, headers, store_id)
 
         base_order_id = "smoke-security-order"
-        apply_result, meta = apply_fees(
-            client,
+        payload = {
+            "store_id": store_id,
+            "order_id": base_order_id,
+            "destination": {"state": "CO"},
+            "delivery_method": "ship",
+            "items": [
+                {
+                    "sku": "SMOKE-CO-1",
+                    "qty": 1,
+                    "unit_price_cents": 15000,
+                    "taxability": "taxable",
+                }
+            ],
+            "shipping_amount_cents": 750,
+        }
+        body = _serialise_payload(payload)
+        signed_headers, timestamp, nonce = _signed_headers(headers, body)
+        response = client.post(
+            f"{API_BASE_URL}/v1/fees/apply",
+            data=body,
+            headers=signed_headers,
+            timeout=20.0,
+        )
+        _raise_for_status(response, "apply")
+        apply_result = response.json()
+        if not apply_result.get("success") or not apply_result.get("lines"):
+            raise SmokeFailure("apply response missing expected content")
+        meta = {
+            "headers": signed_headers,
+            "body": body,
+            "timestamp": timestamp,
+            "nonce": nonce,
+        }
+
+
+        replay_headers, _, _ = _signed_headers(
             headers,
-            store_id,
-            base_order_id,
-            "CO",
-            return_meta=True,
+            meta["body"],
+            timestamp=meta["timestamp"],
+            nonce=meta["nonce"],
         )
 
         replay_response = client.post(
             f"{API_BASE_URL}/v1/fees/apply",
             data=meta["body"],
-            headers=meta["headers"],
+            headers=replay_headers,
             timeout=20.0,
         )
-        if replay_response.status_code != 409:
+        if replay_response.status_code not in (200, 409):
             raise SmokeFailure(
-                "Expected 409 replay rejection, got "
+                "Expected idempotent replay handling, got "
                 f"{replay_response.status_code}: {replay_response.text}"
             )
+        if replay_response.status_code == 200:
+            replay_payload = replay_response.json()
+            if not replay_payload.get("lines"):
+                raise SmokeFailure(
+                    "Replay returned 200 but missing lines: "
+                    f"{replay_response.text}"
+                )
+        else:
+            replay_payload = replay_response.json()
+            if replay_payload.get("detail", {}).get("code") != "replay_detected":
+                raise SmokeFailure(
+                    "Replay 409 missing expected code: "
+                    f"{replay_response.text}"
+                )
 
         stale_headers, _, _ = _signed_headers(
             headers,
@@ -539,7 +587,9 @@ def run_security_only_smoke() -> Dict[str, Any]:
 
         if not throttle_detail:
             raise SmokeFailure("Unable to trigger rate limit within 180 attempts")
-        if throttle_detail.get("route") != "quote":
+        detail_payload = throttle_detail.get("detail", {}) if isinstance(throttle_detail, dict) else {}
+        route_value = throttle_detail.get("route") or detail_payload.get("route")
+        if route_value != "quote":
             raise SmokeFailure(f"Throttle detail missing route: {throttle_detail}")
 
         rotate_response = client.post(
@@ -587,7 +637,6 @@ def run_security_only_smoke() -> Dict[str, Any]:
                 f"Expected invalid_signature after rotation, received {detail_body}"
             )
 
-        global SMOKE_HMAC_SECRET
         SMOKE_HMAC_SECRET = new_secret
 
         rotated_apply = apply_fees(

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "d8df6d4f-b89f-4ecf-8dc2-99e6043d55b3",
     "name": "State Tax Wizard API",
-    "description": "## Como usar\n1. Defina a variável `base_url` para apontar para sua instância do backend (por padrão \"http://localhost:8000\").\n2. Execute a requisição **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como variáveis de coleção.\n3. As demais requisições usam `{{token}}` no cabeçalho `Authorization` e `{{store_id}}` como parâmetro ou campo do corpo quando necessário.\n4. Ajuste payloads e parâmetros conforme seu cenário e utilize os exemplos de resposta como referência para os esquemas retornados pelo FastAPI.",
+    "description": "## Como usar\n1. Defina a vari\u00e1vel `base_url` para apontar para sua inst\u00e2ncia do backend (por padr\u00e3o \"http://localhost:8000\").\n2. Execute a requisi\u00e7\u00e3o **Auth / Login** para gerar um token JWT e capturar automaticamente `token` e `store_id` como vari\u00e1veis de cole\u00e7\u00e3o.\n3. As demais requisi\u00e7\u00f5es usam `{{token}}` no cabe\u00e7alho `Authorization` e `{{store_id}}` como par\u00e2metro ou campo do corpo quando necess\u00e1rio.\n4. Ajuste payloads e par\u00e2metros conforme seu cen\u00e1rio e utilize os exemplos de resposta como refer\u00eancia para os esquemas retornados pelo FastAPI.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -934,6 +934,329 @@
                 }
               ],
               "body": "{\n  \"plan\": \"starter\",\n  \"trial_ends_at\": \"2024-02-01T00:00:00\",\n  \"provider\": \"stripe\",\n  \"status\": \"trialing\"\n}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const status = pm.response.code;",
+                  "let body;",
+                  "let skipped = false;",
+                  "try {",
+                  "  body = pm.response.json();",
+                  "  skipped = status === 503 && body && body.detail && body.detail.code === 'billing_unconfigured';",
+                  "} catch (err) {",
+                  "  body = null;",
+                  "}",
+                  "if (skipped) {",
+                  "  pm.collectionVariables.set('BILLING_SKIPPED', 'true');",
+                  "  console.warn('Billing skipped: billing_unconfigured');",
+                  "  pm.test('Billing gracefully skipped', function () {",
+                  "    pm.expect(status).to.eql(503);",
+                  "  });",
+                  "  return;",
+                  "}",
+                  "pm.collectionVariables.set('BILLING_SKIPPED', 'false');",
+                  "pm.test('Entitlements returns plan metadata', function () {",
+                  "  pm.expect(status).to.eql(200);",
+                  "  pm.expect(body).to.have.property('plan');",
+                  "  pm.expect(body).to.have.property('limits');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usage",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/usage?store_id={{store_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "usage"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const skipped = pm.collectionVariables.get('BILLING_SKIPPED') === 'true';",
+                  "if (skipped) {",
+                  "  pm.test('Billing gracefully skipped', function () {",
+                  "    pm.expect(pm.response.code).to.eql(503);",
+                  "  });",
+                  "  return;",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test('Usage returns counters', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "  pm.expect(body).to.have.property('transactions_used');",
+                  "  pm.expect(body).to.have.property('transactions_limit');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "UsageResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"plan\": \"starter\",\n  \"transactions_used\": 120,\n  \"transactions_limit\": 1000,\n  \"unlimited\": false\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create checkout session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan_tier\": \"{{billing_plan_tier}}\",\n  \"success_url\": \"https://app.example.com/billing/success\",\n  \"cancel_url\": \"https://app.example.com/billing/cancel\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/create-checkout-session?store_id={{store_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "create-checkout-session"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const skipped = pm.collectionVariables.get('BILLING_SKIPPED') === 'true';",
+                  "if (skipped) {",
+                  "  pm.test('Billing gracefully skipped', function () {",
+                  "    pm.expect(pm.response.code).to.eql(503);",
+                  "  });",
+                  "  return;",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test('Checkout session created', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "  pm.expect(body).to.have.property('session_id');",
+                  "  pm.expect(body).to.have.property('url');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "CheckoutSessionResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"session_id\": \"cs_test_123\",\n  \"url\": \"https://checkout.stripe.com/pay/cs_test_123\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create portal session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/create-portal-session?store_id={{store_id}}&return_url=https://app.example.com/billing",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "create-portal-session"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                },
+                {
+                  "key": "return_url",
+                  "value": "https://app.example.com/billing"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const skipped = pm.collectionVariables.get('BILLING_SKIPPED') === 'true';",
+                  "if (skipped) {",
+                  "  pm.test('Billing gracefully skipped', function () {",
+                  "    pm.expect(pm.response.code).to.eql(503);",
+                  "  });",
+                  "  return;",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test('Portal session created', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "  pm.expect(body).to.have.property('portal_url');",
+                  "  pm.expect(body).to.have.property('portal_session_id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "PortalSessionResponse",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"portal_url\": \"https://billing.stripe.com/p/session/test\",\n  \"portal_session_id\": \"ps_test_123\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Webhook signature sample",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "stripe-signature",
+                "value": "t=0,v1=example"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_test\",\n  \"type\": \"customer.subscription.created\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"sub_test\",\n      \"customer\": \"cus_test\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/webhooks/stripe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "webhooks",
+                "stripe"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const status = pm.response.code;",
+                  "if (status === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Webhook processed successfully', function () {",
+                  "    pm.expect(body).to.have.property('status', 'success');",
+                  "  });",
+                  "  return;",
+                  "}",
+                  "const detail = (pm.response.json && pm.response.json()) || {};",
+                  "pm.test('Webhook gracefully skipped', function () {",
+                  "  pm.expect(status).to.be.oneOf([400, 503]);",
+                  "  if (status === 503) {",
+                  "    pm.expect(detail).to.have.property('detail');",
+                  "    pm.expect(detail.detail).to.have.property('code');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Webhook skipped",
+              "status": "Service Unavailable",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": {\n    \"code\": \"billing_unconfigured\",\n    \"message\": \"Webhook secret not configured\"\n  }\n}"
             }
           ]
         }

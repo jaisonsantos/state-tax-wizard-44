@@ -8,7 +8,7 @@
 - Fee endpoints enforce tenant access, track latency histograms, apply a Redis-backed distributed rate limiter, and validate replay-resistant HMAC signatures with nonce persistence and low-cardinality security logging. 【F:backend/app/routers/fees.py†L1-L214】【F:backend/app/security/hmac.py†L1-L168】【F:backend/app/security/rate_limit.py†L1-L146】
 - Authentication/session APIs persist tokens and expose session metadata consumed by the frontend. 【F:backend/app/models/models.py†L1-L168】【F:src/context/AuthContext.tsx†L1-L108】
 - Seeds create demo stores, analytics-ready fee history, reversal data, and report export audit logs for dashboards/tests. 【F:backend/seed_data.py†L1-L213】
-- Billing endpoints implement Stripe-backed entitlements, usage, checkout, portal, and webhook flows with graceful degradation (`503 billing_unconfigured`) when keys are absent. 【F:backend/app/routers/billing.py†L1-L220】【F:backend/app/services/stripe_service.py†L1-L220】【F:backend/app/services/webhook_service.py†L1-L340】
+- Billing endpoints implement Stripe-backed entitlements, usage, checkout, portal, and webhook flows with graceful degradation (`503 billing_unconfigured`) when keys are absent. Customer contact emails are persisted on the store model so Stripe sessions have deterministic metadata across retries. 【F:backend/app/routers/billing.py†L1-L220】【F:backend/app/services/stripe_service.py†L1-L220】【F:backend/app/models/models.py†L40-L88】
 
 ## Frontend
 
@@ -26,7 +26,7 @@
 
 - Prometheus counters and histograms exist for fee decisions, report exports, auth events, analytics dashboard loads, security failures/replays, and rate-limit throttles; observability docs describe these signals. 【F:backend/app/observability.py†L5-L95】【F:docs/security/observability.md†L1-L160】
 - Structured logging helpers (`log_fee_event`, `log_report_event`, `log_analytics_event`, `log_security_event`) are invoked from routers/services. 【F:backend/app/observability.py†L92-L133】【F:backend/app/routers/analytics.py†L45-L68】【F:backend/app/security/hmac.py†L67-L160】
-- Billing metrics (`billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`) capture subscription lifecycle events, upgrade attempts, and plan gating outcomes. 【F:backend/app/observability.py†L5-L140】【F:docs/certification/EVIDENCE/metrics_dump.txt†L1-L20】
+- Billing metrics (`billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`) capture subscription lifecycle events, upgrade attempts, and plan gating outcomes. 【F:backend/app/observability.py†L5-L140】【F:docs/certification/EVIDENCE/metrics_dump.txt†L1-L18】
 
 ## Automation & QA
 
@@ -44,7 +44,7 @@
 ## Divergences & Gaps
 
 - Operations runbooks should call out required environment variables (`REDIS_URL`, `SMOKE_HMAC_SECRET`) and storage expectations for rotated secrets when deploying outside Docker demos. 【F:README.md†L80-L130】【F:docs/postman/README.md†L1-L140】
-- Security smoke/Newman flows currently assume a PostgreSQL backend because the schema relies on native UUID types; local runs need Dockerised Postgres (see checklist note) until SQLite UUID shims are introduced. 【F:CHECKLIST.md†L47-L60】【F:backend/alembic/versions/202501010000_initial_schema.py†L13-L120】
+- WooCommerce and Shopify connectors remain outstanding; they are planned as part of Milestone 6 and will validate the REST/HMAC contracts against live platform extensions. 【F:docs/backlog/16_milestone_06_integrations.md†L1-L160】
 - Alembic revisions `202510010001`→`202510010002` now execute the dedupe pass before recreating the unique nonce indexes; long-lived databases must run `alembic upgrade head` so the new ordering cleans duplicates before the constraint is reapplied. 【F:backend/alembic/versions/202510010001_ensure_processed_nonce_indexes.py†L1-L90】【F:backend/alembic/versions/202510010002_ensure_unique_nonce_index.py†L1-L70】
 
 ## Recommended Next Step (Milestone Alignment)

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import stripe
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..core.config import settings
 from ..models.models import Store, Subscription
@@ -24,6 +24,21 @@ def _ensure_api_key() -> None:
 class StripeService:
     """Service for managing Stripe customers and subscriptions."""
     
+    @staticmethod
+    def _resolve_contact_email(store: Store) -> str:
+        """Determine the best contact email for a store."""
+
+        if store.contact_email:
+            return store.contact_email
+
+        for user in getattr(store, "users", []) or []:
+            email = getattr(user, "email", None)
+            if email:
+                return email
+
+        # Fallback to a deterministic placeholder to avoid None values.
+        return f"billing+{store.id}@example.com"
+
     @staticmethod
     def create_customer(
         db: Session,
@@ -54,8 +69,10 @@ class StripeService:
             store = db.query(Store).filter(Store.id == store_id).first()
             if store:
                 store.stripe_customer_id = customer.id
+                if email and store.contact_email != email:
+                    store.contact_email = email
                 db.commit()
-                
+
             logger.info(f"Created Stripe customer {customer.id} for store {store_id}")
             return customer.id
             
@@ -68,7 +85,8 @@ class StripeService:
         db: Session,
         store_id: str,
         email: str,
-        name: str
+        name: str,
+        store: Optional[Store] = None,
     ) -> str:
         """Get existing Stripe customer or create new one.
         
@@ -81,11 +99,14 @@ class StripeService:
         Returns:
             Stripe customer ID
         """
-        store = db.query(Store).filter(Store.id == store_id).first()
-        
-        if store and store.stripe_customer_id:
-            return store.stripe_customer_id
-            
+        store_obj = store or db.query(Store).filter(Store.id == store_id).first()
+
+        if store_obj and store_obj.stripe_customer_id:
+            if email and store_obj.contact_email != email:
+                store_obj.contact_email = email
+                db.commit()
+            return store_obj.stripe_customer_id
+
         return StripeService.create_customer(db, store_id, email, name)
     
     @staticmethod
@@ -111,13 +132,23 @@ class StripeService:
         """
         try:
             _ensure_api_key()
-            store = db.query(Store).filter(Store.id == store_id).first()
+            store = (
+                db.query(Store)
+                .options(joinedload(Store.users))
+                .filter(Store.id == store_id)
+                .first()
+            )
             if not store:
                 raise ValueError(f"Store {store_id} not found")
-            
+
             # Get or create customer
+            contact_email = StripeService._resolve_contact_email(store)
             customer_id = StripeService.get_or_create_customer(
-                db, store_id, store.email or "demo@example.com", store.name
+                db,
+                store_id,
+                contact_email,
+                store.name,
+                store=store,
             )
             
             # Create checkout session

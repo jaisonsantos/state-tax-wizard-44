@@ -1,15 +1,11 @@
-# Consistency Patch Log
+# Consistency Patch Log (Pendências Detectadas)
 
-## Applied updates
+## Diferenças código ↔ documentação ↔ tooling
+- ✅ Coleção Postman "Billing" cobre entitlements, usage, checkout, portal e webhook com detecção de `billing_unconfigured`, alinhando o que `docs/billing/stripe.md` descreve com o comportamento real dos endpoints. 【F:docs/postman/state-tax-wizard.postman_collection.json†L940-L1259】【F:docs/billing/stripe.md†L15-L60】【F:backend/app/routers/billing.py†L1-L220】
+- ✅ Evidências (`migrate.txt`, `api_logs.txt`, smokes, metrics) renovadas para sustentar o gate de certificação e as referências em `docs/AGENTE.md`/`DECISION.md`. 【F:docs/certification/EVIDENCE/migrate.txt†L1-L10】【F:docs/certification/EVIDENCE/api_logs.txt†L1-L8】【F:docs/certification/EVIDENCE/security_smoke.txt†L1-L7】
+- ✅ Documentos de segurança atualizados para referenciar `assert_store_access`, além de playbooks de segredos/incidentes agora disponíveis em `docs/security/`. 【F:docs/backlog/14_milestone_04_security.md†L6-L60】【F:docs/security/secrets.md†L1-L120】【F:docs/security/incident-response.md†L1-L120】
+- ✅ Referências ao arquivo `newman_billing.txt` clarificadas como opcionais para evitar inconsistências com o `.gitignore`. 【F:docs/billing/stripe.md†L80-L110】【F:docs/certification/EVIDENCE/README.md†L12-L30】
 
-- Documented the new Redis-backed rate limiter and HMAC rotation workflow in `docs/security/hmac.md`, including retry semantics and audit expectations. 【F:docs/security/hmac.md†L1-L120】
-- Added `rate_limit_throttles_total` to the observability catalog so dashboards and alerts cover throttling events. 【F:docs/security/observability.md†L1-L160】
-- Extended the Postman collection with a **Rotate HMAC secret** request that captures the one-time secret response and resets signing variables. 【F:docs/postman/state-tax-wizard.postman_collection.json†L470-L540】
-- Introduced `anti-drift`/`ci-anti-drift` Makefile targets to keep header/secret scans and the security smoke job wired into CI. 【F:Makefile†L1-L110】
-- Consolidated documentation into `docs/` by relocating certification artifacts to `docs/certification/`, moving evidence under `docs/certification/EVIDENCE/`, and gathering security guides under `docs/security/`. 【F:docs/certification/CERTIFICATION.md†L1-L80】【F:docs/security/ui-guide.md†L1-L80】
-- Renamed backlog milestones/releases to `00_*`/`1X_*` format and added cross-links so navigation stays coherent after the restructure. 【F:docs/backlog/README.md†L9-L32】【F:docs/backlog/14_milestone_04_security.md†L1-L12】
-- `Settings` now tolerates `VITE_API_BASE_URL` and `SMOKE_HMAC_SECRET` so the shared `.env` aligns with docker-compose and smoke test expectations without triggering validation errors. 【F:backend/app/core/config.py†L1-L50】
-- Regenerated migration/QA evidence after fixing the processed nonce chain to match the documented Make targets (`make migrate`, security/analytics/report smokes, pytest, metrics dump). 【F:docs/certification/EVIDENCE/migrate.txt†L1-L10】【F:docs/certification/EVIDENCE/security_smoke.txt†L1-L10】【F:docs/certification/EVIDENCE/analytics_smoke.txt†L1-L10】【F:docs/certification/EVIDENCE/reports_smoke.txt†L1-L10】【F:docs/certification/EVIDENCE/pytest.txt†L1-L20】【F:docs/certification/EVIDENCE/metrics_dump.txt†L1-L25】
-- Completed Stripe/Billing integration across models, services, smoke tests, UI, and docs. Added the missing migration, entitlement enforcement, observability counters, billing smoke, Newman hooks, and screenshots/evidence files. 【F:backend/app/routers/billing.py†L1-L220】【F:backend/app/services/stripe_service.py†L1-L220】【F:backend/smoke_test.py†L1-L260】【F:src/pages/Billing.tsx†L1-L420】【F:docs/api/billing.md†L1-L200】【F:docs/certification/EVIDENCE/billing_smoke.txt†L1-L5】
+## Próximas ações de consistência
+1. Monitorar Milestone 6 para garantir que novos conectores (WooCommerce/Shopify) mantenham HMAC e métricas alinhadas com documentação existente. 【F:docs/backlog/16_milestone_06_integrations.md†L1-L160】
 
-No additional drift detected between code, docs, and tooling after these updates.

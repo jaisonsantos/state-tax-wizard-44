@@ -15,7 +15,7 @@ This directory stores artefacts captured while validating Milestones 4 (Security
 | `reports_smoke.txt` | Output from `make reports-smoke`. |
 | `security_smoke.txt` | Output from `make security-smoke`. |
 | `billing_smoke.txt` | Output from `make billing-smoke` (shows PASS or `⚠ SKIP: billing_unconfigured`). |
-| `newman_billing.txt` | Newman execution log for the Billing folder (skips when Postman env is absent). |
+| _`newman_billing.txt`_ | _(Optional)_ Newman execution log for the Billing folder. Capture manually when Stripe credentials are configured; the file remains ignored by git by default. |
 | `metrics_dump.txt` | Filtered `/metrics` snapshot highlighting fee, security, rate-limit, and billing counters. |
 
 ### Screenshots (`screens/`)
