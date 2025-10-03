@@ -55,5 +55,13 @@ htmlcov/
 # Evidências/artefatos grandes
 docs/certification/EVIDENCE/*.txt
 docs/certification/EVIDENCE/*.log
+!docs/certification/EVIDENCE/api_logs.txt
+!docs/certification/EVIDENCE/migrate.txt
+!docs/certification/EVIDENCE/pytest.txt
+!docs/certification/EVIDENCE/analytics_smoke.txt
+!docs/certification/EVIDENCE/reports_smoke.txt
+!docs/certification/EVIDENCE/security_smoke.txt
+!docs/certification/EVIDENCE/billing_smoke.txt
+!docs/certification/EVIDENCE/metrics_dump.txt
 !docs/certification/EVIDENCE/.gitkeep
 !docs/certification/EVIDENCE/README.md

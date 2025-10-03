@@ -34,17 +34,26 @@ def upgrade() -> None:
     )
 
     # Replace the strict unique constraint with a partial unique index for applied rows
-    op.drop_constraint(
-        "uq_order_fee_store_order_jurisdiction",
-        "order_fees",
-        type_="unique",
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        with op.batch_alter_table("order_fees") as batch_op:
+            batch_op.drop_constraint(
+                "uq_order_fee_store_order_jurisdiction",
+                type_="unique",
+            )
+    else:
+        op.drop_constraint(
+            "uq_order_fee_store_order_jurisdiction",
+            "order_fees",
+            type_="unique",
+        )
     op.create_index(
         "uq_order_fee_store_order_jurisdiction_applied",
         "order_fees",
         ["store_id", "order_id", "jurisdiction"],
         unique=True,
         postgresql_where=sa.text("status = 'applied'"),
+        sqlite_where=sa.text("status = 'applied'"),
     )
 
     op.add_column(

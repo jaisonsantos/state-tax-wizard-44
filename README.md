@@ -130,8 +130,7 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```sh
   make security-smoke
   ```
-  Requires the Docker stack with PostgreSQL running (`make up migrate seed`).
-  Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
+  Run against any API instance (Docker Compose or local `uvicorn`) with migrations/seeds applied; SQLite and PostgreSQL are both supported after the GUID shim. Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
 - Billing smoke (Stripe checkout/portal & graceful degradation):
 
   ```sh

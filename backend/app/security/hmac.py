@@ -93,6 +93,7 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
         store_uuid = uuid.UUID(str(store_id))
     except (ValueError, TypeError):  # pragma: no cover - defensive guard
         _raise_failure(store_id, 401, "invalid_store", "Invalid store identifier for nonce validation")
+    store_key = str(store_uuid)
 
     db.query(ProcessedNonce).filter(
         ProcessedNonce.store_id == store_uuid,
@@ -114,16 +115,16 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
             existing_expiry = existing_expiry.replace(tzinfo=timezone.utc)
 
     if existing and existing_expiry and existing_expiry >= now:
-        hmac_replay_attempts_total.labels(store_id=store_id).inc()
+        hmac_replay_attempts_total.labels(store_id=store_key).inc()
         log_security_event(
             {
                 "event": "hmac_replay_detected",
-                "store_id": store_id,
+                "store_id": store_key,
                 "nonce_preview": nonce[:8],
                 "reason": "duplicate_nonce_in_ttl_window",
             }
         )
-        _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
+        _raise_failure(store_key, 409, "replay_detected", "Nonce was already processed")
 
     if existing and existing_expiry and existing_expiry < now:
         db.delete(existing)
@@ -131,22 +132,22 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
 
     existing = (
         db.query(ProcessedNonce)
-        .filter(ProcessedNonce.store_id == store_id)
+        .filter(ProcessedNonce.store_id == store_uuid)
         .filter(ProcessedNonce.nonce == nonce)
         .filter(ProcessedNonce.expires_at >= now)
         .first()
     )
     if existing:
-        hmac_replay_attempts_total.labels(store_id=store_id).inc()
+        hmac_replay_attempts_total.labels(store_id=store_key).inc()
         log_security_event(
             {
                 "event": "hmac_replay_detected",
-                "store_id": store_id,
+                "store_id": store_key,
                 "nonce_preview": nonce[:8],
                 "reason": "duplicate_nonce_in_ttl_window",
             }
         )
-        _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
+        _raise_failure(store_key, 409, "replay_detected", "Nonce was already processed")
 
     record = ProcessedNonce(
         store_id=store_uuid,
@@ -158,20 +159,20 @@ def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> No
         db.flush()
     except IntegrityError as exc:
         db.rollback()
-        hmac_replay_attempts_total.labels(store_id=store_id).inc()
+        hmac_replay_attempts_total.labels(store_id=store_key).inc()
         log_security_event(
             {
                 "event": "hmac_replay_detected",
-                "store_id": store_id,
+                "store_id": store_key,
                 "nonce_preview": nonce[:8],
             }
         )
-        _raise_failure(store_id, 409, "replay_detected", "Nonce was already processed")
+        _raise_failure(store_key, 409, "replay_detected", "Nonce was already processed")
     else:
         log_security_event(
             {
                 "event": "hmac_nonce_recorded",
-                "store_id": store_id,
+                "store_id": store_key,
                 "nonce_preview": nonce[:8],
                 "expires_at": expires_at.isoformat(),
             }

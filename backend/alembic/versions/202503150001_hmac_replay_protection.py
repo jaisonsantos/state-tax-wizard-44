@@ -1,17 +1,44 @@
 """Add processed_nonces table and secret rotation timestamp"""
 from __future__ import annotations
 
+import uuid
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.types import CHAR, TypeDecorator
 
 # revision identifiers, used by Alembic.
 revision: str = "202503150001"
 down_revision: Union[str, None] = "202503010001"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID/UUID type."""
+
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import UUID as PGUUID
+
+            return dialect.type_descriptor(PGUUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value if dialect.name == "postgresql" else str(value)
+        return str(uuid.UUID(str(value)))
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 
 def upgrade() -> None:
@@ -35,7 +62,7 @@ def upgrade() -> None:
         .values(hmac_secret_rotated_at=sa.func.current_timestamp())
     )
 
-    uuid_type = postgresql.UUID(as_uuid=True) if bind.dialect.name == "postgresql" else sa.String(length=36)
+    uuid_type = GUID()
 
     op.create_table(
         "processed_nonces",

@@ -31,6 +31,7 @@ def ensure_store(
     plan: str,
     enable_mn: bool,
     enable_co: bool,
+    contact_email: str | None = None,
 ) -> Store:
     store = db.query(Store).filter(Store.name == name).first()
     if not store:
@@ -41,9 +42,13 @@ def ensure_store(
             domain=domain,
             country="US",
             state=state,
+            contact_email=contact_email
+            or f"{name.replace(' ', '_')}@example.com".lower(),
         )
         db.add(store)
         db.flush()
+    elif contact_email and store.contact_email != contact_email:
+        store.contact_email = contact_email
 
     demo_customer_id = f"cus_demo_{str(store.id).replace('-', '')[:14]}"
     demo_subscription_id = f"sub_demo_{str(store.id).replace('-', '')[:14]}"
@@ -257,6 +262,7 @@ def seed_database():
             plan="starter",
             enable_mn=True,
             enable_co=True,
+            contact_email="billing+demo1@example.com",
         )
 
         woo_store = ensure_store(
@@ -268,6 +274,7 @@ def seed_database():
             plan="pro",
             enable_mn=False,
             enable_co=True,
+            contact_email="billing+demo2@example.com",
         )
 
         seed_fee_history(db, demo_store)

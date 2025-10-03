@@ -1,0 +1,11 @@
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 202501010000, Initial application schema.
+INFO  [alembic.runtime.migration] Running upgrade 202501010000 -> 202502050001, Fee engine extensions for MVP finalization
+INFO  [alembic.runtime.migration] Running upgrade 202502050001 -> 202503010001, Create session_tokens table and audit index
+INFO  [alembic.runtime.migration] Running upgrade 202503010001 -> 202503150001, Add processed_nonces table and secret rotation timestamp
+INFO  [alembic.runtime.migration] Running upgrade 202503150001 -> 202510010001, Ensure processed_nonces unique index exists
+INFO  [alembic.runtime.migration] Running upgrade 202510010001 -> 202510010002, Ensure unique nonce index for replay protection
+INFO  [alembic.runtime.migration] Running upgrade 202510010002 -> 202510020001, billing_stripe_integration
+INFO  [alembic.runtime.migration] Running upgrade 202510020001 -> 202510020002, Add current_period_start to subscriptions
+INFO  [alembic.runtime.migration] Running upgrade 202510020002 -> 202510020003, Add contact_email column to stores.

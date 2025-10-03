@@ -1,0 +1,50 @@
+    Base = declarative_base()
+
+../../../root/.pyenv/versions/3.12.10/lib/python3.12/site-packages/passlib/utils/__init__.py:854
+  /root/.pyenv/versions/3.12.10/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_analytics_overview.py: 1 warning
+tests/test_auth_and_fees.py: 7 warnings
+tests/test_authz_scope.py: 3 warnings
+tests/test_billing_api.py: 6 warnings
+tests/test_fee_reversals.py: 2 warnings
+tests/test_fee_security.py: 7 warnings
+tests/test_fee_settings_integration.py: 8 warnings
+tests/test_mn_report_json.py: 3 warnings
+tests/test_report_audit.py: 4 warnings
+tests/test_rules_endpoint.py: 1 warning
+tests/test_store_settings.py: 2 warnings
+  /root/.pyenv/versions/3.12.10/lib/python3.12/site-packages/httpx/_client.py:690: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+tests/test_analytics_overview.py: 2 warnings
+tests/test_auth_and_fees.py: 8 warnings
+tests/test_authz_scope.py: 2 warnings
+tests/test_billing_api.py: 5 warnings
+tests/test_fee_reversals.py: 5 warnings
+tests/test_fee_security.py: 19 warnings
+tests/test_fee_settings_integration.py: 16 warnings
+tests/test_mn_report_json.py: 4 warnings
+tests/test_report_audit.py: 7 warnings
+tests/test_rules_endpoint.py: 1 warning
+tests/test_store_settings.py: 2 warnings
+  /root/.pyenv/versions/3.12.10/lib/python3.12/site-packages/jose/jwt.py:311: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = timegm(datetime.utcnow().utctimetuple())
+
+tests/test_auth_and_fees.py: 9 warnings
+tests/test_authz_scope.py: 3 warnings
+tests/test_fee_reversals.py: 6 warnings
+tests/test_fee_security.py: 21 warnings
+tests/test_fee_settings_integration.py: 43 warnings
+tests/test_mn_report_json.py: 3 warnings
+  /root/.pyenv/versions/3.12.10/lib/python3.12/site-packages/pydantic/main.py:1070: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.7/migration/
+    warnings.warn('The `dict` method is deprecated; use `model_dump` instead.', category=PydanticDeprecatedSince20)
+
+tests/test_billing_api.py: 2 warnings
+tests/test_fee_security.py: 15 warnings
+  /root/.pyenv/versions/3.12.10/lib/python3.12/site-packages/httpx/_content.py:204: DeprecationWarning: Use 'content=<...>' to upload raw bytes/text content.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+59 passed, 219 warnings in 6.99s

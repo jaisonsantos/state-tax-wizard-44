@@ -53,7 +53,7 @@ All billing metrics appear in `/metrics` and are captured in `docs/certification
 ## Evidence & automation
 
 - `make billing-smoke` stores console output in `docs/certification/EVIDENCE/billing_smoke.txt`.
-- Newman output (when configured) lives in `docs/certification/EVIDENCE/newman_billing.txt`.
+- When the Newman billing folder is executed with local Stripe credentials, capture the CLI transcript manually (e.g., `newman_billing.txt`). The file is ignored by default via `.gitignore`, so attach it explicitly in certification packs when available.
 - UI screenshots for billing and Settings/HMAC rotation are stored under `docs/certification/EVIDENCE/screens/`.
 
 With these steps Milestone 5 (Billing/Stripe) is fully operational in test mode and ready for sandboxes or pilot stores.

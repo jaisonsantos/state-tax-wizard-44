@@ -1,8 +1,36 @@
 """Create session_tokens table and audit index"""
 
+import uuid
+
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.types import CHAR, TypeDecorator
+
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID/UUID type."""
+
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import UUID as PGUUID
+
+            return dialect.type_descriptor(PGUUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value if dialect.name == "postgresql" else str(value)
+        return str(uuid.UUID(str(value)))
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 # revision identifiers, used by Alembic.
 revision = "202503010001"
@@ -14,10 +42,10 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "session_tokens",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", GUID(), nullable=False),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            GUID(),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
         ),

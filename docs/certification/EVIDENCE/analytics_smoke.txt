@@ -1,0 +1,3 @@
+Analytics overview smoke completed successfully.
+Metric cards returned: 5
+Recent decisions fetched: 5
