@@ -1,67 +1,50 @@
-# ACTION_PLAN – Milestone 6 (Platform Integrations Alpha)
+# ACTION_PLAN – Milestone 6 (Integrations Alpha)
 
 ## Objetivo Geral
-Entregar conectores oficiais para WooCommerce e Shopify que consumam os endpoints `/v1/fees/*` com HMAC, registrem métricas e exponham experiências administrativas alinhadas ao backend. Todo o trabalho deve preservar a certificação de M5 (migrar/rodar smokes) e manter documentação/tooling sincronizados.
+Entregar conectores de integração (WooCommerce + Shopify) sustentados por SDKs e métricas compartilhadas, mantendo a estabilidade conquistada em M5. O trabalho deve sair de um branch dedicado (`feature/m6-integrations-alpha-2025-10-04`) e preservar o checklist de certificação (`docs/certification/CHECKLIST.md`).
 
-## Backend
-- **WooCommerce Webhook Support**
-  - Expor endpoint opcional `/v1/integrations/woocommerce/order` para receber callbacks pós-checkout (idempotente).
-  - Comandos: `pytest -q backend/tests/test_integrations_woocommerce.py` (novo), `python smoke_test.py --security-only`.
-  - Riscos: validação duplicada de HMAC (WooCommerce usa chave compartilhada distinta). Mitigação: reusar `enforce_hmac` com cabeçalhos dedicados.
-  - Rollback: desabilitar rota via feature flag (`INTEGRATIONS_WOO_ENABLED=false`).
-- **Shopify Fee Product Helper**
-  - Expor utilitário REST `/v1/integrations/shopify/fee-products` para listar/criar produto de fee.
-  - Comandos: `pytest -q backend/tests/test_integrations_shopify.py` (novo), `alembic upgrade head` (no-op confirm).
-  - Riscos: limites de rate limit Shopify → adicionar retries exponenciais.
+## Billing & Core Backend
+- **Garantir compatibilidade**: monitorar impactos do plugin/app sobre `/v1/fees/*`, `/v1/billing/*` e segurança HMAC.
+- **Comandos**: `pytest -q`, `pytest -q backend/tests/test_integrations_*` (novos).
+- **Riscos**: aumento de carga em `/v1/fees/apply`; mitigar com testes de carga leves e alertas (`rate_limit_throttles_total`).
+- **Rollback**: feature flags (`INTEGRATIONS_WOO_ENABLED`, `INTEGRATIONS_SHOPIFY_ENABLED`) desligadas + rollback do deploy.
 
-## Frontend
-- **Admin UI para credenciais de integrações**
-  - Adicionar seção "Integrations" em `src/pages/Settings.tsx` listando chaves HMAC, store ID, instruções de plugin.
-  - Comandos: `npm run lint`, `npm run build`.
-  - Riscos: poluir UI existente; usar feature flag `VITE_ENABLE_INTEGRATIONS`.
-  - DoD: instruções copiáveis + link para downloads dos plugins.
+## WooCommerce Plugin
+- Criar diretório `integrations/woocommerce/` (plugin PHP) com hooks para `woocommerce_cart_calculate_fees` e `woocommerce_checkout_order_processed`.
+- Implementar cliente HMAC usando contrato `timestamp\nnonce\nbody` e métricas locais.
+- **Comandos**: `composer install`, `composer test`, `npm run lint` (se usar assets).
+- **Entrega**: ZIP empacotado (`package.sh`) + README detalhando instalação, configuração (`store_id`, `hmac_secret`) e troubleshooting.
+- **Riscos**: compatibilidade com WooCommerce < 8.0; documentar suporte mínimo e fallback.
 
-## Integrations (WooCommerce)
-- Estruturar diretório `integrations/woocommerce/` conforme plano do backlog.
-- Implementar classes `FeeCalculator`, `OrderSync`, `Settings` com testes PHPUnit (`composer test`).
-- Comandos: `composer install`, `composer test`, `npm run lint` (se usar JS assets).
-- Riscos: compatibilidade com versões antigas do WooCommerce; definir suporte oficial (WC 8.0+).
-- Rollback: plugin permanece opcional; basta não publicar ZIP.
+## Shopify App POC
+- Aplicativo Remix/Node em `integrations/shopify/` com app proxy (`/apps/tax-wizard/quote`) e webhook `orders/create`.
+- Sincronizar "fee product" oculto, chamar `/v1/fees/apply`, registrar metafields.
+- **Comandos**: `npm install`, `npm run lint`, `npm run test`, `shopify app dev` (documentar saída/variáveis).
+- **Riscos**: limite de taxa de app proxy; implementar retries com `Retry-After` e logar falhas para `integration_failures_total`.
 
-## Integrations (Shopify)
-- Criar app Remix (`integrations/shopify/app/`).
-- Configurar `npm install`, `npm run test`, `npm run dev` (local tunnel).
-- Garantir que app proxy chama backend com HMAC.
-- Riscos: limites de app proxy; validar fallback (graceful skip) quando API indisponível.
-- Rollback: revogar app no Shopify Partner dashboard, remover webhook subscriptions.
+## Shared SDK / Tooling
+- Criar `integrations/sdk/typescript` com cliente HMAC reutilizável (exportado para Woo/Shopify).
+- Publicar pacote npm privado (ou tarball) + docs de consumo.
+- Atualizar Postman com folder "Integrations" (payloads Woo/Shopify) e scripts de assinatura.
+- Atualizar Makefile com metas `woocommerce-build`, `shopify-build`, `integrations-smoke`.
 
-## Seeds & Data
-- Atualizar `backend/seed_data.py` para incluir instruções/links de download nas mensagens de console.
-- Comandos: `DATABASE_URL=<...> python backend/seed_data.py`.
-- Riscos: poluição de logs; manter mensagens ≤2 linhas.
+## Observability & Metrics
+- Adicionar contadores `integration_requests_total{platform,route}` e `integration_failures_total{platform,reason}` no backend (`backend/app/observability.py`).
+- Expandir `/metrics` evidenciado em `docs/certification/EVIDENCE/metrics_dump.txt`.
+- Documentar novos sinais em `docs/security/observability.md`.
 
-## Observability
-- Adicionar métricas `integration_requests_total{platform,route}` e `integration_failures_total{platform,reason}` em `backend/app/observability.py`.
-- Comandos: `curl -s $SMOKE_METRICS_URL | grep integration_`.
-- Riscos: cardinalidade – limitar labels a `platform`, `route`, `reason` fixo.
+## QA & Evidence
+- Atualizar `docs/certification/CHECKLIST.md` com gates M6 (integrations code, sdk, metrics, docs, smokes, Newman).
+- Executar `pytest -q`, `python smoke_test.py --analytics-only/--reports-only/--security-only`, `python smoke_test.py --billing-only` (SKIP aceitável sem Stripe), `integrations-smoke` (novo) com backends simulados.
+- Capturar novas evidências (`api_logs.txt`, `migrate.txt`, `pytest.txt`, smokes, `metrics_dump.txt`, `md_index.txt`) sem exceder 512 KB.
 
-## Docs
-- Atualizar `README.md`, `docs/backlog/16_milestone_06_integrations.md`, `docs/integrations/woocommerce.md`, `docs/integrations/shopify.md` (novos) com instalação, troubleshooting e métricas.
-- Comandos: `markdownlint docs/integrations/*.md` (se disponível) ou `npm run lint-docs`.
-
-## Postman
-- Acrescentar coleção "Integrations" com exemplos de assinatura Woo/Shopify (`docs/postman/state-tax-wizard.postman_collection.json`).
-- Comandos: `npm run postman:test` (ou `newman run ...`).
-- Riscos: manter corpos idênticos aos plugins.
-
-## QA & CI
-- Estender Makefile com alvos `woocommerce-build`, `shopify-build`, `integrations-smoke` (mocking API).
-- Atualizar pipeline CI para executar `pytest -q`, `npm run build`, `composer test`, `npm run test` (Shopify).
-- Riscos: tempo de pipeline ↑; usar caches (`actions/cache`).
+## Documentação
+- Atualizar `README.md`, `STATUS.md`, backlog M6, `docs/integrations/woocommerce.md`, `docs/integrations/shopify.md` (novos) e `docs/postman/README.md`.
+- Registrar riscos/rollback por camada em `docs/certification/DECISION.md` (próxima rodada) e manter `CONSISTENCY_PATCH.md` sincronizado.
 
 ## Definition of Done
-1. Backend integrações (WooCommerce + Shopify helpers) com testes e métricas.
-2. Plugins compilam, passam testes locais e têm documentação oficial.
-3. UI/Docs/Postman atualizados com instruções completas.
-4. Makefile/CI executam fluxo end-to-end (build + testes + lint) e publicam evidências ≤512 KB.
-5. `docs/certification/CHECKLIST.md` marcado com Gates M6 (a definir) e regressões zero em M5.
+1. Plugins WooCommerce & Shopify entregam fluxo completo (instalação, assinatura HMAC, logs, rollback) com testes automatizados onde aplicável.
+2. SDK compartilhado (TS) publicado e consumido pelos conectores.
+3. Métricas `integration_*` disponíveis em `/metrics` e documentadas.
+4. Makefile/CI executam build/test lint das integrações e coletam evidências.
+5. `docs/certification/CHECKLIST.md` (M6) totalmente marcado e evidência ≤512 KB arquivada.

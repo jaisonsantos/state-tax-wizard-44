@@ -21,6 +21,10 @@ def _ensure_api_key() -> None:
         stripe.api_key = settings.stripe_secret_key
 
 
+class StripeCustomerMissingError(RuntimeError):
+    """Raised when a store lacks the Stripe metadata required for portal access."""
+
+
 class StripeService:
     """Service for managing Stripe customers and subscriptions."""
     
@@ -205,7 +209,7 @@ class StripeService:
             _ensure_api_key()
             store = db.query(Store).filter(Store.id == store_id).first()
             if not store or not store.stripe_customer_id:
-                raise ValueError(f"Store {store_id} has no Stripe customer")
+                raise StripeCustomerMissingError(f"Store {store_id} has no Stripe customer")
 
             session = stripe.billing_portal.Session.create(
                 customer=store.stripe_customer_id,

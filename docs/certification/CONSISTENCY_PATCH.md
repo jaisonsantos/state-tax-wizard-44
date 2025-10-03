@@ -1,11 +1,11 @@
-# Consistency Patch Log (Pendências Detectadas)
+# Consistency Patch Log (Status)
 
-## Diferenças código ↔ documentação ↔ tooling
-- ✅ Coleção Postman "Billing" cobre entitlements, usage, checkout, portal e webhook com detecção de `billing_unconfigured`, alinhando o que `docs/billing/stripe.md` descreve com o comportamento real dos endpoints. 【F:docs/postman/state-tax-wizard.postman_collection.json†L940-L1259】【F:docs/billing/stripe.md†L15-L60】【F:backend/app/routers/billing.py†L1-L220】
-- ✅ Evidências (`migrate.txt`, `api_logs.txt`, smokes, metrics) renovadas para sustentar o gate de certificação e as referências em `docs/AGENTE.md`/`DECISION.md`. 【F:docs/certification/EVIDENCE/migrate.txt†L1-L10】【F:docs/certification/EVIDENCE/api_logs.txt†L1-L8】【F:docs/certification/EVIDENCE/security_smoke.txt†L1-L7】
-- ✅ Documentos de segurança atualizados para referenciar `assert_store_access`, além de playbooks de segredos/incidentes agora disponíveis em `docs/security/`. 【F:docs/backlog/14_milestone_04_security.md†L6-L60】【F:docs/security/secrets.md†L1-L120】【F:docs/security/incident-response.md†L1-L120】
-- ✅ Referências ao arquivo `newman_billing.txt` clarificadas como opcionais para evitar inconsistências com o `.gitignore`. 【F:docs/billing/stripe.md†L80-L110】【F:docs/certification/EVIDENCE/README.md†L12-L30】
+## Concluído nesta rodada
+- ✅ Portal API e docs refletem `portal_session_id` + erro `stripe_customer_missing`. 【F:backend/app/schema/billing.py†L45-L52】【F:docs/api/billing.md†L113-L140】
+- ✅ README/STATUS/backlog M5 sincronizados após o fix. 【F:README.md†L80-L150】【F:STATUS.md†L6-L66】【F:docs/backlog/15_milestone_05_billing.md†L1-L28】
+- ✅ Evidências e métricas (`metrics_dump.txt` com `checkout_sessions_created_total` / `entitlement_denials_total`, `pytest.txt`, smokes) foram renovadas. 【F:docs/certification/EVIDENCE/metrics_dump.txt†L1-L30】【F:docs/certification/EVIDENCE/security_smoke.txt†L1-L7】
 
-## Próximas ações de consistência
-1. Monitorar Milestone 6 para garantir que novos conectores (WooCommerce/Shopify) mantenham HMAC e métricas alinhadas com documentação existente. 【F:docs/backlog/16_milestone_06_integrations.md†L1-L160】
-
+## Pendências para M6
+1. Adicionar métricas `integration_requests_total` / `integration_failures_total` e documentá-las. 【F:docs/backlog/16_milestone_06_integrations.md†L60-L120】
+2. Sincronizar futuros plugins/apps com Postman (folder “Integrations”) e Makefile (`integrations-smoke`).
+3. Atualizar `docs/certification/EVIDENCE/` com novos artefatos (integrations smokes/Newman) durante a execução do incremento.

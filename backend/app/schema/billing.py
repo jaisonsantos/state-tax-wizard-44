@@ -49,3 +49,4 @@ class CheckoutSessionResponse(BaseModel):
 
 class PortalSessionResponse(BaseModel):
     portal_url: str
+    portal_session_id: str
