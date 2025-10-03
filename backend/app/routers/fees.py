@@ -176,6 +176,8 @@ async def apply_fees(
         )
 
     for line in result.lines:
+        applied_at = datetime.now().astimezone()
+
         order_fee = OrderFee(
             store_id=request.store_id,
             order_id=request.order_id,
@@ -189,6 +191,7 @@ async def apply_fees(
             status="applied",
             reversal_reason=None,
             source_of_remittance=request.source_of_remittance,
+            applied_at=applied_at,
         )
         db.add(order_fee)
         fees_applied_total.labels(jurisdiction=line.jurisdiction).inc()

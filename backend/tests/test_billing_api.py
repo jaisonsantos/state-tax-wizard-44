@@ -152,6 +152,32 @@ def test_portal_session_returns_url(client: TestClient, monkeypatch) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["portal_url"] == "https://portal.example"
+    assert payload["portal_session_id"] == "ps_test"
+
+
+def test_portal_session_returns_400_when_customer_missing(
+    client: TestClient, monkeypatch, db_session: Session
+) -> None:
+    token, store_id = _login(client)
+    _configure_billing(monkeypatch)
+
+    def fake_portal_session(**_: Any) -> Dict[str, Any]:
+        raise stripe_service.StripeCustomerMissingError("missing customer")
+
+    monkeypatch.setattr(
+        stripe_service.StripeService,
+        "create_portal_session",
+        staticmethod(fake_portal_session),
+    )
+
+    response = client.post(
+        f"/api/v1/billing/create-portal-session?store_id={store_id}&return_url=https://app.example/return",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["code"] == "stripe_customer_missing"
 
 
 def test_webhook_invalid_signature_returns_400(client: TestClient, monkeypatch) -> None:

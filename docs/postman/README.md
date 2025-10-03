@@ -56,7 +56,7 @@ To validate error handling, exercise at least the following scenarios after a su
 - Exercise the dedicated negative requests — **Fees / Apply fees (stale timestamp)** and **Fees / Apply fees (replay)** — which auto-generate signatures using the exact request body to confirm `401`/`409` responses without manual overrides.
 - After running **Fees / Rotate HMAC secret**, resend an apply request with the previously logged signature to confirm the API returns `detail.code = invalid_signature`.
 - You can still force specific values via `hmac_timestamp_override` or `hmac_nonce_override` before calling **Fees / Apply fees (HMAC)** if you need custom test cases. Expect `detail.code = stale_timestamp` for an expired timestamp and `detail.code = replay_detected` when the same nonce is reused.
-- Override `billing_plan_tier` to an unsupported value (e.g., `enterprise`) in the Billing folder to confirm `400 Bad Request`, and toggle Stripe variables off to document the `503 billing_unconfigured` skip path.
+- Override `billing_plan_tier` to an unsupported value (e.g., `enterprise`) in the Billing folder to confirm `400 Bad Request`, e verifique também o cenário de loja sem Stripe (espera `400 stripe_customer_missing`). Desligar as variáveis Stripe continua gerando o `503 billing_unconfigured` (SKIP).
 
 Document the responses in your test evidence to show both happy-path and guardrail coverage.
 

@@ -3,44 +3,33 @@
 fees_applied_total{jurisdiction="CO"} 2.0
 # HELP fees_applied_created Total number of fee applications processed
 # TYPE fees_applied_created gauge
-fees_applied_created{jurisdiction="CO"} 1.7594514768469076e+09
+fees_applied_created{jurisdiction="CO"} 1.759519994812768e+09
 # HELP fees_absorbed_total Count of fees absorbed instead of shown to shoppers
 # TYPE fees_absorbed_total counter
 # HELP report_exports_total Total number of report exports generated
 # TYPE report_exports_total counter
-report_exports_total{format="json",jurisdiction="MN"} 1.0
-report_exports_total{format="csv",jurisdiction="CO"} 1.0
-# HELP report_exports_created Total number of report exports generated
-# TYPE report_exports_created gauge
-report_exports_created{format="json",jurisdiction="MN"} 1.7594514706057332e+09
-report_exports_created{format="csv",jurisdiction="CO"} 1.7594514706162827e+09
 # HELP hmac_validation_failures_total Count of failed HMAC validation attempts
 # TYPE hmac_validation_failures_total counter
-hmac_validation_failures_total{reason="replay_detected",store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.0
-hmac_validation_failures_total{reason="stale_timestamp",store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.0
-hmac_validation_failures_total{reason="invalid_signature",store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.0
+hmac_validation_failures_total{reason="replay_detected",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
+hmac_validation_failures_total{reason="stale_timestamp",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
+hmac_validation_failures_total{reason="invalid_signature",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
 # HELP hmac_validation_failures_created Count of failed HMAC validation attempts
 # TYPE hmac_validation_failures_created gauge
-hmac_validation_failures_created{reason="replay_detected",store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.7594514768595848e+09
-hmac_validation_failures_created{reason="stale_timestamp",store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.7594514768649182e+09
-hmac_validation_failures_created{reason="invalid_signature",store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.759451478073977e+09
+hmac_validation_failures_created{reason="replay_detected",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.7595199948183072e+09
+hmac_validation_failures_created{reason="stale_timestamp",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.759519994821728e+09
+hmac_validation_failures_created{reason="invalid_signature",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.759519995346377e+09
 # HELP hmac_replay_attempts_total Count of replayed HMAC nonce attempts
 # TYPE hmac_replay_attempts_total counter
-hmac_replay_attempts_total{store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.0
+hmac_replay_attempts_total{store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
 # HELP hmac_replay_attempts_created Count of replayed HMAC nonce attempts
 # TYPE hmac_replay_attempts_created gauge
-hmac_replay_attempts_created{store_id="43cd605b-1bac-42f0-bf4a-3218011f4f9a"} 1.759451476859481e+09
+hmac_replay_attempts_created{store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.7595199948182552e+09
 # HELP rate_limit_throttles_total Count of requests throttled by the rate limiter
 # TYPE rate_limit_throttles_total counter
 rate_limit_throttles_total{route="quote"} 1.0
-# HELP rate_limit_throttles_created Count of requests throttled by the rate limiter
-# TYPE rate_limit_throttles_created gauge
-rate_limit_throttles_created{route="quote"} 1.7594514780613754e+09
 # HELP billing_events_total Count of billing lifecycle events
 # TYPE billing_events_total counter
-billing_events_total{event="billing_unconfigured"} 1.0
-# HELP billing_events_created Count of billing lifecycle events
-# TYPE billing_events_created gauge
-billing_events_created{event="billing_unconfigured"} 1.759451483952299e+09
-# HELP decision_latency_ms Time spent deciding fees in milliseconds
-# HELP decision_latency_ms_created Time spent deciding fees in milliseconds
+# HELP checkout_sessions_created_total Number of Stripe Checkout sessions created
+# TYPE checkout_sessions_created_total counter
+# HELP entitlement_denials_total Count of entitlement denials by feature and plan
+# TYPE entitlement_denials_total counter

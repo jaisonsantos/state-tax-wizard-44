@@ -200,6 +200,7 @@ export interface BillingCheckoutSession {
 
 export interface BillingPortalSession {
   portal_url: string;
+  portal_session_id: string;
 }
 
 export interface RuleVersionResponse {

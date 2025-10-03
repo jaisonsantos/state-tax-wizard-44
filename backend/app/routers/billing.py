@@ -16,7 +16,7 @@ from ..schema.billing import (
     UsageResponse,
 )
 from ..services.entitlement_service import EntitlementService
-from ..services.stripe_service import StripeService
+from ..services.stripe_service import StripeCustomerMissingError, StripeService
 from ..services.webhook_service import WebhookService
 from ..observability import log_billing_event
 
@@ -157,11 +157,21 @@ async def create_portal_session(
     _ensure_billing_configured()
     assert_store_access(db, auth, store_id)
     
-    session_payload = StripeService.create_portal_session(
-        db=db,
-        store_id=store_id,
-        return_url=return_url,
-    )
+    try:
+        session_payload = StripeService.create_portal_session(
+            db=db,
+            store_id=store_id,
+            return_url=return_url,
+        )
+    except StripeCustomerMissingError:
+        log_billing_event("portal_customer_missing", store_id=store_id)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "stripe_customer_missing",
+                "message": "Stripe customer not configured for this store",
+            },
+        )
 
     log_billing_event(
         "portal_session_returned",

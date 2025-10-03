@@ -80,7 +80,7 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
 
 - `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The security smoke defaults to `demo-hmac-secret` but you should override it once secrets are rotated.
 - `REDIS_URL` (optional) configures the distributed rate limiter. When running via Docker Compose the API service automatically connects to the bundled Redis container; set `REDIS_URL=redis://redis:6379/0` if you provision Redis yourself.
-- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` enable live billing flows; when unset the API returns `503` with `code="billing_unconfigured"` and smokes/Newman exit gracefully.
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` enable live billing flows; when unset the API returns `503` with `code="billing_unconfigured"`. If a store lacks Stripe metadata the portal endpoint responds with `400` (`code="stripe_customer_missing"`). Smokes/Newman exit gracefully in both cases.
 - `STRIPE_PRICE_ID_STARTER`, `STRIPE_PRICE_ID_PRO`, and `STRIPE_PRICE_ID_PLUS` map plan tiers to Stripe price IDs. Populate them once products exist in your Stripe dashboard.
 - `SMOKE_BILLING_PLAN` selects which plan tier the billing smoke exercises (defaults to `pro`).
 - `HMAC_MAX_SKEW_SECONDS` and `HMAC_REPLAY_TTL_SECONDS` remain tunable via `.env`.
@@ -136,7 +136,7 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```sh
   make billing-smoke
   ```
-  When Stripe variables are unset the script prints `⚠ SKIP: billing_unconfigured`; otherwise it asserts entitlements, usage, checkout, and portal APIs respond successfully.
+  When Stripe variables are unset the script prints `⚠ SKIP: billing_unconfigured`; otherwise it asserts entitlements, usage, checkout (with `portal_session_id`), and portal APIs respond successfully. Stores without Stripe metadata return `400` with `code="stripe_customer_missing"`.
 - Newman billing folder (optional, requires Postman env JSON with Stripe keys):
 
   ```sh

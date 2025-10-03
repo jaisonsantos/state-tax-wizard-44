@@ -9,7 +9,7 @@ import stripe
 
 from app.core.config import settings
 from app.models.models import Store, StoreSetting, User
-from app.services.stripe_service import StripeService
+from app.services.stripe_service import StripeCustomerMissingError, StripeService
 
 
 @pytest.fixture(autouse=True)
@@ -113,3 +113,16 @@ def test_create_checkout_session_falls_back_to_user_email(db_session, monkeypatc
 
     db_session.refresh(store)
     assert store.contact_email == "member@example.com"
+
+
+def test_create_portal_session_missing_customer(db_session, monkeypatch):
+    monkeypatch.setattr(settings, "stripe_secret_key", "sk_test", raising=False)
+
+    store = _build_store(db_session, contact_email="owner@example.com")
+
+    with pytest.raises(StripeCustomerMissingError):
+        StripeService.create_portal_session(
+            db=db_session,
+            store_id=str(store.id),
+            return_url="https://app.example/billing",
+        )

@@ -123,11 +123,18 @@ Opens the Stripe Customer Portal for self-service plan management.
 
 ```json
 {
-  "portal_url": "https://billing.stripe.com/p/session/test123"
+  "portal_url": "https://billing.stripe.com/p/session/test123",
+  "portal_session_id": "ps_test_123"
 }
 ```
 
-**Error responses**: `400` when the store lacks a Stripe customer, `401/403` for auth issues, and `503 billing_unconfigured` when Stripe is disabled.
+**Error responses**
+
+| Status | Payload |
+| ------ | ------- |
+| `400 Bad Request` | `{ "detail": { "code": "stripe_customer_missing", "message": "Stripe customer not configured for this store" } }` |
+| `401/403` | Auth failures (missing or unauthorised bearer token) |
+| `503 Service Unavailable` | `{ "detail": { "code": "billing_unconfigured", "message": "Stripe integration not configured" } }` |
 
 ---
 

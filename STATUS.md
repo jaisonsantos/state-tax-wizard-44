@@ -8,7 +8,7 @@
 - Fee endpoints enforce tenant access, track latency histograms, apply a Redis-backed distributed rate limiter, and validate replay-resistant HMAC signatures with nonce persistence and low-cardinality security logging. 【F:backend/app/routers/fees.py†L1-L214】【F:backend/app/security/hmac.py†L1-L168】【F:backend/app/security/rate_limit.py†L1-L146】
 - Authentication/session APIs persist tokens and expose session metadata consumed by the frontend. 【F:backend/app/models/models.py†L1-L168】【F:src/context/AuthContext.tsx†L1-L108】
 - Seeds create demo stores, analytics-ready fee history, reversal data, and report export audit logs for dashboards/tests. 【F:backend/seed_data.py†L1-L213】
-- Billing endpoints implement Stripe-backed entitlements, usage, checkout, portal, and webhook flows with graceful degradation (`503 billing_unconfigured`) when keys are absent. Customer contact emails are persisted on the store model so Stripe sessions have deterministic metadata across retries. 【F:backend/app/routers/billing.py†L1-L220】【F:backend/app/services/stripe_service.py†L1-L220】【F:backend/app/models/models.py†L40-L88】
+- Billing endpoints implement Stripe-backed entitlements, usage, checkout, portal, and webhook flows with graceful degradation (`503 billing_unconfigured`) when keys are absent. Stores without Stripe metadata now return `400 stripe_customer_missing`, and portal responses expose `portal_session_id` for the frontend and tooling. 【F:backend/app/routers/billing.py†L1-L220】【F:backend/app/services/stripe_service.py†L1-L230】【F:backend/app/schema/billing.py†L39-L52】
 
 ## Frontend
 
@@ -49,4 +49,4 @@
 
 ## Recommended Next Step (Milestone Alignment)
 
-- **NEXT_SLICE: Integrations Alpha (M6)** — deliver the WooCommerce/Shopify connectors and integration SDK now that billing is production-ready. 【F:docs/backlog/16_milestone_06_integrations.md†L1-L120】
+- **NEXT_SLICE: Integrations Alpha (M6)** — deliver the WooCommerce/Shopify connectors and integration SDK now that billing is production-ready (portal session fix shipped, docs/tests refreshed). 【F:docs/backlog/16_milestone_06_integrations.md†L1-L120】

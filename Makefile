@@ -1,4 +1,4 @@
-.PHONY: help dev build up down logs logs-api logs-db test test-quick migrate seed smoke analytics-smoke reports-smoke security-smoke billing-smoke clean restart shell-api shell-db metrics newman newman-security newman-billing validate m4-validation m5-validation full-validation anti-drift evidence-scan evidence-clean
+.PHONY: help dev build up down logs logs-api logs-db test test-quick migrate seed smoke analytics-smoke reports-smoke security-smoke billing-smoke clean restart shell-api shell-db metrics newman newman-security newman-billing validate m4-validation m5-validation full-validation anti-drift evidence-scan evidence-clean stripe-listen
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -34,7 +34,7 @@ test-quick: ## Run pytest in quiet mode
 	docker-compose exec api pytest -q
 
 migrate: ## Run database migrations
-	docker-compose exec api alembic upgrade head
+	docker-compose exec api python -m alembic upgrade head
 
 seed: ## Seed demo data
 	docker-compose exec api python seed_data.py
@@ -67,7 +67,7 @@ shell-api: ## Open shell in API container
 	docker-compose exec api bash
 
 shell-db: ## Open psql shell in database
-	docker-compose exec db psql -U postgres -d rdf
+	docker-compose exec db psql -U user -d rdf
 
 metrics: ## Display Prometheus metrics
 	@echo "==> Fetching /metrics endpoint..."
@@ -121,9 +121,9 @@ m5-validation: billing-smoke ## Validate M5 (Billing)
 full-validation: test smoke analytics-smoke reports-smoke security-smoke billing-smoke metrics newman ## Complete validation suite
 	@echo "==> Full validation complete!"
 
-# Varreduras de evidência (limitadas para evitar artefatos gigantes)
+# Evidence scans (small, to avoid huge artifacts)
 evidence-scan: ## Generate small anti-drift evidence files
-	@mkdir -p docs/certification/EVIDENCE
+	@mkdir -p docs/ccertification/EVIDENCE
 	rg -n --hidden --no-ignore --color never \
 	  -g '!node_modules/**' -g '!.git/**' -g '!dist/**' -g '!build/**' -g '!.cache/**' \
 	  -g '!docs/certification/EVIDENCE/**' \
@@ -138,3 +138,6 @@ anti-drift: evidence-scan ## Backwards-compatible alias for legacy jobs
 evidence-clean: ## Remove accidentally large evidence files
 	@rm -f docs/certification/EVIDENCE/headers_scan.txt
 	@rm -f docs/certification/EVIDENCE/*.log docs/certification/EVIDENCE/*~ 2>/dev/null || true
+
+stripe-listen: ## Start Stripe CLI webhook forwarder (keep this running while testing)
+	stripe listen --events checkout.session.completed,invoice.paid,invoice.payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted --forward-to http://localhost:8000/api/v1/billing/webhooks/stripe

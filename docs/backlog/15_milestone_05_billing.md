@@ -5,7 +5,7 @@ _[← Milestone 4 — Security](14_milestone_04_security.md) • [Milestone 6 �
 ## Stage Validation Summary
 
 - ✅ Stripe-backed `/v1/billing/entitlements` and `/v1/billing/usage` return live plan metadata, features, and usage limits with graceful `503 billing_unconfigured` handling.
-- ✅ Checkout & Customer Portal flows call Stripe in test mode and surface session IDs/URLs to the UI and tooling.
+- ✅ Checkout & Customer Portal flows call Stripe in test mode and surface session IDs/URLs (`portal_session_id`) to the UI and tooling, with `stripe_customer_missing` covering stores without Stripe metadata.
 - ✅ Webhooks (subscription created/updated/deleted, invoice paid/failed) update the `subscriptions` table, emit audit logs, and increment Prometheus counters.
 - ✅ Entitlement enforcement guards fee application, analytics/reports, and metrics track denials per feature/plan.
 - ✅ Tooling (smoke tests, Newman, Postman, docs) aligned with real behaviour, skipping cleanly when Stripe variables are unset.
