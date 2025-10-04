@@ -189,7 +189,7 @@ def test_webhook_invalid_signature_returns_400(client: TestClient, monkeypatch) 
 
     response = client.post(
         "/api/v1/billing/webhooks/stripe",
-        data=json.dumps({"id": "evt_test"}),
+        content=json.dumps({"id": "evt_test"}),
         headers={"stripe-signature": "invalid"},
     )
 
@@ -225,7 +225,7 @@ def test_webhook_processes_known_event(client: TestClient, monkeypatch) -> None:
 
     response = client.post(
         "/api/v1/billing/webhooks/stripe",
-        data=json.dumps({"id": "evt_test"}),
+        content=json.dumps({"id": "evt_test"}),
         headers={"stripe-signature": "sig_test"},
     )
 

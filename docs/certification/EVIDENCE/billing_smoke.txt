@@ -1,7 +1,7 @@
 ==> Testing billing endpoints...
 docker-compose exec -T api python smoke_test.py --billing-only
 Billing smoke completed successfully.
-Plan: starter status=trialing
-Usage: 5/1000 transactions
-Checkout session id: cs_test_a1NWHDOeTpBGp07ocKryGhB8amFiVBJauZj1JZCcW0NnXj19NSVp4IDWUs
+Plan: pro status=active
+Usage: 0/10000 transactions
+Checkout session id: cs_test_a1t7SY8qwtRVdNY52ShcYwKUXcuYc93y0xmSwVKqQ42YTewbM2qb2DRruV
 Portal URL prefix: https://billing.stripe.com/p/ses

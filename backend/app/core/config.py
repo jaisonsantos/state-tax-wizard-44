@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     stripe_price_id_plus: Optional[str] = None
     shopify_app_key: Optional[str] = "stub_key"
     shopify_app_secret: Optional[str] = "stub_secret"
+    integrations_woo_enabled: bool = False
+    integrations_shopify_enabled: bool = False
     hmac_max_skew_seconds: int = 300
     hmac_replay_ttl_seconds: int = 600
     redis_url: Optional[str] = None

@@ -12,6 +12,7 @@ from .routers import (
     audit,
     auth,
     billing,
+    integrations,
     fees,
     reports,
     rules,
@@ -94,6 +95,7 @@ app.include_router(rules.router, prefix="/api")
 app.include_router(billing.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(store_settings.router, prefix="/api")
+app.include_router(integrations.router, prefix="/api")
 
 
 @app.get("/metrics")

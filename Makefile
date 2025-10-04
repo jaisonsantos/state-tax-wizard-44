@@ -1,4 +1,4 @@
-.PHONY: help dev build up down logs logs-api logs-db test test-quick migrate seed smoke analytics-smoke reports-smoke security-smoke billing-smoke clean restart shell-api shell-db metrics newman newman-security newman-billing validate m4-validation m5-validation full-validation anti-drift evidence-scan evidence-clean stripe-listen
+.PHONY: help dev build up down logs logs-api logs-db test test-quick migrate seed smoke analytics-smoke reports-smoke security-smoke billing-smoke integrations-smoke webhooks-smoke woocommerce-build woocommerce-test shopify-build shopify-test sdk-test clean restart shell-api shell-db metrics newman newman-security newman-billing validate m4-validation m5-validation m6-validation m7-validation cleanup-webhooks metrics-dump full-validation full-validation-all anti-drift evidence-scan evidence-clean stripe-listen
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -57,6 +57,34 @@ security-smoke: ## Smoke test HMAC + rate limiting
 billing-smoke: ## Smoke test billing endpoints (requires Stripe configuration)
 	@echo "==> Testing billing endpoints..."
 	docker-compose exec -T api python smoke_test.py --billing-only
+
+integrations-smoke: ## Smoke test integrations endpoints (feature flags)
+	@echo "==> Testing integration readiness..."
+	docker-compose exec -T api python smoke_test.py --integrations-only
+
+webhooks-smoke: ## Smoke test Stripe webhook ingestion
+	@echo "==> Testing webhook ingestion..."
+	docker-compose exec -T api python smoke_test.py --webhooks-only
+
+woocommerce-build: ## Package the WooCommerce plugin ZIP
+	@echo "==> Packaging WooCommerce plugin..."
+	@cd integrations/woocommerce && ./package.sh
+
+woocommerce-test: ## Run WooCommerce plugin PHPUnit tests
+	@echo "==> Running WooCommerce PHPUnit tests..."
+	@cd integrations/woocommerce && composer install --no-interaction --quiet && ./vendor/bin/phpunit
+
+shopify-build: ## Build Shopify proxy/webhook app
+	@echo "==> Building Shopify app..."
+	@cd integrations/shopify && npm install --no-audit --no-fund && npm run build
+
+shopify-test: ## Run Shopify integration tests
+	@echo "==> Running Shopify Jest suite..."
+	@cd integrations/shopify && npm install --no-audit --no-fund && npm test
+
+sdk-test: ## Run TypeScript SDK unit tests
+	@echo "==> Running TypeScript SDK tests..."
+	@cd integrations/sdk/typescript && npm install --no-audit --no-fund && npm test
 
 clean: ## Remove all containers and volumes
 	docker-compose down -v
@@ -118,7 +146,39 @@ m4-validation: security-smoke metrics ## Validate M4 (Security)
 m5-validation: billing-smoke ## Validate M5 (Billing)
 	@echo "==> M5 Billing validation complete. Check EVIDENCE/ for outputs."
 
-full-validation: test smoke analytics-smoke reports-smoke security-smoke billing-smoke metrics newman ## Complete validation suite
+m6-validation: integrations-smoke ## Validate M6 (Integrations)
+	@echo "==> M6 Integrations validation complete. Check EVIDENCE/ for outputs."
+
+m7-validation: webhooks-smoke ## Validate M7 (Webhooks)
+	@echo "==> M7 Webhooks validation complete. Check EVIDENCE/ for outputs."
+
+# --- Evidência / utilitários ---
+
+# Limpa processed_webhooks (roda o SQL dentro do container do Postgres)
+cleanup-webhooks:
+	@mkdir -p docs/certification/EVIDENCE
+	cat scripts/cleanup_processed_webhooks.sql \
+	| docker-compose exec -T db psql -U user -d rdf -v ON_ERROR_STOP=1
+
+# Dump rápido de métricas relevantes p/ evidência
+metrics-dump:
+	@mkdir -p docs/certification/EVIDENCE
+	curl -s http://localhost:8000/metrics \
+	| grep -E "webhook|billing" \
+	| tee docs/certification/EVIDENCE/metrics_dump.txt
+
+# --- Validações ---
+
+# Versão enxuta (certificação): tests + smokes + métricas
+full-validation:
+	@mkdir -p docs/certification/EVIDENCE
+	docker-compose exec -T api pytest -q | tee docs/certification/EVIDENCE/pytest.txt
+	$(MAKE) webhooks-smoke
+	$(MAKE) billing-smoke | tee docs/certification/EVIDENCE/billing_smoke.txt
+	$(MAKE) metrics-dump
+
+# Versão completa antiga (se quiser manter por compatibilidade)
+full-validation-all: test smoke analytics-smoke reports-smoke security-smoke billing-smoke metrics newman
 	@echo "==> Full validation complete!"
 
 # Evidence scans (small, to avoid huge artifacts)

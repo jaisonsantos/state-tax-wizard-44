@@ -1,8 +1,58 @@
-INFO:     Started server process [73525]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8020 (Press CTRL+C to quit)
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [73525]
+api-1  | WARNING:  WatchFiles detected changes in 'smoke_test.py'. Reloading...
+api-1  | INFO:     Shutting down
+api-1  | INFO:     Waiting for application shutdown.
+api-1  | INFO:     Application shutdown complete.
+api-1  | INFO:     Finished server process [895]
+api-1  | INFO:     Started server process [1004]
+api-1  | INFO:     Waiting for application startup.
+api-1  | INFO:     Application startup complete.
+api-1  | WARNING:  WatchFiles detected changes in 'tests/test_fee_security.py'. Reloading...
+api-1  | INFO:     Shutting down
+api-1  | INFO:     Waiting for application shutdown.
+api-1  | INFO:     Application shutdown complete.
+api-1  | INFO:     Finished server process [1004]
+api-1  | INFO:     Started server process [1005]
+api-1  | INFO:     Waiting for application startup.
+api-1  | INFO:     Application startup complete.
+api-1  | WARNING:  WatchFiles detected changes in 'tests/test_fee_security.py'. Reloading...
+api-1  | INFO:     Shutting down
+api-1  | INFO:     Waiting for application shutdown.
+api-1  | INFO:     Application shutdown complete.
+api-1  | INFO:     Finished server process [1005]
+api-1  | INFO:     Started server process [1006]
+api-1  | INFO:     Waiting for application startup.
+api-1  | INFO:     Application startup complete.
+api-1  | INFO:     192.168.65.1:27537 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+api-1  | {"event": "login", "subject": "smoke-tester@example.com", "user_id": "f3124067-96aa-47ce-886d-2aa8c268cbd1", "session_id": "9e0f52dd-5fae-4115-941d-9d1d67dd338b", "jti": "b2e96ebb-2d42-4579-ac13-d42058480dd4", "stores": ["ed13a9bd-c81a-45b7-bd15-2b4c31f85255"]}
+api-1  | INFO:     127.0.0.1:60816 - "POST /api/auth/login HTTP/1.1" 200 OK
+api-1  | {"event": "subscription_created", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "plan_tier": "pro", "subscription_id": "sub_fc0afb870307", "timestamp": "2025-10-04T12:27:42.988525+00:00"}
+api-1  | Processed subscription.created for store ed13a9bd-c81a-45b7-bd15-2b4c31f85255
+api-1  | {"event": "webhook_processed", "event_type": "customer.subscription.created", "outcome": "processed", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "timestamp": "2025-10-04T12:27:42.990359+00:00"}
+api-1  | INFO:     127.0.0.1:60816 - "POST /api/v1/billing/webhooks/stripe HTTP/1.1" 200 OK
+api-1  | {"event": "subscription_created", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "plan_tier": "pro", "subscription_id": "sub_fc0afb870307", "timestamp": "2025-10-04T12:27:42.998311+00:00"}
+api-1  | Processed subscription.created for store ed13a9bd-c81a-45b7-bd15-2b4c31f85255
+api-1  | INFO:     127.0.0.1:60816 - "POST /api/v1/billing/webhooks/stripe/replay/evt_smoke_6e314da85fc24426b566c7146109a128 HTTP/1.1" 200 OK
+api-1  | INFO:     127.0.0.1:60816 - "GET /metrics HTTP/1.1" 200 OK
+api-1  | {"event": "subscription_created", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "plan_tier": "starter", "subscription_id": "sub_postman_5a11751e-58fe-4734-bfcf-3badaa6a5187", "timestamp": "2025-10-04T12:27:43.783003+00:00"}
+api-1  | Processed subscription.created for store ed13a9bd-c81a-45b7-bd15-2b4c31f85255
+api-1  | {"event": "webhook_processed", "event_type": "customer.subscription.created", "outcome": "processed", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "timestamp": "2025-10-04T12:27:43.784631+00:00"}
+api-1  | INFO:     172.18.0.1:58964 - "POST /api/v1/billing/webhooks/stripe HTTP/1.1" 200 OK
+api-1  | {"event": "webhook_invalid_signature", "timestamp": "2025-10-04T12:27:43.819311+00:00"}
+api-1  | INFO:     172.18.0.1:58964 - "POST /api/v1/billing/webhooks/stripe HTTP/1.1" 400 Bad Request
+api-1  | {"event": "login", "subject": "smoke-tester@example.com", "user_id": "f3124067-96aa-47ce-886d-2aa8c268cbd1", "session_id": "e276303c-0450-4591-af9f-324debfa0904", "jti": "59f4e5ac-e65a-40a2-b9d6-cd2518ee84ae", "stores": ["ed13a9bd-c81a-45b7-bd15-2b4c31f85255"]}
+api-1  | INFO:     127.0.0.1:49254 - "POST /api/auth/login HTTP/1.1" 200 OK
+api-1  | {"event": "subscription_created", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "plan_tier": "pro", "subscription_id": "sub_7073a8d8b1af", "timestamp": "2025-10-04T12:29:50.612738+00:00"}
+api-1  | Processed subscription.created for store ed13a9bd-c81a-45b7-bd15-2b4c31f85255
+api-1  | {"event": "webhook_processed", "event_type": "customer.subscription.created", "outcome": "processed", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "timestamp": "2025-10-04T12:29:50.613708+00:00"}
+api-1  | INFO:     127.0.0.1:49254 - "POST /api/v1/billing/webhooks/stripe HTTP/1.1" 200 OK
+api-1  | {"event": "subscription_created", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "plan_tier": "pro", "subscription_id": "sub_7073a8d8b1af", "timestamp": "2025-10-04T12:29:50.619910+00:00"}
+api-1  | Processed subscription.created for store ed13a9bd-c81a-45b7-bd15-2b4c31f85255
+api-1  | INFO:     127.0.0.1:49254 - "POST /api/v1/billing/webhooks/stripe/replay/evt_smoke_4ad6b971e00141db9f99ad7081523746 HTTP/1.1" 200 OK
+api-1  | INFO:     127.0.0.1:49254 - "GET /metrics HTTP/1.1" 200 OK
+api-1  | {"event": "subscription_created", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "plan_tier": "starter", "subscription_id": "sub_postman_e0bfef67-87bd-4e3e-aad0-3b0e35a5d885", "timestamp": "2025-10-04T12:29:51.378355+00:00"}
+api-1  | Processed subscription.created for store ed13a9bd-c81a-45b7-bd15-2b4c31f85255
+api-1  | {"event": "webhook_processed", "event_type": "customer.subscription.created", "outcome": "processed", "store_id": "ed13a9bd-c81a-45b7-bd15-2b4c31f85255", "timestamp": "2025-10-04T12:29:51.379711+00:00"}
+api-1  | INFO:     172.18.0.1:59226 - "POST /api/v1/billing/webhooks/stripe HTTP/1.1" 200 OK
+api-1  | {"event": "webhook_invalid_signature", "timestamp": "2025-10-04T12:29:51.413328+00:00"}
+api-1  | INFO:     172.18.0.1:59226 - "POST /api/v1/billing/webhooks/stripe HTTP/1.1" 400 Bad Request
+api-1  | INFO:     192.168.65.1:27214 - "GET /metrics HTTP/1.1" 200 OK

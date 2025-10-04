@@ -26,6 +26,9 @@ The collection expects the following collection variables:
 | `hmac_timestamp_override` | Forces a specific timestamp for negative tests | _optional_ |
 | `hmac_nonce_override` | Forces a specific nonce to simulate replays | _optional_ |
 | `billing_plan_tier` | Plan tier used by the Billing folder (starter/pro/plus) | `pro` |
+| `stripe_webhook_secret` | Secret used to sign webhook payloads in the Webhooks folder | _required for Webhooks_ |
+
+> Sample configuration lives in `docs/postman/local.postman_environment.json`. Duplicate it, update the secrets (`token`, `store_id`, `stripe_webhook_secret`), and reference the file when running Newman (`--environment`).
 
 When running in Postman, set `base_url` manually if your API is not on `localhost`. The login request will automatically populate `token` and `store_id` via the test script. For Newman, you can override defaults with an environment JSON file or `--env-var` flags.
 
@@ -37,7 +40,9 @@ When running in Postman, set `base_url` manually if your API is not on `localhos
 4. **Fees / Rotate HMAC secret** — optionally rotate the secret after validating `Apply fees`; the test script captures the one-time `hmac_secret` response and updates collection variables.
 5. **Analytics** — call **Analytics / Overview** to capture KPI cards, cursor metadata, and Prometheus counter snapshots. When `evidence_dir` is set the test logs `analytics-overview.json` so artifacts can be archived.
 6. **Reports & billing** — use the previously captured `store_id` to scope report generation and billing previews. Reports assert attachment filenames for deterministic downloads, while the Billing folder exercises entitlements, usage, checkout, portal, and webhook samples. When Stripe credentials are missing the tests emit `BILLING_SKIPPED=true` and exit gracefully.
-7. **Auth / Logout** — revoke the active session when you finish to validate the new `/api/auth/logout` endpoint and clear cached `token`/`store_id` variables for the next run.
+7. **Integrations** — exercise `/v1/integrations/status` and the negative install request. By default the collection asserts the feature flag is disabled (`503 integration_disabled`); when flags are turned on, capture the provider status as evidence.
+8. **Webhooks** — use the configured `stripe_webhook_secret` to sign a sample event (processed) and validate that tampered signatures return `400 Invalid signature`.
+9. **Auth / Logout** — revoke the active session when you finish to validate the new `/api/auth/logout` endpoint and clear cached `token`/`store_id` variables for the next run.
 
 Running requests in this sequence ensures dependent variables are always available for downstream calls. The **Analytics** folder exercises `/v1/analytics/overview` and the **Reports** folder includes CSV and JSON variants with test scripts that assert the `Content-Type` header matches the requested format and echo the evidence directory so Newman artifacts can be archived.
 
@@ -57,6 +62,8 @@ To validate error handling, exercise at least the following scenarios after a su
 - After running **Fees / Rotate HMAC secret**, resend an apply request with the previously logged signature to confirm the API returns `detail.code = invalid_signature`.
 - You can still force specific values via `hmac_timestamp_override` or `hmac_nonce_override` before calling **Fees / Apply fees (HMAC)** if you need custom test cases. Expect `detail.code = stale_timestamp` for an expired timestamp and `detail.code = replay_detected` when the same nonce is reused.
 - Override `billing_plan_tier` to an unsupported value (e.g., `enterprise`) in the Billing folder to confirm `400 Bad Request`, e verifique também o cenário de loja sem Stripe (espera `400 stripe_customer_missing`). Desligar as variáveis Stripe continua gerando o `503 billing_unconfigured` (SKIP).
+- The **Integrations / Install (disabled)** request expects `503 integration_disabled` until the feature flag is enabled. When the flag is active, update documentation and evidence with the `200` response payload and ensure the metrics counter `integrations_requests_total{provider="woocommerce",route="install"}` increments.
+- In the **Webhooks** folder, intentionally send the `Webhooks / Deliver (invalid signature)` request to verify the API returns `400 Invalid signature` without surfacing `5xx` errors. Use the signed request to confirm `200 processed` and capture the event id for replay automation (`last_webhook_event_id`).
 
 Document the responses in your test evidence to show both happy-path and guardrail coverage.
 

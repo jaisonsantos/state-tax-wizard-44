@@ -83,14 +83,14 @@ async def quote_fees(
         payload={
             "store_id": request.store_id,
             "subject": auth.email,
-            "destination": request.destination.dict(),
+            "destination": request.destination.model_dump(),
             "delivery_method": request.delivery_method,
             "item_count": len(request.items),
             "shipping_amount_cents": request.shipping_amount_cents,
             "lines_count": len(result.lines),
             "absorbed": result.absorbed,
             "source_of_remittance": request.source_of_remittance,
-            "decisions": [decision.dict() for decision in result.decisions],
+            "decisions": [decision.model_dump() for decision in result.decisions],
         },
     )
     db.add(audit_log)
@@ -206,11 +206,11 @@ async def apply_fees(
             "subject": auth.email,
             "order_id": request.order_id,
             "delivery_method": request.delivery_method,
-            "lines": [line.dict() for line in result.lines],
+            "lines": [line.model_dump() for line in result.lines],
             "status": "applied" if result.lines else "skipped",
             "absorbed": result.absorbed,
             "source_of_remittance": request.source_of_remittance,
-            "decisions": [decision.dict() for decision in result.decisions],
+            "decisions": [decision.model_dump() for decision in result.decisions],
         },
     )
     db.add(audit_log)

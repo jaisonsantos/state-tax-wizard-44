@@ -54,7 +54,24 @@ Monitor the following counters and logs via Prometheus and centralized logging:
    responses are present.
 3. Communicate retry/backoff expectations to the integration owner.
 4. Consider temporarily lowering rate limits via environment configuration if
-   abuse persists (e.g., `RATE_LIMIT_LIMIT`).
+ abuse persists (e.g., `RATE_LIMIT_LIMIT`).
+
+### Webhook DLQ / latency alerts
+
+1. **Alert triggers**
+   - `increase(webhooks_processed_total{outcome="dead_letter"}[10m]) > 0`
+   - `histogram_quantile(0.95, rate(webhook_processing_latency_ms_bucket{provider="stripe"}[5m])) > 0.5`
+2. **First response**
+   - Query `processed_webhooks` for `dead_letter = true` and capture `event_id`,
+     `last_error`, and `attempts`.
+   - Replay via `POST /api/v1/billing/webhooks/stripe/replay/{event_id}` or
+     Stripe CLI if the API is unavailable.
+   - Inspect Stripe status page and recent deploys for external causes.
+3. **Remediation**
+   - If retries continue failing, capture logs (`webhook_processed` events) and
+     escalate to the on-call engineer per the rotation table.
+   - After resolution, run `make webhooks-smoke` to validate the path end-to-end
+     and attach `webhooks_smoke.txt` to the incident ticket.
 
 ### Stripe credential revocation
 

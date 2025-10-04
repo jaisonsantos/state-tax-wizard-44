@@ -1,11 +1,12 @@
-# Consistency Patch Log (Status)
+# Consistency Patch Log – M7 Webhooks
 
-## Concluído nesta rodada
-- ✅ Portal API e docs refletem `portal_session_id` + erro `stripe_customer_missing`. 【F:backend/app/schema/billing.py†L45-L52】【F:docs/api/billing.md†L113-L140】
-- ✅ README/STATUS/backlog M5 sincronizados após o fix. 【F:README.md†L80-L150】【F:STATUS.md†L6-L66】【F:docs/backlog/15_milestone_05_billing.md†L1-L28】
-- ✅ Evidências e métricas (`metrics_dump.txt` com `checkout_sessions_created_total` / `entitlement_denials_total`, `pytest.txt`, smokes) foram renovadas. 【F:docs/certification/EVIDENCE/metrics_dump.txt†L1-L30】【F:docs/certification/EVIDENCE/security_smoke.txt†L1-L7】
+## Alinhado nesta rodada
+- Router `/v1/billing/webhooks/stripe`, serviço de idempotência (`processed_webhooks`) e replay documentados em API/Stripe guide/STATUS. 【backend/app/routers/billing.py†L200-L270】【backend/app/services/webhook_service.py†L40-L260】【docs/api/billing.md†L1-L220】【docs/billing/stripe.md†L1-L220】
+- Métricas `webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms` implementadas, descritas em `docs/security/observability.md`, e capturadas em `docs/certification/EVIDENCE/metrics_dump.txt`/smokes. 【backend/app/observability.py†L77-L160】【docs/security/observability.md†L1-L60】【backend/smoke_test.py†L800-L960】
+- Tooling sincronizado: `make webhooks-smoke`/`m7-validation`, Postman **Webhooks** com pré-script de assinatura, README/STATUS/backlog atualizados. 【Makefile†L1-L150】【docs/postman/state-tax-wizard.postman_collection.json†L1700-L1900】【README.md†L1-L200】【STATUS.md†L6-L70】【docs/backlog/17_milestone_07_webhooks.md†L1-L200】
+- Observability playbook (`docs/observability.md`) consolida dashboards, alertas e política de retenção para `processed_webhooks`, referenciado em `docs/billing/stripe.md` e `docs/security/incident-response.md`. 【docs/observability.md†L1-L120】【docs/billing/stripe.md†L120-L200】【docs/security/incident-response.md†L40-L100】
 
-## Pendências para M6
-1. Adicionar métricas `integration_requests_total` / `integration_failures_total` e documentá-las. 【F:docs/backlog/16_milestone_06_integrations.md†L60-L120】
-2. Sincronizar futuros plugins/apps com Postman (folder “Integrations”) e Makefile (`integrations-smoke`).
-3. Atualizar `docs/certification/EVIDENCE/` com novos artefatos (integrations smokes/Newman) durante a execução do incremento.
+## Próximos cuidados (M8)
+- Garantir que dashboards/alertas reflitam os novos counters (`webhooks_*`, `integrations_*`) e anexar prints/comandos ≤512 KB.
+- Priorizar execução do job de limpeza em produção e monitorar métricas pós-remoção.
+- Consolidar evidências finais (`full_validation`, `webhooks_smoke`, `metrics_dump`, `api_logs`) antes do handoff.

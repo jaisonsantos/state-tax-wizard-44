@@ -25,6 +25,11 @@ All metrics are defined in `backend/app/observability.py`.
 | `hmac_validation_failures_total` | Counter | `reason`, `store_id` | Counts request signing failures segmented by failure reason (missing signature, stale timestamp, invalid signature). |
 | `hmac_replay_attempts_total` | Counter | `store_id` | Tracks replay attempts detected by nonce validation to highlight potential abuse. |
 | `rate_limit_throttles_total` | Counter | `route` | Counts how often the distributed rate limiter rejects requests for each API route. |
+| `integrations_requests_total` | Counter | `provider`, `route` | Counts integration-facing requests (e.g., Shopify app proxy, WooCommerce plugin) by provider and API route. |
+| `integrations_errors_total` | Counter | `provider`, `reason` | Captures integration errors such as disabled feature flags or persistence failures to aid triage. |
+| `webhooks_received_total` | Counter | `provider`, `event` | Increments whenever a webhook notification is received and signature-validated. Useful for alerting on drops or bursts per provider/event type. |
+| `webhooks_processed_total` | Counter | `provider`, `event`, `outcome` | Tracks webhook processing outcomes (`processed`, `duplicate`, `retry`, `dead_letter`, `skipped`). |
+| `webhook_processing_latency_ms` | Histogram | `provider`, `event` | Measures webhook processing duration in milliseconds so operators can monitor p95/p99 latency. |
 
 Scrape `/metrics` from the API container or <http://localhost:8000/metrics> when
 running locally.

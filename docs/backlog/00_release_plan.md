@@ -75,7 +75,7 @@ Status: Completed. Evidence and write-up in [`docs/certification/M5_COMPLETION.m
 
 ---
 
-## Milestone 6 — Platform Integrations Alpha (Weeks 11–12)
+## Milestone 6 — Platform Integrations Alpha (Weeks 11–12) ✅
 
 **Escopo (Epic 06)**
 - **WooCommerce plugin** (admin, store-key, mapeamento de carrinho).
@@ -87,8 +87,8 @@ Status: Completed. Evidence and write-up in [`docs/certification/M5_COMPLETION.m
 - Mocks para DevStores + scripts de geração de ordem fake.
 
 **Exit criteria**
-- Demonstração dos dois fluxos registrando audit logs e métricas.
-- QA de compatibilidade (versões mínimas, lojas demo).
+- Demonstração dos dois fluxos registrando audit logs e métricas (`integrations_requests_total`, `integrations_errors_total`).
+- QA de compatibilidade (versões mínimas, lojas demo) concluída via `make integrations-smoke`, PHPUnit e Jest.
 
 ---
 

@@ -74,6 +74,37 @@ entitlement_denials_total = Counter(
     ["feature", "plan"],
 )
 
+integrations_requests_total = Counter(
+    "integrations_requests_total",
+    "Total number of integration API requests processed",
+    ["provider", "route"],
+)
+
+integrations_errors_total = Counter(
+    "integrations_errors_total",
+    "Count of integration related errors by provider and reason",
+    ["provider", "reason"],
+)
+
+webhooks_received_total = Counter(
+    "webhooks_received_total",
+    "Count of incoming webhook events grouped by provider and event type",
+    ["provider", "event"],
+)
+
+webhooks_processed_total = Counter(
+    "webhooks_processed_total",
+    "Count of processed webhook events grouped by provider, event type, and outcome",
+    ["provider", "event", "outcome"],
+)
+
+# Track webhook processing latency in milliseconds
+webhook_processing_latency_ms = Histogram(
+    "webhook_processing_latency_ms",
+    "Webhook processing duration in milliseconds",
+    ["provider", "event"],
+)
+
 # Track decision latency in milliseconds
 decision_latency_ms = Histogram(
     "decision_latency_ms",
@@ -148,3 +179,28 @@ def ensure_request_id(request_id: str | None) -> str:
     """Ensure every request has a stable identifier."""
 
     return request_id or str(uuid.uuid4())
+
+
+def record_integration_request(provider: str, route: str) -> None:
+    """Increment integration request counter with normalized labels."""
+
+    integrations_requests_total.labels(provider=provider, route=route).inc()
+
+
+def record_integration_error(provider: str, reason: str) -> None:
+    """Increment integration error counter for observability dashboards."""
+
+    integrations_errors_total.labels(provider=provider, reason=reason).inc()
+
+
+def record_webhook_received(provider: str, event: str) -> None:
+    """Increment counter when a webhook notification arrives."""
+
+    webhooks_received_total.labels(provider=provider, event=event).inc()
+
+
+def record_webhook_processed(provider: str, event: str, outcome: str, duration_ms: float) -> None:
+    """Track webhook processing outcome and latency."""
+
+    webhooks_processed_total.labels(provider=provider, event=event, outcome=outcome).inc()
+    webhook_processing_latency_ms.labels(provider=provider, event=event).observe(duration_ms)

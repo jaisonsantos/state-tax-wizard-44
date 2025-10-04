@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import stripe
 
@@ -212,25 +213,48 @@ async def stripe_webhook(
         log_billing_event("webhook_invalid_signature")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # Handle different event types
-    event_type = event["type"]
-    
-    try:
-        if event_type == "customer.subscription.created":
-            WebhookService.process_subscription_created(db, event)
-        elif event_type == "customer.subscription.updated":
-            WebhookService.process_subscription_updated(db, event)
-        elif event_type == "customer.subscription.deleted":
-            WebhookService.process_subscription_deleted(db, event)
-        elif event_type == "invoice.paid":
-            WebhookService.process_invoice_paid(db, event)
-        elif event_type == "invoice.payment_failed":
-            WebhookService.process_invoice_payment_failed(db, event)
-        else:
-            log_billing_event("webhook_ignored", event_type=event_type)
-    except Exception as exc:  # pragma: no cover - safety logging
-        logger.exception("Error processing webhook event %s", event_type)
-        log_billing_event("webhook_processing_error", event_type=event_type, error=str(exc))
+    result = WebhookService.handle_stripe_event(db, event)
 
-    log_billing_event("webhook_processed", event_type=event_type)
-    return {"status": "success"}
+    if result.status_code >= 400:
+        raise HTTPException(status_code=result.status_code, detail=result.message)
+
+    log_payload = {
+        "event_type": event.get("type"),
+        "outcome": result.outcome,
+    }
+    if result.store_id:
+        log_payload["store_id"] = result.store_id
+    log_billing_event("webhook_processed", **log_payload)
+
+    response_body = {
+        "status": "success" if result.outcome == "processed" and result.generated_event_id else result.outcome,
+        "outcome": result.outcome,
+        "message": result.message,
+        "event_id": event.get("id"),
+        "store_id": result.store_id,
+    }
+
+    return JSONResponse(status_code=result.status_code, content=response_body)
+
+
+@router.post("/webhooks/stripe/replay/{event_id}")
+async def replay_stripe_webhook(
+    event_id: str,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(get_auth_context),
+):
+    """Replay a Stripe webhook event that previously failed."""
+
+    result = WebhookService.replay_stripe_event(db, event_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Webhook event not found")
+
+    return JSONResponse(
+        status_code=result.status_code,
+        content={
+            "status": result.outcome,
+            "message": result.message,
+            "event_id": event_id,
+            "store_id": result.store_id,
+        },
+    )

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2, Play, AlertTriangle, RotateCw, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiClient, ApiError } from "@/lib/api";
+import { apiClient, ApiError, type IntegrationProviderStatus, type IntegrationStatusResponse } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Settings() {
@@ -29,6 +29,9 @@ export default function Settings() {
     reasonCodes: string[];
     absorbed: boolean;
   } | null>(null);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
+  const [installingProvider, setInstallingProvider] = useState<string | null>(null);
   
   // Playground form state
   const [playgroundData, setPlaygroundData] = useState({
@@ -58,6 +61,28 @@ export default function Settings() {
     return parsed.toLocaleString();
   }, [hmacRotatedAt]);
 
+  const refreshIntegrations = useCallback(() => {
+    if (!storeId) {
+      setIntegrationStatus(null);
+      return;
+    }
+
+    setIntegrationsLoading(true);
+    apiClient
+      .getIntegrationStatus(storeId)
+      .then((status) => {
+        setIntegrationStatus(status);
+      })
+      .catch((error: unknown) => {
+        toast({
+          title: "Failed to load integrations",
+          description: error instanceof Error ? error.message : "Unexpected error",
+          variant: "destructive",
+        });
+      })
+      .finally(() => setIntegrationsLoading(false));
+  }, [storeId, toast]);
+
   const describeHmacError = (error: ApiError): string => {
     switch (error.code) {
       case "missing_signature":
@@ -75,6 +100,48 @@ export default function Settings() {
     }
   };
 
+  const integrationDocsLink = (provider: IntegrationProviderStatus): string => {
+    if (provider.docs_url && provider.docs_url.startsWith("http")) {
+      return provider.docs_url;
+    }
+    return provider.docs_url || "/api/files/docs/integrations/README.md";
+  };
+
+  const handleInstallIntegration = async (provider: IntegrationProviderStatus) => {
+    if (!storeId) {
+      toast({
+        title: "Select a store",
+        description: "Choose a store before installing integrations.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setInstallingProvider(provider.provider);
+    const defaultDomain = typeof window !== "undefined" ? window.location.hostname || "demo-store.local" : "demo-store.local";
+
+    try {
+      await apiClient.installIntegration(provider.provider, storeId, {
+        store_domain: defaultDomain,
+        external_shop_id: provider.provider === "shopify" ? `shopify-${storeId}` : `woo-${storeId}`,
+      });
+      toast({
+        title: "Integration connected",
+        description: `${provider.provider} marked as connected.`,
+      });
+      refreshIntegrations();
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Unexpected error";
+      toast({
+        title: "Failed to install integration",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setInstallingProvider(null);
+    }
+  };
+
   useEffect(() => {
     if (!storeId) {
       setPlan(null);
@@ -84,6 +151,7 @@ export default function Settings() {
       setLabelOverride("Delivery Fee");
       setHmacRotatedAt(null);
       setLastRotatedSecret(null);
+      setIntegrationStatus(null);
       return;
     }
 
@@ -113,12 +181,13 @@ export default function Settings() {
       .finally(() => {
         if (cancelled) return;
         setSettingsLoading(false);
+        refreshIntegrations();
       });
 
     return () => {
       cancelled = true;
     };
-  }, [storeId, toast]);
+  }, [storeId, toast, refreshIntegrations]);
 
   const handleSaveSettings = async () => {
     if (!storeId) {
@@ -440,6 +509,57 @@ export default function Settings() {
                 </Button>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Integrations</CardTitle>
+          <CardDescription>
+            Review platform connector status and align with the WooCommerce/Shopify deployment guides.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {integrationsLoading && (
+            <p className="text-sm text-muted-foreground">Loading integration providers…</p>
+          )}
+          {!integrationsLoading && integrationStatus && (
+            <div className="space-y-3">
+              {integrationStatus.providers.map((provider) => (
+                <div key={provider.provider} className="flex flex-col gap-2 rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium capitalize">{provider.provider}</p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant={provider.connected ? "default" : provider.enabled ? "secondary" : "outline"}>
+                          {provider.status}
+                        </Badge>
+                        {provider.notes && <span>{provider.notes}</span>}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" asChild>
+                        <a href={integrationDocsLink(provider)} target="_blank" rel="noreferrer">
+                          View docs
+                        </a>
+                      </Button>
+                      {provider.enabled && !provider.connected && (
+                        <Button
+                          onClick={() => handleInstallIntegration(provider)}
+                          disabled={installingProvider === provider.provider}
+                        >
+                          {installingProvider === provider.provider ? 'Connecting…' : 'Mark as connected'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!integrationsLoading && !integrationStatus && (
+            <p className="text-sm text-muted-foreground">Select a store to view integration status.</p>
           )}
         </CardContent>
       </Card>

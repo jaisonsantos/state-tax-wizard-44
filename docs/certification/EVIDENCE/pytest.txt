@@ -1,54 +1,24 @@
-.............................................................            [100%]
+.....................................................................    [100%]
 =============================== warnings summary ===============================
-app/db/database.py:12
-  /Users/jaison/Developer/state-tax-wizard-44/backend/app/db/database.py:12: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
-    Base = declarative_base()
-
-../.venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854
-  /Users/jaison/Developer/state-tax-wizard-44/.venv/lib/python3.12/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+../usr/local/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /usr/local/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
     from crypt import crypt as _crypt
 
 tests/test_analytics_overview.py: 1 warning
 tests/test_auth_and_fees.py: 7 warnings
 tests/test_authz_scope.py: 3 warnings
 tests/test_billing_api.py: 7 warnings
+tests/test_billing_webhook_endpoint.py: 3 warnings
 tests/test_fee_reversals.py: 2 warnings
 tests/test_fee_security.py: 7 warnings
 tests/test_fee_settings_integration.py: 8 warnings
+tests/test_integrations_api.py: 3 warnings
 tests/test_mn_report_json.py: 3 warnings
 tests/test_report_audit.py: 4 warnings
 tests/test_rules_endpoint.py: 1 warning
 tests/test_store_settings.py: 2 warnings
-  /Users/jaison/Developer/state-tax-wizard-44/.venv/lib/python3.12/site-packages/httpx/_client.py:690: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
-    warnings.warn(message, DeprecationWarning)
-
-tests/test_analytics_overview.py: 2 warnings
-tests/test_auth_and_fees.py: 8 warnings
-tests/test_authz_scope.py: 2 warnings
-tests/test_billing_api.py: 6 warnings
-tests/test_fee_reversals.py: 5 warnings
-tests/test_fee_security.py: 19 warnings
-tests/test_fee_settings_integration.py: 16 warnings
-tests/test_mn_report_json.py: 4 warnings
-tests/test_report_audit.py: 7 warnings
-tests/test_rules_endpoint.py: 1 warning
-tests/test_store_settings.py: 2 warnings
-  /Users/jaison/Developer/state-tax-wizard-44/.venv/lib/python3.12/site-packages/jose/jwt.py:311: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
-    now = timegm(datetime.utcnow().utctimetuple())
-
-tests/test_auth_and_fees.py: 9 warnings
-tests/test_authz_scope.py: 3 warnings
-tests/test_fee_reversals.py: 6 warnings
-tests/test_fee_security.py: 21 warnings
-tests/test_fee_settings_integration.py: 43 warnings
-tests/test_mn_report_json.py: 3 warnings
-  /Users/jaison/Developer/state-tax-wizard-44/.venv/lib/python3.12/site-packages/pydantic/main.py:1070: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.7/migration/
-    warnings.warn('The `dict` method is deprecated; use `model_dump` instead.', category=PydanticDeprecatedSince20)
-
-tests/test_billing_api.py: 2 warnings
-tests/test_fee_security.py: 15 warnings
-  /Users/jaison/Developer/state-tax-wizard-44/.venv/lib/python3.12/site-packages/httpx/_content.py:204: DeprecationWarning: Use 'content=<...>' to upload raw bytes/text content.
+  /usr/local/lib/python3.11/site-packages/httpx/_client.py:690: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
     warnings.warn(message, DeprecationWarning)
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-61 passed, 221 warnings in 1.80s
+69 passed, 52 warnings in 4.55s

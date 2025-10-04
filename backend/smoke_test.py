@@ -6,13 +6,17 @@ import argparse
 import json
 import os
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Tuple
 
 import httpx
 
+from app.core.config import settings
 from app.security.hmac import compute_signature
+import hashlib
+import hmac
 
 
 API_BASE_URL = os.environ.get("SMOKE_API_BASE_URL", "http://localhost:8000/api")
@@ -21,6 +25,7 @@ SMOKE_EMAIL = os.environ.get("SMOKE_EMAIL", "smoke-tester@example.com")
 SMOKE_PASSWORD = os.environ.get("SMOKE_PASSWORD", "change-me")
 SMOKE_HMAC_SECRET = os.environ.get("SMOKE_HMAC_SECRET", "demo-hmac-secret")
 BILLING_PLAN_FOR_CHECKOUT = os.environ.get("SMOKE_BILLING_PLAN", "pro")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 
 class SmokeFailure(RuntimeError):
@@ -151,6 +156,13 @@ def _signed_headers(
     return headers, timestamp_value, nonce_value
 
 
+def _stripe_signature(payload: bytes, secret: str) -> str:
+    timestamp = int(time.time())
+    message = f"{timestamp}.{payload.decode('utf-8')}".encode("utf-8")
+    signature = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+    return f"t={timestamp},v1={signature}"
+
+
 def apply_fees(
     client: httpx.Client,
     headers: Dict[str, str],
@@ -174,7 +186,7 @@ def apply_fees(
     signed_headers, timestamp, nonce = _signed_headers(headers, body)
     response = client.post(
         f"{API_BASE_URL}/v1/fees/apply",
-        data=body,
+        content=body,
         headers=signed_headers,
         timeout=20.0,
     )
@@ -437,7 +449,19 @@ def run_full_smoke() -> Dict[str, Any]:
         audit_result = fetch_audit(client, headers, store_id)
         report_audit = fetch_reports(client, headers, store_id, verify_audit=True)
         analytics_snapshot = fetch_analytics(client, headers, store_id)
+        integrations_status_response = client.get(
+            f"{API_BASE_URL}/v1/integrations/status",
+            params={"store_id": store_id},
+            headers=headers,
+            timeout=20.0,
+        )
+        _raise_for_status(integrations_status_response, "integrations status")
+        integrations_status = integrations_status_response.json()
+        if not integrations_status.get("providers"):
+            raise SmokeFailure("integrations status missing providers")
         metrics_text = fetch_metrics(client)
+        if "integrations_requests_total" not in metrics_text:
+            raise SmokeFailure("metrics missing integrations_requests_total")
 
     print("Smoke test completed successfully.")
     print(f"MN quote lines (disabled): {len(mn_quote['lines'])}")
@@ -449,7 +473,13 @@ def run_full_smoke() -> Dict[str, Any]:
         "Analytics cards: "
         f"{', '.join(card['id'] for card in analytics_snapshot.get('metric_cards', [])[:3])}"
     )
+    provider_summaries = ", ".join(
+        f"{p['provider']}={p['status']}" for p in integrations_status.get("providers", [])
+    )
+    print(f"Integration providers: {provider_summaries}")
     print(f"Metrics sample: {metrics_text.splitlines()[0]}")
+
+    webhooks_result = run_webhooks_only_smoke()
 
     return {
         "mn_quote": mn_quote,
@@ -458,6 +488,8 @@ def run_full_smoke() -> Dict[str, Any]:
         "audit": audit_result,
         "report_audit": report_audit,
         "analytics": analytics_snapshot,
+        "integrations": integrations_status,
+        "webhooks": webhooks_result,
         "metrics": metrics_text,
     }
 
@@ -491,7 +523,7 @@ def run_security_only_smoke() -> Dict[str, Any]:
         signed_headers, timestamp, nonce = _signed_headers(headers, body)
         response = client.post(
             f"{API_BASE_URL}/v1/fees/apply",
-            data=body,
+            content=body,
             headers=signed_headers,
             timeout=20.0,
         )
@@ -516,7 +548,7 @@ def run_security_only_smoke() -> Dict[str, Any]:
 
         replay_response = client.post(
             f"{API_BASE_URL}/v1/fees/apply",
-            data=meta["body"],
+            content=meta["body"],
             headers=replay_headers,
             timeout=20.0,
         )
@@ -548,7 +580,7 @@ def run_security_only_smoke() -> Dict[str, Any]:
         )
         stale_response = client.post(
             f"{API_BASE_URL}/v1/fees/apply",
-            data=meta["body"],
+            content=meta["body"],
             headers=stale_headers,
             timeout=20.0,
         )
@@ -622,7 +654,7 @@ def run_security_only_smoke() -> Dict[str, Any]:
         )
         invalid_after_rotation = client.post(
             f"{API_BASE_URL}/v1/fees/apply",
-            data=meta["body"],
+            content=meta["body"],
             headers=invalid_headers,
             timeout=20.0,
         )
@@ -759,6 +791,137 @@ def run_analytics_only_smoke() -> Dict[str, Any]:
     return {"analytics": overview}
 
 
+def run_integrations_only_smoke() -> Dict[str, Any]:
+    with httpx.Client() as client:
+        login_payload = login(client)
+        store_id = login_payload["stores"][0]["id"]
+        headers = {"Authorization": f"Bearer {login_payload['token']}"}
+
+        status_response = client.get(
+            f"{API_BASE_URL}/v1/integrations/status",
+            params={"store_id": store_id},
+            headers=headers,
+            timeout=20.0,
+        )
+        _raise_for_status(status_response, "integrations status")
+        status_payload = status_response.json()
+        providers = status_payload.get("providers", [])
+        if not providers:
+            raise SmokeFailure("integrations status returned no providers")
+
+        metrics_snapshot = fetch_metrics(client)
+        if "integrations_requests_total" not in metrics_snapshot:
+            raise SmokeFailure("metrics missing integrations_requests_total")
+
+    for provider in providers:
+        provider_label = provider.get("provider")
+        if not provider_label:
+            raise SmokeFailure("integration provider payload missing provider key")
+        label = f'provider="{provider_label}"'
+        if label not in metrics_snapshot:
+            raise SmokeFailure(
+                f"metrics missing integrations_requests_total with label {label}"
+            )
+
+    print("Integrations smoke completed successfully.")
+    for provider in providers:
+        print(
+            f"Provider {provider['provider']}: enabled={provider['enabled']} status={provider['status']}"
+        )
+
+    return {"status": status_payload, "metrics": metrics_snapshot}
+
+
+def run_webhooks_only_smoke() -> Dict[str, Any]:
+    if not STRIPE_WEBHOOK_SECRET:
+        print("⚠ SKIP: STRIPE_WEBHOOK_SECRET not configured; skipping webhook smoke.")
+        return {"skipped": True, "reason": "webhook_secret_missing"}
+
+    event_id = f"evt_smoke_{uuid.uuid4().hex}"
+
+    with httpx.Client() as client:
+        login_payload = login(client)
+        store_id = login_payload["stores"][0]["id"]
+        token = login_payload["token"]
+
+        event_payload = {
+            "id": event_id,
+            "type": "customer.subscription.created",
+            "data": {
+                "object": {
+                    "id": f"sub_{uuid.uuid4().hex[:12]}",
+                    "customer": f"cus_{uuid.uuid4().hex[:12]}",
+                    "metadata": {"store_id": store_id},
+                    "status": "active",
+                    "items": {
+                        "data": [
+                            {
+                                "price": {
+                                    "id": settings.stripe_price_id_pro or "price_pro",
+                                }
+                            }
+                        ]
+                    },
+                    "current_period_start": int(time.time()),
+                    "current_period_end": int(time.time()) + 86_400,
+                    "cancel_at_period_end": False,
+                }
+            },
+        }
+
+        payload_bytes = json.dumps(event_payload).encode("utf-8")
+        signature = _stripe_signature(payload_bytes, STRIPE_WEBHOOK_SECRET)
+
+        response = client.post(
+            f"{API_BASE_URL}/v1/billing/webhooks/stripe",
+            content=payload_bytes,
+            headers={"stripe-signature": signature},
+            timeout=20.0,
+        )
+        _raise_for_status(response, "webhook delivery")
+        result = response.json()
+        status = result.get("status")
+        if status not in {"processed", "duplicate"}:
+            raise SmokeFailure(f"Unexpected webhook outcome: {status}")
+
+        # Replay endpoint should acknowledge the already processed event
+        replay_response = client.post(
+            f"{API_BASE_URL}/v1/billing/webhooks/stripe/replay/{event_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=20.0,
+        )
+        _raise_for_status(replay_response, "webhook replay")
+
+        metrics_snapshot = fetch_metrics(client)
+        expected_checks = [
+            (
+                "webhooks_received_total",
+                ["provider=\"stripe\"", "event=\"customer.subscription.created\""],
+            ),
+            (
+                "webhooks_processed_total",
+                ["provider=\"stripe\"", "event=\"customer.subscription.created\""],
+            ),
+        ]
+        for metric_name, labels in expected_checks:
+            if metric_name not in metrics_snapshot or not all(
+                label in metrics_snapshot for label in labels
+            ):
+                raise SmokeFailure(
+                    f"metrics missing {metric_name} with labels {', '.join(labels)}"
+                )
+
+    print("Webhooks smoke completed successfully.")
+    print(f"Webhook status: {status}")
+    print(f"Replay status: {replay_response.json().get('status')}")
+
+    return {
+        "webhook": result,
+        "replay": replay_response.json(),
+        "metrics": metrics_snapshot,
+    }
+
+
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
     parser = argparse.ArgumentParser(description="State Tax Wizard smoke tests")
     parser.add_argument(
@@ -781,6 +944,16 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
         action="store_true",
         help="Only execute billing subscription validation",
     )
+    parser.add_argument(
+        "--integrations-only",
+        action="store_true",
+        help="Only execute integrations status validation",
+    )
+    parser.add_argument(
+        "--webhooks-only",
+        action="store_true",
+        help="Only execute webhook validation",
+    )
     parsed_args = parser.parse_args()
 
     try:
@@ -791,6 +964,8 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
                 parsed_args.reports_only,
                 parsed_args.security_only,
                 parsed_args.billing_only,
+                parsed_args.integrations_only,
+                parsed_args.webhooks_only,
             )
             if flag
         ]
@@ -804,6 +979,10 @@ if __name__ == "__main__":  # pragma: no cover - CLI entrypoint
             run_reports_only_smoke()
         elif parsed_args.billing_only:
             run_billing_only_smoke()
+        elif parsed_args.integrations_only:
+            run_integrations_only_smoke()
+        elif parsed_args.webhooks_only:
+            run_webhooks_only_smoke()
         else:
             run_full_smoke()
     except SmokeFailure as exc:

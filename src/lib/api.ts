@@ -203,6 +203,36 @@ export interface BillingPortalSession {
   portal_session_id: string;
 }
 
+export interface IntegrationProviderStatus {
+  provider: string;
+  enabled: boolean;
+  connected: boolean;
+  status: 'connected' | 'disconnected' | 'disabled';
+  docs_url: string;
+  install_url?: string | null;
+  installed_at?: string | null;
+  notes?: string | null;
+}
+
+export interface IntegrationStatusResponse {
+  store_id: string;
+  providers: IntegrationProviderStatus[];
+}
+
+export interface IntegrationInstallRequest {
+  store_domain: string;
+  external_shop_id?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface IntegrationInstallResponse {
+  provider: string;
+  connected: boolean;
+  status: 'connected' | 'disabled';
+  docs_url: string;
+  notes?: string | null;
+}
+
 export interface RuleVersionResponse {
   jurisdiction: string;
   version: string;
@@ -426,6 +456,26 @@ class ApiClient {
     return this.request<RotateHmacSecretResponse>(`/v1/stores/${storeId}/hmac/rotate`, {
       method: 'POST',
     });
+  }
+
+  async getIntegrationStatus(storeId: string): Promise<IntegrationStatusResponse> {
+    const params = new URLSearchParams({ store_id: storeId });
+    return this.request<IntegrationStatusResponse>(`/v1/integrations/status?${params.toString()}`);
+  }
+
+  async installIntegration(
+    provider: string,
+    storeId: string,
+    payload: IntegrationInstallRequest,
+  ): Promise<IntegrationInstallResponse> {
+    const params = new URLSearchParams({ store_id: storeId });
+    return this.request<IntegrationInstallResponse>(
+      `/v1/integrations/providers/${provider}/install?${params.toString()}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
   }
 
   // Fee methods
