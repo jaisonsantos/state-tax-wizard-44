@@ -61,6 +61,19 @@ export default function Settings() {
     return parsed.toLocaleString();
   }, [hmacRotatedAt]);
 
+  const displayPlan = useMemo(() => {
+    if (!plan) {
+      return null;
+    }
+
+    const normalised = plan.trim();
+    if (!normalised) {
+      return null;
+    }
+
+    return normalised.charAt(0).toUpperCase() + normalised.slice(1);
+  }, [plan]);
+
   const refreshIntegrations = useCallback(() => {
     if (!storeId) {
       setIntegrationStatus(null);
@@ -426,9 +439,9 @@ export default function Settings() {
         <p className="text-muted-foreground">
           Configure delivery fee rules for {storeName || "your store"}
         </p>
-        {plan && (
+        {displayPlan && (
           <p className="text-xs text-muted-foreground mt-1">
-            Current plan: <span className="font-medium text-foreground">{plan}</span>
+            Current plan: <span className="font-medium text-foreground">{displayPlan}</span>
           </p>
         )}
         <p className="text-xs text-muted-foreground mt-2">
@@ -513,7 +526,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="integrations">
         <CardHeader>
           <CardTitle>Integrations</CardTitle>
           <CardDescription>
@@ -566,7 +579,7 @@ export default function Settings() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Fee Rules Configuration */}
-        <Card>
+        <Card id="fee-rules">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5" />
@@ -656,7 +669,7 @@ export default function Settings() {
         </Card>
 
         {/* Playground */}
-        <Card>
+        <Card id="rules-playground">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Play className="h-5 w-5" />

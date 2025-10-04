@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import secrets
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from ..schema.store_settings import (
     StoreSettingsResponse,
     UpdateStoreSettingsRequest,
 )
+from ..services.entitlement_service import EntitlementService
 
 
 router = APIRouter(prefix="/v1/stores", tags=["store-settings"])
@@ -33,6 +35,23 @@ def _get_or_create_settings(db: Session, store_id: str) -> StoreSetting:
     return settings
 
 
+def _resolve_plan_slug(
+    db: Session, store_id: str, fallback: Optional[str] = None
+) -> Optional[str]:
+    """Determine the active plan for a store based on subscription data."""
+
+    subscription = EntitlementService.get_subscription(db, store_id)
+    plan_tier = getattr(subscription, "plan_tier", None) or getattr(subscription, "plan", None)
+
+    if isinstance(plan_tier, str) and plan_tier:
+        return plan_tier.lower()
+
+    if isinstance(fallback, str) and fallback:
+        return fallback.lower()
+
+    return fallback
+
+
 @router.get("/{store_id}/settings", response_model=StoreSettingsResponse)
 async def get_store_settings(
     store_id: str,
@@ -48,6 +67,7 @@ async def get_store_settings(
         raise HTTPException(status_code=404, detail="Store not found")
 
     settings = _get_or_create_settings(db, store_id)
+    plan = _resolve_plan_slug(db, store_id, settings.plan)
 
     return StoreSettingsResponse(
         store_id=str(store_id),
@@ -55,7 +75,7 @@ async def get_store_settings(
         enable_co=settings.enable_co,
         absorb_fee=settings.absorb_fee,
         label_override=settings.label_override,
-        plan=settings.plan,
+        plan=plan,
         hmac_last_rotated_at=settings.hmac_secret_rotated_at,
     )
 
@@ -129,6 +149,9 @@ async def update_store_settings(
     settings.enable_co = payload.enable_co
     settings.absorb_fee = payload.absorb_fee
     settings.label_override = payload.label_override.strip()
+    plan = _resolve_plan_slug(db, store_id, settings.plan)
+    if plan and settings.plan != plan:
+        settings.plan = plan
 
     db.add(settings)
 
@@ -151,6 +174,6 @@ async def update_store_settings(
         enable_co=settings.enable_co,
         absorb_fee=settings.absorb_fee,
         label_override=settings.label_override,
-        plan=settings.plan,
+        plan=_resolve_plan_slug(db, store_id, settings.plan),
         hmac_last_rotated_at=settings.hmac_secret_rotated_at,
     )
