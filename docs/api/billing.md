@@ -140,21 +140,84 @@ Opens the Stripe Customer Portal for self-service plan management.
 
 ### `POST /v1/billing/webhooks/stripe`
 
-Ingests Stripe webhooks. Requests are verified with `stripe.Webhook.construct_event` using `STRIPE_WEBHOOK_SECRET`.
+Receives Stripe billing events. The handler verifies the `Stripe-Signature` header with `STRIPE_WEBHOOK_SECRET`, persists the payload in `processed_webhooks`, and routes the event to the appropriate lifecycle handler. Idempotency is enforced per `event_id`; duplicates return `status = "duplicate"` without reprocessing.
 
-- Successful processing always returns `200 OK` (Stripe handles retries on non-2xx responses).
-- Signature failures return `400` with `detail = "Invalid signature"` and increment `billing_events_total{event="webhook_invalid_signature"}`.
-- Unknown event types log `billing_events_total{event="webhook_ignored"}`.
+**Headers**
 
-**Supported events**
+| Header | Required | Description |
+| --- | --- | --- |
+| `stripe-signature` | ✅ | Stripe signing secret formatted as `t=<timestamp>,v1=<signature>` |
 
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-- `invoice.paid`
-- `invoice.payment_failed`
+**Request body (example)**
 
-Each handler updates the `subscriptions` table, records an audit log, and keeps Prometheus counters (`billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`) in sync.
+```json
+{
+  "id": "evt_123",
+  "type": "customer.subscription.created",
+  "data": {
+    "object": {
+      "id": "sub_123",
+      "customer": "cus_123",
+      "metadata": {
+        "store_id": "{{store_id}}"
+      },
+      "status": "active",
+      "current_period_start": 1700000000,
+      "current_period_end": 1700086400,
+      "cancel_at_period_end": false,
+      "items": {
+        "data": [
+          {
+            "price": {"id": "{{stripe_price_id_pro}}"}
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Responses**
+
+| Status | Payload | Scenario |
+| --- | --- | --- |
+| `200 OK` | `{ "status": "processed", "event_id": "evt_123", "store_id": "..." }` | Event processed successfully |
+| `200 OK` | `{ "status": "duplicate", ... }` | Event was already processed (`processed_webhooks.status = processed`) |
+| `200 OK` | `{ "status": "dead_letter", ... }` | Event exceeded retries and is parked in the DLQ pending replay |
+| `202 Accepted` | `{ "status": "retry", ... }` | Temporary failure recorded; Stripe will retry |
+| `400 Bad Request` | `Invalid payload` | Malformed JSON (`webhook_invalid_payload`) |
+| `400 Bad Request` | `Invalid signature` | Signature mismatch |
+
+The service increments `webhooks_received_total{provider="stripe",event}` for every delivery and records outcomes/latency via `webhooks_processed_total` and `webhook_processing_latency_ms`. Subscription and invoice handlers continue to update `subscriptions`, emit audit logs, and raise `billing_events_total` entries.
+
+---
+
+### `POST /v1/billing/webhooks/stripe/replay/{event_id}`
+
+Replays a previously recorded Stripe event (typically one marked `dead_letter`). Requires a valid bearer token; the authenticated operator must have access to the associated store.
+
+| Path parameter | Type | Description |
+| --- | --- | --- |
+| `event_id` | string | Stripe event identifier (e.g., `evt_123`) |
+
+**Response `200 OK`**
+
+```json
+{
+  "status": "processed",
+  "event_id": "evt_123",
+  "store_id": "4fa0b8f7-7c1a-4f35-a8a1-9fdb3f3e4a02"
+}
+```
+
+**Error responses**
+
+| Status | Payload |
+| --- | --- |
+| `401/403` | Missing/unauthorised bearer token |
+| `404 Not Found` | `{ "detail": "Webhook event not found" }` |
+
+Replay updates the existing `processed_webhooks` record (`status = processed`, `dead_letter = false`) and emits the same metrics/logs as a live delivery.
 
 ---
 

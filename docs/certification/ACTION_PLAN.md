@@ -1,50 +1,31 @@
-# ACTION_PLAN – Milestone 6 (Integrations Alpha)
+# ACTION_PLAN – Milestone 8 (Launch Readiness)
 
 ## Objetivo Geral
-Entregar conectores de integração (WooCommerce + Shopify) sustentados por SDKs e métricas compartilhadas, mantendo a estabilidade conquistada em M5. O trabalho deve sair de um branch dedicado (`feature/m6-integrations-alpha-2025-10-04`) e preservar o checklist de certificação (`docs/certification/CHECKLIST.md`).
+Preparar a plataforma para GA consolidando observabilidade, runbooks e QA final após o shipment de webhooks Stripe.
 
-## Billing & Core Backend
-- **Garantir compatibilidade**: monitorar impactos do plugin/app sobre `/v1/fees/*`, `/v1/billing/*` e segurança HMAC.
-- **Comandos**: `pytest -q`, `pytest -q backend/tests/test_integrations_*` (novos).
-- **Riscos**: aumento de carga em `/v1/fees/apply`; mitigar com testes de carga leves e alertas (`rate_limit_throttles_total`).
-- **Rollback**: feature flags (`INTEGRATIONS_WOO_ENABLED`, `INTEGRATIONS_SHOPIFY_ENABLED`) desligadas + rollback do deploy.
+## Observabilidade & Operações
+- Construir dashboards/alertas para as métricas chave (`webhooks_*`, `billing_*`, `integrations_*`, `decision_latency_ms`).
+- Documentar procedimentos em `docs/observability.md` e `docs/security/incident-response.md` para responder a quedas/dlq.
+- Definir estratégia de retenção/limpeza para `processed_webhooks` (TTL, job oportunista) e registrar em runbooks.
 
-## WooCommerce Plugin
-- Criar diretório `integrations/woocommerce/` (plugin PHP) com hooks para `woocommerce_cart_calculate_fees` e `woocommerce_checkout_order_processed`.
-- Implementar cliente HMAC usando contrato `timestamp\nnonce\nbody` e métricas locais.
-- **Comandos**: `composer install`, `composer test`, `npm run lint` (se usar assets).
-- **Entrega**: ZIP empacotado (`package.sh`) + README detalhando instalação, configuração (`store_id`, `hmac_secret`) e troubleshooting.
-- **Riscos**: compatibilidade com WooCommerce < 8.0; documentar suporte mínimo e fallback.
+## Billing & Webhooks
+- Exercitar cenários de reversals/entitlements end-to-end (assinatura cancelada, pagamento falho, replay) usando fixtures/smokes + Postman.
+- Validar que relatórios/analytics refletem corretamente eventos processados e DLQ (capturar evidências adicionais).
+- Automatizar checklist de replay (`make webhooks-smoke` + script CLI) e anexar logs truncados.
 
-## Shopify App POC
-- Aplicativo Remix/Node em `integrations/shopify/` com app proxy (`/apps/tax-wizard/quote`) e webhook `orders/create`.
-- Sincronizar "fee product" oculto, chamar `/v1/fees/apply`, registrar metafields.
-- **Comandos**: `npm install`, `npm run lint`, `npm run test`, `shopify app dev` (documentar saída/variáveis).
-- **Riscos**: limite de taxa de app proxy; implementar retries com `Retry-After` e logar falhas para `integration_failures_total`.
-
-## Shared SDK / Tooling
-- Criar `integrations/sdk/typescript` com cliente HMAC reutilizável (exportado para Woo/Shopify).
-- Publicar pacote npm privado (ou tarball) + docs de consumo.
-- Atualizar Postman com folder "Integrations" (payloads Woo/Shopify) e scripts de assinatura.
-- Atualizar Makefile com metas `woocommerce-build`, `shopify-build`, `integrations-smoke`.
-
-## Observability & Metrics
-- Adicionar contadores `integration_requests_total{platform,route}` e `integration_failures_total{platform,reason}` no backend (`backend/app/observability.py`).
-- Expandir `/metrics` evidenciado em `docs/certification/EVIDENCE/metrics_dump.txt`.
-- Documentar novos sinais em `docs/security/observability.md`.
-
-## QA & Evidence
-- Atualizar `docs/certification/CHECKLIST.md` com gates M6 (integrations code, sdk, metrics, docs, smokes, Newman).
-- Executar `pytest -q`, `python smoke_test.py --analytics-only/--reports-only/--security-only`, `python smoke_test.py --billing-only` (SKIP aceitável sem Stripe), `integrations-smoke` (novo) com backends simulados.
-- Capturar novas evidências (`api_logs.txt`, `migrate.txt`, `pytest.txt`, smokes, `metrics_dump.txt`, `md_index.txt`) sem exceder 512 KB.
+## QA & Evidências
+- Rodar `pytest -q` + `make full-validation` com ênfase em `webhooks-smoke`/`integrations-smoke`.
+- Atualizar evidências (`webhooks_smoke.txt`, `metrics_dump.txt`, `api_logs.txt`, `newman_webhooks.txt`) ≤512 KB.
+- Consolidar matriz de testes em `docs/certification/CHECKLIST.md` marcando Gates M8.
 
 ## Documentação
-- Atualizar `README.md`, `STATUS.md`, backlog M6, `docs/integrations/woocommerce.md`, `docs/integrations/shopify.md` (novos) e `docs/postman/README.md`.
-- Registrar riscos/rollback por camada em `docs/certification/DECISION.md` (próxima rodada) e manter `CONSISTENCY_PATCH.md` sincronizado.
+- Atualizar `STATUS.md`, `README.md` (seção Operações), `docs/billing/stripe.md` (runbook de replay) e `docs/security/observability.md` com artefatos finais.
+- Registrar riscos/resoluções em `docs/certification/CONSISTENCY_PATCH.md`.
+- Preparar nota de release com instruções de produção (rollout/rollback) e anexos de evidência.
 
 ## Definition of Done
-1. Plugins WooCommerce & Shopify entregam fluxo completo (instalação, assinatura HMAC, logs, rollback) com testes automatizados onde aplicável.
-2. SDK compartilhado (TS) publicado e consumido pelos conectores.
-3. Métricas `integration_*` disponíveis em `/metrics` e documentadas.
-4. Makefile/CI executam build/test lint das integrações e coletam evidências.
-5. `docs/certification/CHECKLIST.md` (M6) totalmente marcado e evidência ≤512 KB arquivada.
+1. Dashboards/alertas configurados e documentados (capturar comandos/prints ≤512 KB).
+2. Evidências de QA final anexadas (`pytest.txt`, `full_validation.txt`, `webhooks_smoke.txt`, `metrics_dump.txt`, `api_logs.txt`, `newman_webhooks.txt`).
+3. Documentação alinhada (README, STATUS, backlog M8, observability, incident response, AGENTE).
+4. Consistency patch atualizado listando sincronia entre docs ↔ código ↔ tooling.
+5. Plano de lançamento (deploy, rollback, suporte) descrito em `docs/certification/DECISION.md`/`ACTION_PLAN.md` pronto para auditoria.

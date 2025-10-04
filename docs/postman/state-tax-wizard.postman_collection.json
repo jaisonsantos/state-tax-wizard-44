@@ -30,6 +30,11 @@
       "key": "order_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "stripe_webhook_secret",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -475,10 +480,11 @@
                   "const forcedTimestamp = pm.environment.get('hmac_timestamp_override') || pm.collectionVariables.get('hmac_timestamp_override');",
                   "const timestamp = (forcedTimestamp && forcedTimestamp.length) ? forcedTimestamp : new Date().toISOString();",
                   "const forcedNonce = pm.environment.get('hmac_nonce_override') || pm.collectionVariables.get('hmac_nonce_override');",
-                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
+                  "const crypto = require('crypto-js');",
+                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : crypto.lib.WordArray.random(16).toString(crypto.enc.Hex);",
                   "pm.collectionVariables.set('last_signed_nonce', nonce);",
                   "const message = `${timestamp}\\n${nonce}\\n${resolvedBody}`;",
-                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "const signature = crypto.HmacSHA256(message, secret).toString(crypto.enc.Hex);",
                   "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
@@ -674,10 +680,11 @@
                   "const forcedTimestamp = pm.environment.get('hmac_timestamp_override') || pm.collectionVariables.get('hmac_timestamp_override');",
                   "const timestamp = (forcedTimestamp && forcedTimestamp.length) ? forcedTimestamp : new Date().toISOString();",
                   "const forcedNonce = pm.environment.get('hmac_nonce_override') || pm.collectionVariables.get('hmac_nonce_override');",
-                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
+                  "const crypto = require('crypto-js');",
+                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : crypto.lib.WordArray.random(16).toString(crypto.enc.Hex);",
                   "pm.collectionVariables.set('last_signed_nonce', nonce);",
                   "const message = `${timestamp}\\n${nonce}\\n${resolvedBody}`;",
-                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "const signature = crypto.HmacSHA256(message, secret).toString(crypto.enc.Hex);",
                   "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
@@ -790,9 +797,10 @@
                   "const template = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
                   "const body = pm.variables.replaceIn(template);",
                   "const timestamp = new Date(Date.now() - (15 * 60 * 1000)).toISOString();",
-                  "const nonce = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);",
+                  "const crypto = require('crypto-js');",
+                  "const nonce = (forcedNonce && forcedNonce.length) ? forcedNonce : crypto.lib.WordArray.random(16).toString(crypto.enc.Hex);",
                   "const message = `${timestamp}\\n${nonce}\\n${body}`;",
-                  "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "const signature = crypto.HmacSHA256(message, secret).toString(crypto.enc.Hex);",
                   "pm.request.body.raw = body;",
                   "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
                   "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
@@ -1703,6 +1711,233 @@
                 }
               ],
               "body": "{\n  \"rules\": [\n    {\n      \"jurisdiction\": \"MN\",\n      \"version\": \"MN-2024\",\n      \"effective_from\": \"2024-01-01T00:00:00Z\",\n      \"effective_to\": null,\n      \"params\": {\n        \"threshold_cents\": 10000,\n        \"fee_cents\": 50\n      },\n      \"is_latest\": true\n    },\n    {\n      \"jurisdiction\": \"CO\",\n      \"version\": \"CO-2024H2\",\n      \"effective_from\": \"2024-07-01T00:00:00Z\",\n      \"effective_to\": \"2024-12-31T23:59:59Z\",\n      \"params\": {\n        \"rate_cents\": 28\n      },\n      \"is_latest\": false\n    },\n    {\n      \"jurisdiction\": \"CO\",\n      \"version\": \"CO-2025H1\",\n      \"effective_from\": \"2025-01-01T00:00:00Z\",\n      \"effective_to\": null,\n      \"params\": {\n        \"rate_cents\": 29\n      },\n      \"is_latest\": true\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Integrations",
+      "item": [
+        {
+          "name": "Integrations / Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/integrations/status?store_id={{store_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "integrations",
+                "status"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status returns 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.expect(body).to.have.property('providers');",
+                  "pm.expect(body.providers).to.be.an('array').that.is.not.empty;",
+                  "pm.collectionVariables.set('integration_provider', body.providers[0].provider);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Integrations / Install (disabled)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"store_domain\": \"demo-store.invalid\", \"external_shop_id\": \"postman\"}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/integrations/providers/woocommerce/install?store_id={{store_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "integrations",
+                "providers",
+                "woocommerce",
+                "install"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Integration disabled returns 503', function () { pm.response.to.have.status(503); });",
+                  "const json = pm.response.json();",
+                  "pm.expect(json.detail.code).to.eql('integration_disabled');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "Webhooks / Deliver (processed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_postman_{{$guid}}\",\n  \"type\": \"customer.subscription.created\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"sub_postman_{{$guid}}\",\n      \"customer\": \"cus_postman_{{$timestamp}}\",\n      \"metadata\": {\n        \"store_id\": \"{{store_id}}\"\n      },\n      \"status\": \"active\",\n      \"items\": {\n        \"data\": [\n          {\n            \"price\": {\n              \"id\": \"{{stripe_price_id_pro}}\"\n            }\n          }\n        ]\n      },\n      \"current_period_start\": 1700000000,\n      \"current_period_end\": 1700086400,\n      \"cancel_at_period_end\": false\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/webhooks/stripe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "webhooks",
+                "stripe"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const secret = pm.collectionVariables.get('stripe_webhook_secret') || pm.environment.get('stripe_webhook_secret');",
+                  "const rawBody = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
+                  "if (secret) {",
+                  "  const timestamp = Math.floor(Date.now() / 1000);",
+                  "  const crypto = (typeof CryptoJS !== 'undefined') ? CryptoJS : require('crypto-js');",
+                  "  if (typeof CryptoJS === 'undefined') { globalThis.CryptoJS = crypto; }",
+                  "  const resolvedBody = pm.variables.replaceIn(rawBody);",
+                  "  pm.request.body.raw = resolvedBody;",
+                  "  const signature = crypto.HmacSHA256(`${timestamp}.${resolvedBody}`, secret).toString(crypto.enc.Hex);",
+                  "  pm.request.headers.upsert({ key: 'stripe-signature', value: `t=${timestamp},v1=${signature}` });",
+                  "  try {",
+                  "    const parsed = JSON.parse(resolvedBody);",
+                  "    pm.collectionVariables.set('last_webhook_event_id', parsed.id);",
+                  "  } catch (err) {",
+                  "    console.warn('Unable to parse webhook body', err);",
+                  "  }",
+                  "} else {",
+                  "  console.warn('stripe_webhook_secret not configured; request may fail');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Webhook processed', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Webhooks / Deliver (invalid signature)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "stripe-signature",
+                "value": "t=0,v1=invalid"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"evt_postman_{{$guid}}\",\n  \"type\": \"customer.subscription.created\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"sub_postman_{{$guid}}\",\n      \"customer\": \"cus_postman_{{$timestamp}}\",\n      \"metadata\": {\n        \"store_id\": \"{{store_id}}\"\n      },\n      \"status\": \"active\",\n      \"items\": {\n        \"data\": [\n          {\n            \"price\": {\n              \"id\": \"{{stripe_price_id_pro}}\"\n            }\n          }\n        ]\n      },\n      \"current_period_start\": 1700000000,\n      \"current_period_end\": 1700086400,\n      \"cancel_at_period_end\": false\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/webhooks/stripe",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "webhooks",
+                "stripe"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Webhook rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().detail).to.eql('Invalid signature');",
+                  "});"
+                ]
+              }
             }
           ]
         }

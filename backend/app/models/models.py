@@ -208,3 +208,30 @@ class ProcessedNonce(Base):
         Index("uq_processed_nonces_store_nonce", "store_id", "nonce", unique=True),
         Index("ix_processed_nonces_expires", "expires_at"),
     )
+
+
+class ProcessedWebhook(Base):
+    __tablename__ = "processed_webhooks"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    provider = Column(String(50), nullable=False)
+    event_id = Column(String(255), nullable=False, unique=True)
+    event_type = Column(String(200), nullable=False)
+    store_id = Column(GUID(), ForeignKey("stores.id"), nullable=True)
+    status = Column(String(50), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=True)
+    dead_letter = Column(Boolean, nullable=False, default=False)
+    payload = Column(JSON, nullable=False)
+    received_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+    store = relationship("Store")
+
+    __table_args__ = (
+        Index("ix_processed_webhooks_provider", "provider"),
+        Index("ix_processed_webhooks_status", "status"),
+    )

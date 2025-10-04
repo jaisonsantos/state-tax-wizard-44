@@ -1,0 +1,12 @@
+{
+  "name": "state-tax-wizard/woocommerce",
+  "description": "WooCommerce connector for State Tax Wizard",
+  "type": "wordpress-plugin",
+  "license": "MIT",
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
+  },
+  "autoload": {
+    "classmap": ["includes/"]
+  }
+}

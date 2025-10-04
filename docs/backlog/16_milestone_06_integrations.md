@@ -4,10 +4,10 @@ _[← Milestone 5 — Billing](15_milestone_05_billing.md) • [Milestone 7 — 
 
 ## Stage Validation Summary
 
-- **Backend fee endpoints ready**: `/v1/fees/quote` and `/v1/fees/apply` accept structured payloads with item details ([`backend/app/routers/fees.py`](../../backend/app/routers/fees.py)).
-- **Security foundation in place**: HMAC verification and rate limiting protect API endpoints (Milestone 4).
-- **Audit logging captures decisions**: All fee operations logged with full context ([`backend/app/services/audit_repository.py`](../../backend/app/services/audit_repository.py)).
-- **Remaining gap**: No WooCommerce plugin or Shopify app exists; integrations only tested via Postman/API.
+- **Backend integrations API live**: Feature flags, status/installation endpoints, audit logs, and Prometheus counters (`integrations_requests_total`, `integrations_errors_total`) ship with tests. 【F:backend/app/routers/integrations.py†L1-L170】【F:backend/tests/test_integrations_api.py†L1-L120】
+- **WooCommerce plugin packaged**: Hooks inject fees, sync orders, expose settings/logs, and include PHPUnit coverage plus `package.sh`. 【F:integrations/woocommerce/state-tax-wizard.php†L1-L140】【F:integrations/woocommerce/tests/test-fee-calculator.php†L1-L60】
+- **Shopify proxy/webhook app delivered**: Express server with signature verification, shared HMAC helper, and Jest coverage. 【F:integrations/shopify/src/server.ts†L1-L34】【F:integrations/shopify/tests/hmac.test.ts†L1-L30】
+- **Documentation/tooling aligned**: Postman Integrations folder, Makefile targets (`integrations-smoke`, build/test scripts), and operator docs published. 【F:Makefile†L1-L160】【F:docs/postman/README.md†L1-L160】【F:docs/integrations/woocommerce.md†L1-L120】
 
 ## Next Development Objective
 

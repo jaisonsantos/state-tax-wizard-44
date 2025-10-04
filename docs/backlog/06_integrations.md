@@ -7,10 +7,9 @@ plugin and a Shopify proof of concept, but neither is implemented.
 
 ## Current Status
 
-- ❌ WooCommerce plugin code absent (UI references only).
-- ❌ Shopify integration (app proxy/product-fee) not started.
-- ⚠️ Backend endpoints assume payload shape from integrations but lack HMAC
-  verification (covered by security epic).
+- ✅ WooCommerce plugin ships with cart injection, order sync, settings UI, and PHPUnit coverage. 【F:integrations/woocommerce/state-tax-wizard.php†L1-L140】【F:integrations/woocommerce/tests/test-fee-calculator.php†L1-L60】
+- ✅ Shopify proxy/webhook app implemented with TypeScript, HMAC helpers, and Jest coverage. 【F:integrations/shopify/src/server.ts†L1-L34】【F:integrations/shopify/tests/hmac.test.ts†L1-L30】
+- ✅ Backend exposes `/v1/integrations/*`, feature flags, and Prometheus counters consumed by connectors. 【F:backend/app/routers/integrations.py†L1-L170】【F:backend/app/observability.py†L59-L150】
 
 ## Acceptance Criteria
 

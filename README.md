@@ -9,6 +9,8 @@ State Tax Wizard is a full-stack demo application that showcases a configurable 
 - **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request, store, and security context.
 - **React frontend** with a fee playground, audit log viewer, CSV export powered by a shared API client, and a persistent header menu for store switching and logout.
 - **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
+- **Stripe webhooks** captured via `/v1/billing/webhooks/stripe` with processed event storage, DLQ/replay, and Prometheus metrics (`webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms`).
+- **Integration connectors** for WooCommerce and Shopify guarded by feature flags, a shared TypeScript SDK, and Prometheus counters (`integrations_requests_total`, `integrations_errors_total`).
 
 ## Project structure
 
@@ -137,12 +139,45 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   make billing-smoke
   ```
   When Stripe variables are unset the script prints `⚠ SKIP: billing_unconfigured`; otherwise it asserts entitlements, usage, checkout (with `portal_session_id`), and portal APIs respond successfully. Stores without Stripe metadata return `400` with `code="stripe_customer_missing"`.
+- Webhooks smoke (Stripe webhook ingestion & replay):
+
+  ```sh
+  make webhooks-smoke
+  ```
+  Generates a signed webhook payload, validates DLQ/replay endpoints, and asserts new Prometheus counters.
+
+- Integrations smoke (feature flag + observability):
+
+  ```sh
+  make integrations-smoke
+  ```
+
+  This calls `/v1/integrations/status`, validates provider metadata, and asserts `/metrics` exposes the new `integration_*` counters. The command returns `503 integration_disabled` when feature flags remain off.
 - Newman billing folder (optional, requires Postman env JSON with Stripe keys):
 
   ```sh
   make newman-billing
   ```
   Skips automatically when `docs/postman/local.postman_environment.json` is absent or Stripe credentials are not configured.
+- WooCommerce plugin tests / package:
+
+  ```sh
+  make woocommerce-test
+  make woocommerce-build
+  ```
+
+- Shopify app tests / build:
+
+  ```sh
+  make shopify-test
+  make shopify-build
+  ```
+
+- TypeScript SDK tests:
+
+  ```sh
+  make sdk-test
+  ```
 - Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
 
   ```sh
@@ -166,6 +201,7 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Backlog overview: explore [`docs/backlog/README.md`](docs/backlog/README.md) for milestone context, dependencies, and iteration checklists.
 - Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
 - Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token`, `store_id` e configure `hmac_secret` antes de testar as rotas assinadas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
+- Observability playbook: consulte [`docs/observability.md`](docs/observability.md) para dashboards, alertas e política de retenção de `processed_webhooks`.
 - Guia de segurança HMAC: [`docs/security/hmac.md`](docs/security/hmac.md) detalha o algoritmo de assinatura, exemplos de código e estratégias de rotação.
 - Guia de interface: consulte [`docs/security/ui-guide.md`](docs/security/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
 

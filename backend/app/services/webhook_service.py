@@ -1,16 +1,51 @@
 """Webhook service for processing Stripe events."""
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from time import perf_counter
+from typing import Any, Dict, Optional
 
 import stripe
 from sqlalchemy.orm import Session
 
 from ..core.config import settings
-from ..models.models import AuditLog, Store, Subscription
-from ..observability import log_billing_event
+from ..models.models import AuditLog, ProcessedWebhook, Store, Subscription
+from ..observability import (
+    log_billing_event,
+    record_webhook_processed,
+    record_webhook_received,
+)
 
 logger = logging.getLogger(__name__)
+
+
+MAX_WEBHOOK_ATTEMPTS = 3
+BACKOFF_SCHEDULE_SECONDS = (30, 120, 600)
+
+
+@dataclass
+class WebhookProcessingResult:
+    outcome: str
+    message: str
+    status_code: int = 200
+    store_id: Optional[str] = None
+    generated_event_id: bool = False
+
+
+def _backoff_for_attempt(attempt: int) -> int:
+    if attempt <= 0:
+        return BACKOFF_SCHEDULE_SECONDS[0]
+    index = min(attempt - 1, len(BACKOFF_SCHEDULE_SECONDS) - 1)
+    return BACKOFF_SCHEDULE_SECONDS[index]
+
+
+class UnsupportedWebhookEventError(Exception):
+    """Raised when a webhook event is not handled by the service."""
+
+    def __init__(self, event_type: str) -> None:
+        super().__init__(f"Unhandled webhook event '{event_type}'")
+        self.event_type = event_type
 
 
 def _to_dict(payload: Any) -> Dict[str, Any]:
@@ -91,9 +126,197 @@ def _resolve_plan_tier(payload: Dict[str, Any], fallback: str = "starter") -> st
 
 class WebhookService:
     """Service for processing Stripe webhook events."""
-    
+
     @staticmethod
-    def process_subscription_created(db: Session, event: dict):
+    def handle_stripe_event(
+        db: Session, event: Dict[str, Any], *, force: bool = False
+    ) -> WebhookProcessingResult:
+        event_payload = _to_dict(event)
+        generated_event_id = False
+        raw_event_id = event_payload.get("id")
+        event_id = raw_event_id or (
+            event_payload.get("data", {})
+            .get("object", {})
+            .get("id")
+        )
+        if not event_id:
+            # Fallback to a generated ID so the event can be processed once.
+            event_id = event_payload["id"] = f"evt-generated-{uuid.uuid4().hex}"
+            generated_event_id = True
+        elif raw_event_id is None:
+            generated_event_id = True
+
+        event_type = event_payload.get("type", "unknown")
+        record_webhook_received("stripe", event_type)
+        started_at = perf_counter()
+
+        processed = (
+            db.query(ProcessedWebhook)
+            .filter(ProcessedWebhook.event_id == event_id)
+            .first()
+        )
+
+        if not processed:
+            processed = ProcessedWebhook(
+                provider="stripe",
+                event_id=event_id,
+                event_type=event_type,
+                payload=event_payload,
+                status="pending",
+            )
+            db.add(processed)
+            db.commit()
+            db.refresh(processed)
+        else:
+            processed.event_type = event_type
+            processed.payload = event_payload
+            db.commit()
+            db.refresh(processed)
+
+        if processed.dead_letter and not force:
+            duration_ms = (perf_counter() - started_at) * 1000
+            record_webhook_processed("stripe", event_type, "dead_letter", duration_ms)
+            return WebhookProcessingResult(
+                outcome="dead_letter",
+                message="Event is in dead letter queue; replay required.",
+                generated_event_id=generated_event_id,
+            )
+
+        if processed.status == "processed" and not force:
+            duration_ms = (perf_counter() - started_at) * 1000
+            record_webhook_processed("stripe", event_type, "duplicate", duration_ms)
+            return WebhookProcessingResult(
+                outcome="duplicate",
+                message="Event already processed.",
+                generated_event_id=generated_event_id,
+            )
+
+        if force:
+            processed.dead_letter = False
+            processed.status = "pending"
+            processed.attempts = 0
+            processed.last_error = None
+            processed.next_retry_at = None
+            db.commit()
+            db.refresh(processed)
+
+        try:
+            store_id = WebhookService._dispatch_stripe_event(db, event_type, event_payload)
+            processed.status = "processed"
+            processed.dead_letter = False
+            processed.last_error = None
+            processed.attempts = (processed.attempts or 0) + 1
+            processed.processed_at = datetime.now(timezone.utc)
+            processed.next_retry_at = None
+            processed.updated_at = datetime.now(timezone.utc)
+            if store_id:
+                processed.store_id = store_id
+            db.commit()
+
+            duration_ms = (perf_counter() - started_at) * 1000
+            record_webhook_processed("stripe", event_type, "processed", duration_ms)
+            return WebhookProcessingResult(
+                outcome="processed",
+                message="Event processed",
+                store_id=store_id,
+                generated_event_id=generated_event_id,
+            )
+        except UnsupportedWebhookEventError as exc:
+            db.rollback()
+            processed = (
+                db.query(ProcessedWebhook)
+                .filter(ProcessedWebhook.event_id == event_id)
+                .first()
+            )
+            if processed:
+                processed.status = "skipped"
+                processed.dead_letter = False
+                processed.attempts = (processed.attempts or 0) + 1
+                processed.last_error = None
+                processed.processed_at = datetime.now(timezone.utc)
+                processed.next_retry_at = None
+                processed.updated_at = datetime.now(timezone.utc)
+                db.commit()
+
+            duration_ms = (perf_counter() - started_at) * 1000
+            record_webhook_processed("stripe", event_type, "skipped", duration_ms)
+            return WebhookProcessingResult(
+                outcome="skipped",
+                message=str(exc),
+                generated_event_id=generated_event_id,
+            )
+        except Exception as exc:  # pragma: no cover - defensive guard
+            db.rollback()
+            processed = (
+                db.query(ProcessedWebhook)
+                .filter(ProcessedWebhook.event_id == event_id)
+                .first()
+            )
+            attempts = 1
+            if processed:
+                attempts = (processed.attempts or 0) + 1
+                processed.attempts = attempts
+                processed.last_error = str(exc)
+                processed.status = "dead_letter" if attempts >= MAX_WEBHOOK_ATTEMPTS else "failed"
+                processed.dead_letter = attempts >= MAX_WEBHOOK_ATTEMPTS
+                processed.next_retry_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=_backoff_for_attempt(attempts)
+                )
+                processed.updated_at = datetime.now(timezone.utc)
+                db.commit()
+
+            duration_ms = (perf_counter() - started_at) * 1000
+            outcome = "dead_letter" if attempts >= MAX_WEBHOOK_ATTEMPTS else "retry"
+            record_webhook_processed("stripe", event_type, outcome, duration_ms)
+
+            if attempts >= MAX_WEBHOOK_ATTEMPTS:
+                return WebhookProcessingResult(
+                    outcome="dead_letter",
+                    message="Event moved to dead letter queue after repeated failures.",
+                    generated_event_id=generated_event_id,
+                )
+
+            return WebhookProcessingResult(
+                outcome="retry",
+                message="Temporary failure. Event will be retried.",
+                status_code=202,
+                generated_event_id=generated_event_id,
+            )
+
+    @staticmethod
+    def replay_stripe_event(db: Session, event_id: str) -> Optional[WebhookProcessingResult]:
+        record = (
+            db.query(ProcessedWebhook)
+            .filter(ProcessedWebhook.event_id == event_id)
+            .first()
+        )
+        if not record:
+            return None
+
+        payload = record.payload or {}
+        payload["id"] = event_id
+        payload.setdefault("type", record.event_type)
+        return WebhookService.handle_stripe_event(db, payload, force=True)
+
+    @staticmethod
+    def _dispatch_stripe_event(
+        db: Session, event_type: str, event: Dict[str, Any]
+    ) -> Optional[str]:
+        if event_type == "customer.subscription.created":
+            return WebhookService.process_subscription_created(db, event)
+        if event_type == "customer.subscription.updated":
+            return WebhookService.process_subscription_updated(db, event)
+        if event_type == "customer.subscription.deleted":
+            return WebhookService.process_subscription_deleted(db, event)
+        if event_type in {"invoice.payment_succeeded", "invoice.paid"}:
+            return WebhookService.process_invoice_paid(db, event)
+        if event_type == "invoice.payment_failed":
+            return WebhookService.process_invoice_payment_failed(db, event)
+
+        raise UnsupportedWebhookEventError(event_type)
+
+    @staticmethod
+    def process_subscription_created(db: Session, event: dict) -> Optional[str]:
         """Process subscription.created event.
         
         Args:
@@ -189,6 +412,7 @@ class WebhookService:
             )
 
             logger.info("Processed subscription.created for store %s", store.id)
+            return str(store.id)
 
         except Exception as exc:  # pragma: no cover - defensive guard
             logger.error("Error processing subscription.created: %s", exc)
@@ -196,7 +420,7 @@ class WebhookService:
             raise
     
     @staticmethod
-    def process_subscription_updated(db: Session, event: dict):
+    def process_subscription_updated(db: Session, event: dict) -> Optional[str]:
         """Process subscription.updated event.
         
         Args:
@@ -288,6 +512,7 @@ class WebhookService:
             )
 
             logger.info("Processed subscription.updated for subscription %s", subscription_id)
+            return str(subscription.store_id)
 
         except Exception as exc:  # pragma: no cover
             logger.error("Error processing subscription.updated: %s", exc)
@@ -295,7 +520,7 @@ class WebhookService:
             raise
     
     @staticmethod
-    def process_subscription_deleted(db: Session, event: dict):
+    def process_subscription_deleted(db: Session, event: dict) -> Optional[str]:
         """Process subscription.deleted event.
         
         Args:
@@ -321,12 +546,13 @@ class WebhookService:
             
             # Create audit log
             audit_log = AuditLog(
-                store_id=subscription.store_id,
+                actor="stripe_webhook",
                 action="stripe_webhook",
                 payload={
+                    "store_id": str(subscription.store_id),
                     "event_type": "subscription.deleted",
-                    "subscription_id": subscription_id
-                }
+                    "subscription_id": subscription_id,
+                },
             )
             db.add(audit_log)
             
@@ -339,6 +565,7 @@ class WebhookService:
             )
             
             logger.info(f"Processed subscription.deleted for subscription {subscription_id}")
+            return str(subscription.store_id)
             
         except Exception as e:
             logger.error(f"Error processing subscription.deleted: {e}")
@@ -346,7 +573,7 @@ class WebhookService:
             raise
     
     @staticmethod
-    def process_invoice_paid(db: Session, event: dict):
+    def process_invoice_paid(db: Session, event: dict) -> Optional[str]:
         """Process invoice.paid event.
         
         Args:
@@ -381,14 +608,15 @@ class WebhookService:
             
             # Create audit log
             audit_log = AuditLog(
-                store_id=subscription.store_id,
+                actor="stripe_webhook",
                 action="stripe_webhook",
                 payload={
+                    "store_id": str(subscription.store_id),
                     "event_type": "invoice.paid",
                     "invoice_id": invoice_obj["id"],
                     "subscription_id": subscription_id,
-                    "amount_paid": invoice_obj.get("amount_paid", 0) / 100
-                }
+                    "amount_paid": invoice_obj.get("amount_paid", 0) / 100,
+                },
             )
             db.add(audit_log)
             
@@ -402,6 +630,7 @@ class WebhookService:
             )
             
             logger.info(f"Processed invoice.paid for subscription {subscription_id}")
+            return str(subscription.store_id)
             
         except Exception as e:
             logger.error(f"Error processing invoice.paid: {e}")
@@ -409,7 +638,7 @@ class WebhookService:
             raise
     
     @staticmethod
-    def process_invoice_payment_failed(db: Session, event: dict):
+    def process_invoice_payment_failed(db: Session, event: dict) -> Optional[str]:
         """Process invoice.payment_failed event.
         
         Args:
@@ -434,14 +663,15 @@ class WebhookService:
             
             # Create audit log
             audit_log = AuditLog(
-                store_id=subscription.store_id,
+                actor="stripe_webhook",
                 action="stripe_webhook",
                 payload={
+                    "store_id": str(subscription.store_id),
                     "event_type": "invoice.payment_failed",
                     "invoice_id": invoice_obj["id"],
                     "subscription_id": subscription_id,
-                    "attempt_count": invoice_obj.get("attempt_count", 0)
-                }
+                    "attempt_count": invoice_obj.get("attempt_count", 0),
+                },
             )
             db.add(audit_log)
             
@@ -454,6 +684,7 @@ class WebhookService:
             )
             
             logger.warning(f"Payment failed for subscription {subscription_id}")
+            return str(subscription.store_id)
             
         except Exception as e:
             logger.error(f"Error processing invoice.payment_failed: {e}")

@@ -1,35 +1,56 @@
-# HELP fees_applied_total Total number of fee applications processed
-# TYPE fees_applied_total counter
-fees_applied_total{jurisdiction="CO"} 2.0
-# HELP fees_applied_created Total number of fee applications processed
-# TYPE fees_applied_created gauge
-fees_applied_created{jurisdiction="CO"} 1.759519994812768e+09
-# HELP fees_absorbed_total Count of fees absorbed instead of shown to shoppers
-# TYPE fees_absorbed_total counter
-# HELP report_exports_total Total number of report exports generated
-# TYPE report_exports_total counter
-# HELP hmac_validation_failures_total Count of failed HMAC validation attempts
-# TYPE hmac_validation_failures_total counter
-hmac_validation_failures_total{reason="replay_detected",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
-hmac_validation_failures_total{reason="stale_timestamp",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
-hmac_validation_failures_total{reason="invalid_signature",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
-# HELP hmac_validation_failures_created Count of failed HMAC validation attempts
-# TYPE hmac_validation_failures_created gauge
-hmac_validation_failures_created{reason="replay_detected",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.7595199948183072e+09
-hmac_validation_failures_created{reason="stale_timestamp",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.759519994821728e+09
-hmac_validation_failures_created{reason="invalid_signature",store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.759519995346377e+09
-# HELP hmac_replay_attempts_total Count of replayed HMAC nonce attempts
-# TYPE hmac_replay_attempts_total counter
-hmac_replay_attempts_total{store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.0
-# HELP hmac_replay_attempts_created Count of replayed HMAC nonce attempts
-# TYPE hmac_replay_attempts_created gauge
-hmac_replay_attempts_created{store_id="3d462ae3-83c1-4905-b33b-b828a940f3ac"} 1.7595199948182552e+09
-# HELP rate_limit_throttles_total Count of requests throttled by the rate limiter
-# TYPE rate_limit_throttles_total counter
-rate_limit_throttles_total{route="quote"} 1.0
 # HELP billing_events_total Count of billing lifecycle events
 # TYPE billing_events_total counter
-# HELP checkout_sessions_created_total Number of Stripe Checkout sessions created
-# TYPE checkout_sessions_created_total counter
-# HELP entitlement_denials_total Count of entitlement denials by feature and plan
-# TYPE entitlement_denials_total counter
+billing_events_total{event="entitlements_requested"} 2.0
+billing_events_total{event="usage_fetched"} 2.0
+billing_events_total{event="usage_requested"} 2.0
+billing_events_total{event="subscription_created"} 4.0
+billing_events_total{event="webhook_processed"} 2.0
+billing_events_total{event="checkout_session_created"} 1.0
+billing_events_total{event="checkout_session_returned"} 1.0
+billing_events_total{event="portal_session_created"} 1.0
+billing_events_total{event="portal_session_returned"} 1.0
+# HELP billing_events_created Count of billing lifecycle events
+# TYPE billing_events_created gauge
+billing_events_created{event="entitlements_requested"} 1.7595820827617984e+09
+billing_events_created{event="usage_fetched"} 1.759582082768998e+09
+billing_events_created{event="usage_requested"} 1.759582082769133e+09
+billing_events_created{event="subscription_created"} 1.7595821252942386e+09
+billing_events_created{event="webhook_processed"} 1.75958212533671e+09
+billing_events_created{event="checkout_session_created"} 1.7595821496795733e+09
+billing_events_created{event="checkout_session_returned"} 1.7595821496798944e+09
+billing_events_created{event="portal_session_created"} 1.7595821500107112e+09
+billing_events_created{event="portal_session_returned"} 1.759582150011026e+09
+# HELP webhooks_received_total Count of incoming webhook events grouped by provider and event type
+# TYPE webhooks_received_total counter
+webhooks_received_total{event="customer.subscription.created",provider="stripe"} 4.0
+# HELP webhooks_received_created Count of incoming webhook events grouped by provider and event type
+# TYPE webhooks_received_created gauge
+webhooks_received_created{event="customer.subscription.created",provider="stripe"} 1.7595821252815945e+09
+# HELP webhooks_processed_total Count of processed webhook events grouped by provider, event type, and outcome
+# TYPE webhooks_processed_total counter
+webhooks_processed_total{event="customer.subscription.created",outcome="processed",provider="stripe"} 4.0
+# HELP webhooks_processed_created Count of processed webhook events grouped by provider, event type, and outcome
+# TYPE webhooks_processed_created gauge
+webhooks_processed_created{event="customer.subscription.created",outcome="processed",provider="stripe"} 1.7595821253366554e+09
+# HELP webhook_processing_latency_ms Webhook processing duration in milliseconds
+# TYPE webhook_processing_latency_ms histogram
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.005",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.01",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.025",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.05",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.075",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.1",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.25",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.5",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.75",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="1.0",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="2.5",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="5.0",provider="stripe"} 0.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="7.5",provider="stripe"} 3.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="10.0",provider="stripe"} 3.0
+webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="+Inf",provider="stripe"} 4.0
+webhook_processing_latency_ms_count{event="customer.subscription.created",provider="stripe"} 4.0
+webhook_processing_latency_ms_sum{event="customer.subscription.created",provider="stripe"} 75.36833299673162
+# HELP webhook_processing_latency_ms_created Webhook processing duration in milliseconds
+# TYPE webhook_processing_latency_ms_created gauge
+webhook_processing_latency_ms_created{event="customer.subscription.created",provider="stripe"} 1.7595821253366685e+09

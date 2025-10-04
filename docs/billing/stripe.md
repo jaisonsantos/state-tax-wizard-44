@@ -182,12 +182,18 @@ UPDATE subscriptions SET stripe_subscription_id='sub_REAL' WHERE store_id='STORE
 
 ## Observabilidade & evidências
 
-* Métricas expostas em `/metrics`: `billing_events_total{event}`, `checkout_sessions_created_total{plan_tier}`, `entitlement_denials_total{feature,plan}` .
-* Evidência:
-
+* Métricas chaves em `/metrics`:
+  - `billing_events_total{event}` (portal/checkout/webhook outcomes)
+  - `checkout_sessions_created_total{plan_tier}`
+  - `entitlement_denials_total{feature,plan}`
+  - `webhooks_received_total{provider,event}` / `webhooks_processed_total{provider,event,outcome}`
+  - `webhook_processing_latency_ms{provider,event}` histogram
+* Evidências rápidas:
   ```bash
   make billing-smoke | tee docs/certification/EVIDENCE/billing_smoke.txt
+  make webhooks-smoke | tee docs/certification/EVIDENCE/webhooks_smoke.txt
   ```
+* Retenção: agendar job semanal removendo registros `processed_webhooks` com `status='processed'`, `dead_letter=false` e `processed_at < NOW() - INTERVAL '30 days'`. Consulte `docs/observability.md` para um exemplo de comando SQL.
 
 ---
 

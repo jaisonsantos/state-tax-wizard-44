@@ -92,14 +92,14 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
                 "x-rdf-nonce": uuid.uuid4().hex,
             }
         )
-        missing = client.post("/api/v1/fees/apply", data=unsigned_body, headers=unsigned_headers)
+        missing = client.post("/api/v1/fees/apply", content=unsigned_body, headers=unsigned_headers)
         assert missing.status_code == 401
         assert missing.json()["detail"]["code"] == "missing_signature"
 
         # Invalid signature
         invalid_headers = dict(unsigned_headers)
         invalid_headers["x-rdf-signature"] = "not-a-valid-signature"
-        invalid = client.post("/api/v1/fees/apply", data=unsigned_body, headers=invalid_headers)
+        invalid = client.post("/api/v1/fees/apply", content=unsigned_body, headers=invalid_headers)
         assert invalid.status_code == 403
         assert invalid.json()["detail"]["code"] == "invalid_signature"
 
@@ -116,7 +116,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
                 "x-rdf-nonce": nonce_value,
             }
         )
-        success = client.post("/api/v1/fees/apply", data=unsigned_body, headers=valid_headers)
+        success = client.post("/api/v1/fees/apply", content=unsigned_body, headers=valid_headers)
         assert success.status_code == 200
         response_body = success.json()
         assert response_body["success"] is True
@@ -144,11 +144,11 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
                 "x-rdf-nonce": prefixed_nonce,
             }
         )
-        prefixed = client.post("/api/v1/fees/apply", data=unsigned_body, headers=prefixed_headers)
+        prefixed = client.post("/api/v1/fees/apply", content=unsigned_body, headers=prefixed_headers)
         assert prefixed.status_code == 200
 
         # Replay detection blocks duplicate nonce
-        replay = client.post("/api/v1/fees/apply", data=unsigned_body, headers=valid_headers)
+        replay = client.post("/api/v1/fees/apply", content=unsigned_body, headers=valid_headers)
         assert replay.status_code == 409
         assert replay.json()["detail"]["code"] == "replay_detected"
 
@@ -164,7 +164,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
                 "x-rdf-signature": stale_signature,
             }
         )
-        stale = client.post("/api/v1/fees/apply", data=unsigned_body, headers=stale_headers)
+        stale = client.post("/api/v1/fees/apply", content=unsigned_body, headers=stale_headers)
         assert stale.status_code == 401
         assert stale.json()["detail"]["code"] == "stale_timestamp"
 
@@ -190,7 +190,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
                 "x-rdf-nonce": nonce_value,
             }
         )
-        refreshed = client.post("/api/v1/fees/apply", data=unsigned_body, headers=refreshed_headers)
+        refreshed = client.post("/api/v1/fees/apply", content=unsigned_body, headers=refreshed_headers)
         assert refreshed.status_code == 200
     finally:
         app_settings.hmac_max_skew_seconds = original_skew
@@ -230,13 +230,13 @@ def test_replay_detected_without_unique_index(client: TestClient, db_session: Se
         }
     )
 
-    success = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    success = client.post("/api/v1/fees/apply", content=body, headers=headers)
     assert success.status_code == 200
 
     db_session.execute(text("DROP INDEX IF EXISTS uq_processed_nonces_store_nonce"))
     db_session.commit()
 
-    replay = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    replay = client.post("/api/v1/fees/apply", content=body, headers=headers)
     assert replay.status_code == 409
     assert replay.json()["detail"]["code"] == "replay_detected"
 
@@ -312,7 +312,7 @@ def test_hmac_accepts_iso_timestamp_with_z_suffix(client: TestClient, db_session
         "x-rdf-signature": signature,
     }
 
-    response = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    response = client.post("/api/v1/fees/apply", content=body, headers=headers)
     assert response.status_code == 200
 
 
@@ -346,7 +346,7 @@ def test_hmac_accepts_epoch_timestamp(client: TestClient, db_session: Session) -
         "x-rdf-signature": signature,
     }
 
-    response = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    response = client.post("/api/v1/fees/apply", content=body, headers=headers)
     assert response.status_code == 200
 
 
@@ -383,7 +383,7 @@ def test_security_logs_do_not_expose_secrets(
     }
 
     caplog.set_level("INFO", logger="security")
-    response = client.post("/api/v1/fees/apply", data=body, headers=headers)
+    response = client.post("/api/v1/fees/apply", content=body, headers=headers)
     assert response.status_code == 403
     log_output = "\n".join(record.getMessage() for record in caplog.records)
     assert log_output
@@ -424,7 +424,7 @@ def test_secret_rotation_invalidates_previous_signatures(
         "x-rdf-signature": signature,
     }
 
-    first_apply = client.post("/api/v1/fees/apply", data=body, headers=signed_headers)
+    first_apply = client.post("/api/v1/fees/apply", content=body, headers=signed_headers)
     assert first_apply.status_code == 200
 
     rotate_response = client.post(
@@ -459,7 +459,7 @@ def test_secret_rotation_invalidates_previous_signatures(
 
     replay_with_old_secret = client.post(
         "/api/v1/fees/apply",
-        data=body,
+        content=body,
         headers=signed_headers,
     )
     assert replay_with_old_secret.status_code == 403
@@ -483,7 +483,7 @@ def test_secret_rotation_invalidates_previous_signatures(
 
     refreshed_apply = client.post(
         "/api/v1/fees/apply",
-        data=body,
+        content=body,
         headers=refreshed_headers,
     )
     assert refreshed_apply.status_code == 200

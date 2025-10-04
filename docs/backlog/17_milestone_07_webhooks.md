@@ -4,10 +4,11 @@ _[← Milestone 6 — Integrations](16_milestone_06_integrations.md) • [Milest
 
 ## Stage Validation Summary
 
-- **Platform integrations functional**: WooCommerce plugin and Shopify app send order data to `/v1/fees/apply` (Milestone 6).
-- **Audit logging captures decisions**: All fee applications logged with context ([`backend/app/services/audit_repository.py`](../../backend/app/services/audit_repository.py)).
-- **HMAC verification in place**: Webhook endpoints can validate request signatures (Milestone 4).
-- **Remaining gap**: No webhook ingestion for refunds/cancellations, no reversal logic for `order_fees`, reporting doesn't account for reversed transactions.
+- **Stripe webhooks ingested**: `/v1/billing/webhooks/stripe` verifies `Stripe-Signature`, records events in `processed_webhooks`, enforces idempotency, and exposes replay/metrics for DLQ management. 【F:backend/app/routers/billing.py†L200-L260】【F:backend/app/models/models.py†L220-L260】
+- **Retry & DLQ implemented**: Failed events persist attempts/backoff, surface `dead_letter` status, and can be replayed via the authenticated endpoint. 【F:backend/app/services/webhook_service.py†L40-L200】
+- **Observability & tooling**: Prometheus counters (`webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms`), smoke tests (`make webhooks-smoke`), and Postman folder cover positive/negative flows. 【F:backend/app/observability.py†L77-L140】【F:backend/smoke_test.py†L820-L940】【F:docs/postman/state-tax-wizard.postman_collection.json†L1700-L1900】
+- **Docs & certification updated**: API references, Stripe guide, STATUS/backlog, and certification pack reflect webhook lifecycle, replay steps, and evidence capture. 【F:docs/api/billing.md†L1-L200】【F:docs/billing/stripe.md†L1-L200】【F:STATUS.md†L6-L100】
+- **Remaining gap**: Shopify/WooCommerce order lifecycle webhooks and fee reversal automation remain future scope (Milestone 8+).
 
 ## Next Development Objective
 
