@@ -34,6 +34,7 @@ from ..services.fee_service import (
     FeeCalculationService,
     _normalize_override,
 )
+from ..services.taxo_webhook_service import QueuedEvent, TaxoWebhookService
 
 router = APIRouter(prefix="/v1/fees", tags=["fees"])
 
@@ -123,6 +124,8 @@ async def apply_fees(
         .first()
     )
 
+    request_id = ensure_request_id(http_request.headers.get("x-request-id"))
+
     raw_body = await http_request.body()
     enforce_hmac(
         headers=http_request.headers,
@@ -154,6 +157,8 @@ async def apply_fees(
     result = FeeCalculationService.calculate_fees(quote_request, db)
     elapsed_ms = (time.perf_counter() - started) * 1000
     _record_latency("apply", elapsed_ms, result.decisions)
+
+    queued_events: list[QueuedEvent] = []
 
     if existing_lines:
         lines = [
@@ -194,9 +199,34 @@ async def apply_fees(
             applied_at=applied_at,
         )
         db.add(order_fee)
+        db.flush()
+        queued = TaxoWebhookService.queue_fee_applied(
+            db,
+            store_id=str(request.store_id),
+            request_id=request_id,
+            order_fee=order_fee,
+            absorbed=line.absorbed,
+            delivery_method=request.delivery_method,
+            source_of_remittance=request.source_of_remittance,
+        )
+        if queued:
+            queued_events.append(queued)
         fees_applied_total.labels(jurisdiction=line.jurisdiction).inc()
         if line.absorbed:
             fees_absorbed_total.labels(jurisdiction=line.jurisdiction).inc()
+
+    for decision in result.decisions:
+        if decision.outcome == "skipped":
+            queued = TaxoWebhookService.queue_fee_skipped(
+                db,
+                store_id=str(request.store_id),
+                order_id=request.order_id,
+                jurisdiction=decision.jurisdiction,
+                reason_codes=decision.reason_codes,
+                request_id=request_id,
+            )
+            if queued:
+                queued_events.append(queued)
 
     audit_log = AuditLog(
         actor=f"user:{auth.email}",
@@ -217,8 +247,6 @@ async def apply_fees(
 
     db.commit()
 
-    request_id = ensure_request_id(http_request.headers.get("x-request-id"))
-
     for line in result.lines:
         log_fee_event(
             {
@@ -235,6 +263,15 @@ async def apply_fees(
                 "subject": auth.email,
             }
         )
+
+    if queued_events:
+        TaxoWebhookService.dispatch_events(
+            db,
+            str(request.store_id),
+            queued_events,
+            settings_model=store_settings,
+        )
+        db.commit()
 
     return FeeApplyResponse(
         success=True,

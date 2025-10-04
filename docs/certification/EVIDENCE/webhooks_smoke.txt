@@ -1,0 +1,13 @@
+# make webhooks-smoke (2025-10-06) – ambiente sem Docker Compose
+$ make webhooks-smoke
+==> Testing webhook ingestion...
+docker-compose exec -T api python smoke_test.py --webhooks-only
+make: docker-compose: No such file or directory
+make: *** [Makefile:67: webhooks-smoke] Error 127
+
+# Nota: executar manualmente sem Docker
+$ python backend/smoke_test.py --webhooks-only --capture-server http://127.0.0.1:8082
+# Requer iniciar antes um servidor HTTP simples que exponha endpoint /capture para registrar POSTs.
+# Tentativa sem servidor de captura:
+$ python backend/smoke_test.py --webhooks-only
+HTTP error during smoke test: [Errno 111] Connection refused

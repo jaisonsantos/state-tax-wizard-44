@@ -1,99 +1,83 @@
 # Store Settings API
 
-The store settings endpoints manage delivery fee configuration flags for each
-merchant store. They back the React settings page and the fee engine, enabling
-merchants to toggle state-specific fees, absorb delivery charges, and customize
-checkout labels. When a custom label is omitted the engine now falls back to the
-jurisdiction defaults – **Road Improvement and Food Delivery Fee (MN)** and
-**Retail Delivery Fee (CO)** – ensuring quotes and persisted order fees stay in
-sync with the latest regulatory copy.
+Os endpoints de store settings controlam regras de taxas de entrega e, a partir da M7, configuram os webhooks outbound Taxo (endpoint, eventos e rotação de segredo). São consumidos pela tela React de Settings, pelo serviço de webhooks e pelas automações de suporte.
 
-## Authentication
-
-All routes require a valid bearer token created via `POST /api/auth/login`. The
-authenticated user must have access to the target store. Requests without the
-`Authorization: Bearer {{token}}` header receive a `401`, while users lacking
-store access receive a `403`.
+## Autenticação
+Todas as rotas exigem bearer token válido (`POST /api/auth/login`). O usuário autenticado deve ter acesso à loja alvo – do contrário recebe `403`.
 
 ## Endpoints
 
 ### `GET /api/v1/stores/{store_id}/settings`
-
-Returns the persisted configuration for the selected store. A settings row is
-created on first access if it does not exist.
+Retorna a configuração persistida da loja. Cria um registro na primeira chamada.
 
 **Response**
-
 ```json
 {
   "store_id": "1d9a5d24-8a53-4a40-9ae1-6fcb83b4f0be",
   "enable_mn": true,
   "enable_co": true,
   "absorb_fee": false,
-  "label_override": "Delivery Fee",
+  "label_override": "Delivery fee",
   "plan": "starter",
-  "hmac_last_rotated_at": "2025-01-12T19:44:21+00:00"
+  "hmac_last_rotated_at": "2025-10-06T18:24:12+00:00",
+  "webhook_active": true,
+  "webhook_endpoint": "https://merchant.invalid/webhooks/taxo",
+  "webhook_events": ["fee.applied", "report.ready", "hmac.rotated"]
 }
 ```
 
 ### `PUT /api/v1/stores/{store_id}/settings`
-
-Persists the configuration flags for the store and writes an audit log entry
-(`store_settings.update`). The request body must include all fields; the API
-trims surrounding whitespace on `label_override`.
+Persiste as flags e registra `store_settings.update` no `audit_logs`. Campos opcionais podem ser omitidos (`null` remove endpoint/eventos). O serviço normaliza espaços em `label_override` e valida o catálogo de eventos (`fee.applied`, `fee.skipped`, `report.ready`, `hmac.rotated`).
 
 **Request body**
-
 ```json
 {
   "enable_mn": false,
   "enable_co": true,
   "absorb_fee": true,
-  "label_override": "Handling Surcharge"
+  "label_override": "Handling surcharge",
+  "webhook_active": true,
+  "webhook_endpoint": "https://merchant.invalid/webhooks/taxo",
+  "webhook_events": ["fee.applied", "report.ready", "hmac.rotated"]
 }
 ```
 
 **Response**
-
 ```json
 {
   "store_id": "1d9a5d24-8a53-4a40-9ae1-6fcb83b4f0be",
   "enable_mn": false,
   "enable_co": true,
   "absorb_fee": true,
-  "label_override": "Handling Surcharge",
+  "label_override": "Handling surcharge",
   "plan": "starter",
-  "hmac_last_rotated_at": "2025-01-12T19:44:21+00:00"
+  "hmac_last_rotated_at": "2025-10-06T18:24:12+00:00",
+  "webhook_active": true,
+  "webhook_endpoint": "https://merchant.invalid/webhooks/taxo",
+  "webhook_events": ["fee.applied", "report.ready", "hmac.rotated"]
 }
 ```
 
 ### `POST /api/v1/stores/{store_id}/hmac/rotate`
-
-Generates a new per-store HMAC secret, persists the timestamp, emits a `store_secret.rotated` audit log, and returns the secret **once** so operators can copy it into their integration tooling.
+Gera novo segredo HMAC, persiste timestamp, emite `store_secret.rotated` e enfileira webhook `hmac.rotated`. O valor é exibido **apenas uma vez**.
 
 **Response**
-
 ```json
 {
   "store_id": "1d9a5d24-8a53-4a40-9ae1-6fcb83b4f0be",
   "hmac_secret": "<new-secret-value>",
-  "rotated_at": "2025-01-12T19:45:02+00:00",
-  "previous_rotated_at": "2024-12-01T17:12:44+00:00"
+  "rotated_at": "2025-10-06T18:24:12+00:00",
+  "previous_rotated_at": "2025-08-01T12:04:55+00:00"
 }
 ```
 
-> Copy the secret immediately—neither the API nor audit log payloads will display it again.
+> Copie imediatamente: audit logs armazenam apenas metadados, não o segredo.
 
 ## Audit trail
+- `store_settings.update` captura ator, loja e payload enviado (sem segredo).
+- `store_secret.rotated` registra timestamps para compliance e alimenta o webhook `hmac.rotated`.
 
-Updates emit an `audit_logs` record capturing the actor email, store ID, and the
-submitted payload. This keeps compliance teams informed about who changed fee
-rules and when.
-
-## Related resources
-
-- Frontend integration lives in `src/pages/Settings.tsx`.
-- Postman collection requests (including rotation) live under the **Store Settings** and **Fees** folders in `docs/postman/state-tax-wizard.postman_collection.json`.
-- Fee calculation honors these toggles via `backend/app/services/fee_service.py` and
-  propagates `absorb_fee` to `FeeLine.absorbed` / `order_fees.absorbed` for audit and
-  reporting.
+## Recursos relacionados
+- Frontend: `src/pages/Settings.tsx` renderiza toggles/inputs de webhook e o botão de rotação.
+- Postman: pasta **Webhooks** (atualiza settings, rota segredo, lista e replay) em `docs/postman/state-tax-wizard.postman_collection.json`.
+- Serviço backend: `backend/app/routers/store_settings.py` + `backend/app/services/taxo_webhook_service.py`.

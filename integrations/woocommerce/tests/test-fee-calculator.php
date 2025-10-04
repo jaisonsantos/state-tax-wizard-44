@@ -45,13 +45,13 @@ class STW_Fee_Calculator_Test extends TestCase {
 
         $headers = $method->invoke($calculator, $settings->get(), json_encode(['foo' => 'bar']));
 
-        $this->assertArrayHasKey('X-RDF-Timestamp', $headers);
-        $this->assertArrayHasKey('X-RDF-Nonce', $headers);
-        $this->assertArrayHasKey('X-RDF-Signature', $headers);
+        $this->assertArrayHasKey('X-Taxo-Timestamp', $headers);
+        $this->assertArrayHasKey('X-Taxo-Nonce', $headers);
+        $this->assertArrayHasKey('X-Taxo-Signature', $headers);
 
-        $timestamp = $headers['X-RDF-Timestamp'];
-        $nonce = $headers['X-RDF-Nonce'];
+        $timestamp = $headers['X-Taxo-Timestamp'];
+        $nonce = $headers['X-Taxo-Nonce'];
         $expected = hash_hmac('sha256', $timestamp . "\n" . $nonce . "\n" . json_encode(['foo' => 'bar']), 'secret-key');
-        $this->assertSame($expected, $headers['X-RDF-Signature']);
+        $this->assertSame($expected, $headers['X-Taxo-Signature']);
     }
 }

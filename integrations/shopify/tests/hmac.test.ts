@@ -6,9 +6,9 @@ describe('signPayload', () => {
     const now = new Date('2024-01-01T00:00:00.000Z');
     const result = signPayload('secret', { foo: 'bar' }, now);
 
-    expect(result.headers['X-RDF-Timestamp']).toBe(now.toISOString());
-    expect(result.headers['X-RDF-Nonce']).toHaveLength(32);
-    expect(result.headers['X-RDF-Signature']).toHaveLength(64);
+    expect(result.headers['X-Taxo-Timestamp']).toBe(now.toISOString());
+    expect(result.headers['X-Taxo-Nonce']).toHaveLength(32);
+    expect(result.headers['X-Taxo-Signature']).toHaveLength(64);
   });
 });
 

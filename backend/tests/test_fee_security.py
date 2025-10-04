@@ -88,8 +88,8 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         unsigned_headers.update(
             {
                 "Content-Type": "application/json",
-                "x-rdf-timestamp": timestamp,
-                "x-rdf-nonce": uuid.uuid4().hex,
+                "x-taxo-timestamp": timestamp,
+                "x-taxo-nonce": uuid.uuid4().hex,
             }
         )
         missing = client.post("/api/v1/fees/apply", content=unsigned_body, headers=unsigned_headers)
@@ -98,7 +98,7 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
 
         # Invalid signature
         invalid_headers = dict(unsigned_headers)
-        invalid_headers["x-rdf-signature"] = "not-a-valid-signature"
+        invalid_headers["x-taxo-signature"] = "not-a-valid-signature"
         invalid = client.post("/api/v1/fees/apply", content=unsigned_body, headers=invalid_headers)
         assert invalid.status_code == 403
         assert invalid.json()["detail"]["code"] == "invalid_signature"
@@ -111,9 +111,9 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         valid_headers.update(
             {
                 "Content-Type": "application/json",
-                "x-rdf-signature": signature,
-                "x-rdf-timestamp": timestamp_iso,
-                "x-rdf-nonce": nonce_value,
+                "x-taxo-signature": signature,
+                "x-taxo-timestamp": timestamp_iso,
+                "x-taxo-nonce": nonce_value,
             }
         )
         success = client.post("/api/v1/fees/apply", content=unsigned_body, headers=valid_headers)
@@ -139,9 +139,9 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         prefixed_headers.update(
             {
                 "Content-Type": "application/json",
-                "x-rdf-signature": f"sha256={prefixed_signature}",
-                "x-rdf-timestamp": prefixed_timestamp,
-                "x-rdf-nonce": prefixed_nonce,
+                "x-taxo-signature": f"sha256={prefixed_signature}",
+                "x-taxo-timestamp": prefixed_timestamp,
+                "x-taxo-nonce": prefixed_nonce,
             }
         )
         prefixed = client.post("/api/v1/fees/apply", content=unsigned_body, headers=prefixed_headers)
@@ -159,9 +159,9 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         stale_signature = compute_signature(secret, stale_timestamp, uuid.uuid4().hex, unsigned_body)
         stale_headers.update(
             {
-                "x-rdf-timestamp": stale_timestamp,
-                "x-rdf-nonce": uuid.uuid4().hex,
-                "x-rdf-signature": stale_signature,
+                "x-taxo-timestamp": stale_timestamp,
+                "x-taxo-nonce": uuid.uuid4().hex,
+                "x-taxo-signature": stale_signature,
             }
         )
         stale = client.post("/api/v1/fees/apply", content=unsigned_body, headers=stale_headers)
@@ -185,9 +185,9 @@ def test_hmac_enforcement(client: TestClient, db_session: Session) -> None:
         refreshed_headers.update(
             {
                 "Content-Type": "application/json",
-                "x-rdf-signature": fresh_signature,
-                "x-rdf-timestamp": fresh_timestamp,
-                "x-rdf-nonce": nonce_value,
+                "x-taxo-signature": fresh_signature,
+                "x-taxo-timestamp": fresh_timestamp,
+                "x-taxo-nonce": nonce_value,
             }
         )
         refreshed = client.post("/api/v1/fees/apply", content=unsigned_body, headers=refreshed_headers)
@@ -224,9 +224,9 @@ def test_replay_detected_without_unique_index(client: TestClient, db_session: Se
     headers.update(
         {
             "Content-Type": "application/json",
-            "x-rdf-signature": signature,
-            "x-rdf-timestamp": timestamp_iso,
-            "x-rdf-nonce": nonce_value,
+            "x-taxo-signature": signature,
+            "x-taxo-timestamp": timestamp_iso,
+            "x-taxo-nonce": nonce_value,
         }
     )
 
@@ -307,9 +307,9 @@ def test_hmac_accepts_iso_timestamp_with_z_suffix(client: TestClient, db_session
     headers = {
         **auth_header,
         "Content-Type": "application/json",
-        "x-rdf-timestamp": timestamp_z,
-        "x-rdf-nonce": nonce_value,
-        "x-rdf-signature": signature,
+        "x-taxo-timestamp": timestamp_z,
+        "x-taxo-nonce": nonce_value,
+        "x-taxo-signature": signature,
     }
 
     response = client.post("/api/v1/fees/apply", content=body, headers=headers)
@@ -341,9 +341,9 @@ def test_hmac_accepts_epoch_timestamp(client: TestClient, db_session: Session) -
     headers = {
         **auth_header,
         "Content-Type": "application/json",
-        "x-rdf-timestamp": timestamp_epoch,
-        "x-rdf-nonce": nonce_value,
-        "x-rdf-signature": signature,
+        "x-taxo-timestamp": timestamp_epoch,
+        "x-taxo-nonce": nonce_value,
+        "x-taxo-signature": signature,
     }
 
     response = client.post("/api/v1/fees/apply", content=body, headers=headers)
@@ -377,9 +377,9 @@ def test_security_logs_do_not_expose_secrets(
     headers = {
         **auth_header,
         "Content-Type": "application/json",
-        "x-rdf-timestamp": timestamp_iso,
-        "x-rdf-nonce": nonce_value,
-        "x-rdf-signature": invalid_signature,
+        "x-taxo-timestamp": timestamp_iso,
+        "x-taxo-nonce": nonce_value,
+        "x-taxo-signature": invalid_signature,
     }
 
     caplog.set_level("INFO", logger="security")
@@ -419,9 +419,9 @@ def test_secret_rotation_invalidates_previous_signatures(
     signed_headers = {
         **auth_header,
         "Content-Type": "application/json",
-        "x-rdf-timestamp": timestamp,
-        "x-rdf-nonce": nonce,
-        "x-rdf-signature": signature,
+        "x-taxo-timestamp": timestamp,
+        "x-taxo-nonce": nonce,
+        "x-taxo-signature": signature,
     }
 
     first_apply = client.post("/api/v1/fees/apply", content=body, headers=signed_headers)
@@ -476,9 +476,9 @@ def test_secret_rotation_invalidates_previous_signatures(
     refreshed_headers = {
         **auth_header,
         "Content-Type": "application/json",
-        "x-rdf-timestamp": refreshed_timestamp,
-        "x-rdf-nonce": refreshed_nonce,
-        "x-rdf-signature": refreshed_signature,
+        "x-taxo-timestamp": refreshed_timestamp,
+        "x-taxo-nonce": refreshed_nonce,
+        "x-taxo-signature": refreshed_signature,
     }
 
     refreshed_apply = client.post(

@@ -1,75 +1,65 @@
-# Observability Playbook
-
-This playbook consolidates the production monitoring strategy for State Tax Wizard once the webhooks slice is deployed.
+# Observability Playbook – Webhooks Launch
 
 ## 1. Dashboards
+Crie painel Grafana "Taxo – Webhooks" com os componentes abaixo:
 
-Create a Grafana dashboard (or equivalent) with the following panels:
+- **Delivery Success Rate** – `sum(rate(webhooks_delivery_total{status="delivered"}[5m])) / sum(rate(webhooks_delivery_total[5m]))` (threshold 99.5%).
+- **Delivery Latency (p95)** – `histogram_quantile(0.95, sum(rate(webhooks_delivery_seconds_bucket[5m])) by (le, event))` (meta <5s) com legenda por `event`.
+- **Failures by Reason** – tabela `increase(webhooks_failed_total[5m])` com colunas `event`, `reason` (esperado: `missing_endpoint`, `missing_hmac_secret`, `http_error`).
+- **Dead Letters** – tabela de `webhook_events{status="dead_letter"}` e painel com `increase(webhooks_dead_letter_total[5m])` por `event`.
+- **Attempt Timeline** – gráfico de barras `increase(webhook_delivery_attempts_total[5m])` (derive de logs ou use contagem de `attempts_log`).
+- **Related Counters** – `rate(fees_applied_total[5m])`, `rate(report_exports_total[5m])`, `rate(billing_events_total[5m])` para correlação.
 
-- **Webhook Throughput** – `rate(webhooks_received_total{provider="stripe"}[5m])` grouped by `event`. Highlights unexpected drops or spikes.
-- **Webhook Outcomes** – stacked bar chart of `increase(webhooks_processed_total{provider="stripe"}[5m])` split by `outcome` (`processed`, `duplicate`, `retry`, `dead_letter`). Alerts when `dead_letter` increments.
-- **Webhook Latency (p95)** – `histogram_quantile(0.95, sum(rate(webhook_processing_latency_ms_bucket{provider="stripe"}[5m])) by (le))` to ensure processing stays under 500 ms.
-- **Integration Traffic** – `rate(integrations_requests_total{provider!=""}[5m])` by provider/route for WooCommerce and Shopify connectors.
-- **Billing Counters** – timeseries for `billing_events_total` and `checkout_sessions_created_total` to correlate subscription activity with webhook spikes.
-- **Error Overview** – table of `increase(integrations_errors_total[5m])` and `increase(webhooks_processed_total{outcome="retry"}[5m])` to surface integration or webhook issues.
+Armazene o JSON do dashboard no repositório de monitoramento e referencie o link aqui quando disponível.
 
-Store the dashboard JSON export under your monitoring repo and link it in the runbook once created.
-
-## 2. Alerts
-
-Recommended Prometheus alert rules:
-
+## 2. Alertas Prometheus (exemplo)
 ```yaml
-- alert: WebhookDeadLetterBurst
-  expr: increase(webhooks_processed_total{provider="stripe",outcome="dead_letter"}[10m]) > 0
+- alert: TaxoWebhookLatencyP95High
+  expr: histogram_quantile(0.95, sum(rate(webhooks_delivery_seconds_bucket[5m])) by (le)) > 5
   for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Webhook delivery latency above 5s"
+    description: "Check capture endpoint availability and DLQ backlog."
+
+- alert: TaxoWebhookDeliveryErrors
+  expr: increase(webhooks_failed_total[10m]) > 0
+  for: 10m
   labels:
     severity: critical
   annotations:
-    summary: "Stripe webhook moved to DLQ"
-    description: "Check processed_webhooks table and replay via POST /api/v1/billing/webhooks/stripe/replay/{event_id}."
+    summary: "Webhook delivery failures detected"
+    description: "Inspect /v1/webhooks/events?status=pending and contact merchant if endpoint misconfigured."
 
-- alert: WebhookIngestionGap
-  expr: rate(webhooks_received_total{provider="stripe"}[10m]) == 0
+- alert: TaxoWebhookDeadLetter
+  expr: increase(webhooks_dead_letter_total[15m]) > 0
   for: 15m
   labels:
-    severity: warning
+    severity: critical
   annotations:
-    summary: "No Stripe webhooks received"
-    description: "Verify Stripe CLI/listener, credentials, and event subscriptions."
-
-- alert: IntegrationErrorSpike
-  expr: increase(integrations_errors_total[5m]) > 5
-  for: 5m
-  labels:
-    severity: warning
-  annotations:
-    summary: "Integration errors observed"
-    description: "Consult WooCommerce/Shopify logs and /metrics for route/ reason labels."
+    summary: "Webhook events stuck in DLQ"
+    description: "Follow docs/webhooks/runbook.md to replay or disable temporarily."
 ```
 
-## 3. Processed Webhooks Retention
+## 3. Retenção & Manutenção
+- `webhook_events`: manter histórico 30 dias para auditoria. Criar job semanal removendo `status='delivered'` com `updated_at < NOW() - 30d`.
+- `webhook_delivery_attempts`: manter 14 dias ou até extração para data warehouse.
+- Expor métricas de limpeza (`webhooks_cleanup_deleted_total`).
 
-`processed_webhooks` persists every event for traceability. Configure a weekly job (SQL or Celery/cron) to delete rows older than 30 days that are `status = 'processed'` and `dead_letter = false`. Suggested SQL:
+## 4. Evidence Capture
+- `make metrics-dump` (ou `curl -s $METRICS_URL | grep webhooks`) antes de cada release; anexar saída a `docs/certification/EVIDENCE/metrics_dump.txt`.
+- `python backend/smoke_test.py --webhooks-only` gera logs e payloads (consulte `docs/certification/EVIDENCE/webhooks_smoke.txt`).
+- Postman/Newman (`--folder Webhooks`) produz relatório JSON; anexar sumário ≤512 KB.
 
-```sql
-DELETE FROM processed_webhooks
- WHERE status = 'processed'
-   AND dead_letter = false
-   AND processed_at < NOW() - INTERVAL '30 days';
-```
+## 5. Runbooks Relacionados
+- [`docs/webhooks/runbook.md`](docs/webhooks/runbook.md) – incidentes, replay, rotação HMAC.
+- [`docs/launch/RUNBOOKS.md`](docs/launch/RUNBOOKS.md) – deploy/rollback.
+- [`docs/SUPPORT_PLAYBOOK.md`](docs/SUPPORT_PLAYBOOK.md) – comunicação ao cliente.
 
-Document the job in your infrastructure repository and expose metrics for deletions if possible.
+## 6. Anti-drift / Checks
+- `rg "Stripe" backend/app/observability.py` → garantir que painéis não dependem mais de provider stripe-only.
+- Validar que `webhooks_delivery_total` possui labels fixos (`event`, `status`) evitando cardinalidade alta.
+- Monitorar uso de `log_webhook_delivery` para evitar logar payloads completos (somente IDs/erros truncados).
 
-## 4. Runbook Updates
-
-- **Replay procedure:** Use the docs in `docs/billing/stripe.md` to replay events via CLI/cURL. Record replay attempts in ticketing tools.
-- **Incident escalation:** Update `docs/security/incident-response.md` to include webhook-specific responders and troubleshooting steps (alerts above, DLQ query).
-- **Evidence capture:** Archive `webhooks_smoke.txt`, `metrics_dump.txt`, and `api_logs.txt` with every certification run to prove metrics and DLQ behaviour.
-
-## 5. Additional Monitoring Hooks
-
-- Emit structured log events (`webhook_processed`) already include `outcome`. Ship logs to your SIEM with filters for `outcome = dead_letter`.
-- Consider adding tracing spans if you adopt OpenTelemetry — instrument the webhook handler and subscription service to measure DB latency during bursts.
-
-With dashboards, alerts, retention, and runbooks in place, Milestone 8 can focus on production readiness without rediscovering the webhook plumbing.
+Com dashboards, alertas e runbooks alinhados ao novo serviço, o lançamento pode avançar para ensaio em produção (M8).

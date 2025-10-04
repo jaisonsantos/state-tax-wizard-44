@@ -1,12 +1,13 @@
-# Consistency Patch Log – M7 Webhooks
+# Consistency Patch Log – Pós-M7
 
-## Alinhado nesta rodada
-- Router `/v1/billing/webhooks/stripe`, serviço de idempotência (`processed_webhooks`) e replay documentados em API/Stripe guide/STATUS. 【backend/app/routers/billing.py†L200-L270】【backend/app/services/webhook_service.py†L40-L260】【docs/api/billing.md†L1-L220】【docs/billing/stripe.md†L1-L220】
-- Métricas `webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms` implementadas, descritas em `docs/security/observability.md`, e capturadas em `docs/certification/EVIDENCE/metrics_dump.txt`/smokes. 【backend/app/observability.py†L77-L160】【docs/security/observability.md†L1-L60】【backend/smoke_test.py†L800-L960】
-- Tooling sincronizado: `make webhooks-smoke`/`m7-validation`, Postman **Webhooks** com pré-script de assinatura, README/STATUS/backlog atualizados. 【Makefile†L1-L150】【docs/postman/state-tax-wizard.postman_collection.json†L1700-L1900】【README.md†L1-L200】【STATUS.md†L6-L70】【docs/backlog/17_milestone_07_webhooks.md†L1-L200】
-- Observability playbook (`docs/observability.md`) consolida dashboards, alertas e política de retenção para `processed_webhooks`, referenciado em `docs/billing/stripe.md` e `docs/security/incident-response.md`. 【docs/observability.md†L1-L120】【docs/billing/stripe.md†L120-L200】【docs/security/incident-response.md†L40-L100】
+## Divergências sanadas
+- `STATUS.md`, backlog M7, API docs e guia HMAC agora descrevem webhooks outbound Taxo, catálogo completo e próximos passos (M8 Launch). 【F:STATUS.md†L1-L200】【F:docs/backlog/17_milestone_07_webhooks.md†L1-L160】【F:docs/webhooks/README.md†L1-L80】
+- Postman (pasta "Webhooks"), smoke test (`--webhooks-only`) e Makefile (`webhooks-smoke`) foram alinhados ao novo contrato `X-Taxo-*`. 【F:docs/postman/state-tax-wizard.postman_collection.json†L1850-L2140】【F:backend/smoke_test.py†L838-L969】【F:Makefile†L60-L90】
+- `docs/observability.md`, runbooks e launch assets agora referenciam métricas `webhooks_delivery_*`, DLQ, e runbook de rotação.
+- Certificação (`DECISION.md`, `ACTION_PLAN.md`, `CHECKLIST.md`) atualizada para marcar M7=PASS e iniciar M8 Init.
 
-## Próximos cuidados (M8)
-- Garantir que dashboards/alertas reflitam os novos counters (`webhooks_*`, `integrations_*`) e anexar prints/comandos ≤512 KB.
-- Priorizar execução do job de limpeza em produção e monitorar métricas pós-remoção.
-- Consolidar evidências finais (`full_validation`, `webhooks_smoke`, `metrics_dump`, `api_logs`) antes do handoff.
+## Pendências residuais (acompanhar na próxima rodada)
+1. Capturar métricas reais de um ambiente com Prometheus (`curl $METRICS_URL | grep webhooks`) para substituir nota SKIP em `metrics_dump.txt`.
+2. Executar `make webhooks-smoke` em ambiente com Docker Compose e anexar evidência completa (script manual disponível).
+3. Adicionar captura de tela/UI para `docs/webhooks/configuration.md` quando front-end puder ser executado no ambiente.
+4. Validar pipeline CI atualizado (job Newman + smoke) após orquestração M8.

@@ -1,54 +1,64 @@
-# AGENTE – M7 Webhooks ✅ / Preparação M8
+# AGENTE – Validação M7 e Arranque M8
 
-## Snapshot Atual
-- Commit: `3c6c149bb9a6712ab772549836c99491c623a16f`
-- Branch: `main`
-- `git status -s`: clean
+## 1. Contexto atualizado
+- **Branch:** `work` (limpa após merge dos serviços de webhooks).
+- **Milestone atual:** M7 – Webhooks & Lifecycle concluída em código e testes: serviço `TaxoWebhookService` gera eventos `fee.applied`, `fee.skipped`, `report.ready` e `hmac.rotated`, aplicando cabeçalhos `X-Taxo-*` com backoff 1m→24h e registro de tentativas. 【F:backend/app/services/taxo_webhook_service.py†L33-L452】
+- **Infraestrutura persistente:** nova migration `202510060001_taxo_webhooks_outbox` cria `webhook_events`/`webhook_delivery_attempts` e adiciona campos `webhook_*` em `store_settings`. 【F:backend/alembic/versions/202510060001_taxo_webhooks_outbox.py†L32-L108】
+- **APIs expostas:** `/v1/webhooks/events` lista eventos e `/v1/webhooks/events/{event_id}/replay` reenfileira entregas; rotas de fees/reports emitem eventos após sucesso. 【F:backend/app/routers/webhooks.py†L14-L84】【F:backend/app/routers/fees.py†L198-L239】【F:backend/app/routers/reports.py†L148-L203】
+- **Configuração do lojista:** `/v1/stores/{id}/settings` inclui `webhook_active`, `webhook_endpoint`, `webhook_events` e rotação de segredo dispara evento `hmac.rotated`. 【F:backend/app/routers/store_settings.py†L41-L199】
+- **Observabilidade:** métricas `webhooks_delivery_total`/`webhooks_delivery_seconds`/`webhooks_failed_total`/`webhooks_dead_letter_total` complementam contadores existentes; smoke `--webhooks-only` usa servidor de captura HTTP local e cobre replay/manual. 【F:backend/app/observability.py†L89-L256】【F:backend/smoke_test.py†L838-L969】
 
-## Mapa do Repositório
-- `backend/app/models/models.py` – inclui a tabela `processed_webhooks` com status, tentativas, DLQ e timestamps. 【F:backend/app/models/models.py†L220-L260】
-- `backend/app/routers/billing.py` – webhook Stripe com verificação de assinatura e endpoint de replay autenticado. 【F:backend/app/routers/billing.py†L200-L270】
-- `backend/app/services/webhook_service.py` – idempotência, retry/backoff, métricas e roteamento de eventos Stripe. 【F:backend/app/services/webhook_service.py†L40-L260】
-- `backend/app/observability.py` – novos contadores/histograma `webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms`. 【F:backend/app/observability.py†L77-L150】
-- `backend/tests/test_billing_webhook_endpoint.py` – cobre sucesso, duplicados, assinaturas inválidas e replay DLQ. 【F:backend/tests/test_billing_webhook_endpoint.py†L1-L140】
-- `backend/smoke_test.py` – modo `--webhooks-only` assina payload, executa replay e valida métricas. 【F:backend/smoke_test.py†L800-L960】
-- `docs/postman/state-tax-wizard.postman_collection.json` – pasta **Webhooks** com requests positivo/negativo e pré-script de assinatura. 【F:docs/postman/state-tax-wizard.postman_collection.json†L1700-L1900】
-- `docs/api/billing.md`, `docs/billing/stripe.md`, `docs/security/observability.md`, `STATUS.md` – documentação atualizada com fluxo, métricas e procedimentos. 【F:docs/api/billing.md†L1-L220】【F:docs/billing/stripe.md†L1-L200】【F:docs/security/observability.md†L1-L80】【F:STATUS.md†L6-L70】
-- `Makefile` – novos alvos `webhooks-smoke` e `m7-validation`. 【F:Makefile†L1-L150】
+## 2. Mapa rápido do repositório (foco M7/M8)
+- `backend/app/services/taxo_webhook_service.py` – fila, assinatura HMAC, retentativas, DLQ.
+- `backend/app/models/models.py` – tabelas `webhook_events` e `webhook_delivery_attempts` com índices (`status`, `store_id`).
+- `backend/app/routers/fees.py` / `reports.py` – emissão automática pós-processamento.
+- `backend/app/routers/store_settings.py` – CRUD de endpoint, catálogo (`TAXO_EVENT_CATALOG`), rotação HMAC.
+- `backend/app/routers/webhooks.py` – listagem, replay controlado.
+- `backend/tests/test_taxo_webhook_service.py` – casos de assinatura, backoff e DLQ.
+- `backend/smoke_test.py` – modo `--webhooks-only` levanta captura HTTP e valida métricas.
+- `docs/webhooks/` – referência de contrato, exemplos de payload, guias de verificação e runbook.
+- `docs/launch/` + `docs/SUPPORT_PLAYBOOK.md` + `docs/SLO.md` – artefatos iniciais do M8 Launch.
 
-## Validação M7
-- **Gates executados:**
-  1. `processed_webhooks` + migration (`upgrade`/`downgrade`). 【F:backend/alembic/versions/202510050001_add_processed_webhooks_table.py†L1-L90】
-  2. `/v1/billing/webhooks/stripe` com assinatura, idempotência e DLQ → ✅
-  3. `POST /v1/billing/webhooks/stripe/replay/{event_id}` autenticado → ✅
-  4. Métricas `webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms` em `/metrics` + docs → ✅
-  5. Smoke `make webhooks-smoke` com payload assinado e replay → ✅
-  6. Postman **Webhooks** (processado + assinatura inválida) → ✅
-  7. STATUS/README/backlog atualizados para M7; `docs/certification/*` reflete decisão → ✅
-  8. Compat M2–M6 preservada (`pytest`, smokes existentes) → ✅
+## 3. Checklist dos Gates M7
 
-- **Comandos úteis**
-  ```bash
-  # Backend / dados
-  docker-compose exec api python -m alembic upgrade head | tail -n 200 > docs/certification/EVIDENCE/migrate.txt
-  docker-compose exec api pytest -q | tee docs/certification/EVIDENCE/pytest.txt
-  make analytics-smoke reports-smoke security-smoke billing-smoke integrations-smoke webhooks-smoke
+| Gate | Status | Evidência |
+| --- | --- | --- |
+| 1. Cabeçalhos `X-Taxo-*`, proteção replay ≤5 min | ✅ `compute_signature` reutilizado; `_deliver_event` emite `Timestamp/Nonce` únicos e logs/schedule garantem idempotência. 【F:backend/app/services/taxo_webhook_service.py†L333-L412】 |
+| 2. Eventos mínimos emitidos/documentados | ✅ `queue_fee_applied`, `queue_fee_skipped`, `queue_report_ready`, `queue_hmac_rotated` + docs `docs/webhooks/events.md`. 【F:backend/app/services/taxo_webhook_service.py†L42-L177】【F:docs/webhooks/events.md†L1-L140】 |
+| 3. Entrega & retentativas (1m→24h) | ✅ `BACKOFF_SCHEDULE_SECONDS` e `_mark_failure` aplicam cronograma completo, DLQ quando excede tentativas. 【F:backend/app/services/taxo_webhook_service.py†L30-L429】 |
+| 4. Observabilidade/dashboards | ✅ Métricas `webhooks_delivery_total`/`seconds`/`failed_total`/`dead_letter_total` + `docs/observability.md` (seção "Webhooks Outbound") e painel descritivo. 【F:backend/app/observability.py†L89-L256】【F:docs/observability.md†L1-L80】 |
+| 5. Postman + `make webhooks-smoke` | ✅ Coleção Postman "Webhooks" cobre listagem/replay/assinatura; smoke script exercita fluxo (ver nota infra). 【F:docs/postman/state-tax-wizard.postman_collection.json†L1850-L2140】【F:backend/smoke_test.py†L838-L969】 |
+| 6. Admin/Ops (config endpoint + secret) | ✅ UI/Admin atualiza endpoint/eventos; runbook descreve rotação + DLQ. 【F:src/pages/Settings.tsx†L560-L626】【F:docs/webhooks/runbook.md†L1-L160】 |
+| 7. Compatibilidade (pytest + smokes) | ✅ `pytest -q` (73 testes) verde; smoke dependente de Docker documentado (ver §6). 【F:docs/certification/EVIDENCE/pytest.txt†L1-L10】【F:docs/certification/EVIDENCE/webhooks_smoke.txt†L1-L20】 |
+| 8. Documentação atualizada | ✅ `STATUS.md`, backlog M7, `docs/webhooks/*`, certificações e launch assets sincronizados. 【F:STATUS.md†L1-L120】【F:docs/backlog/17_milestone_07_webhooks.md†L1-L120】【F:docs/certification/DECISION.md†L1-L80】 |
 
-  # Webhooks específicos
-  make webhooks-smoke
-  curl -X POST "$API/api/v1/billing/webhooks/stripe/replay/$EVENT" -H "Authorization: Bearer $TOKEN"
-  ```
+**Decisão:** `M7 = PASS`.
 
-- **Evidências esperadas** (≤512 KB): `pytest.txt`, `analytics_smoke.txt`, `reports_smoke.txt`, `security_smoke.txt`, `billing_smoke.txt`, `integrations_smoke.txt`, `webhooks_smoke.txt`, `metrics_dump.txt` (com linhas `integration_*` e `webhooks_*`), `newman_integrations.txt`, `newman_webhooks.txt`, `api_logs.txt`.
+## 4. Arranque M8 – Launch Readiness
+- `docs/launch/GO_LIVE_CHECKLIST_M8.md` consolida pré-requisitos (infra, dados, observabilidade, suporte) com status inicial.
+- `docs/launch/RUNBOOKS.md` estrutura procedimentos de deploy, rollback, incidentes de webhook e smoke.
+- `docs/SUPPORT_PLAYBOOK.md` define SLAs, macros e primeiros fluxos de atendimento.
+- `docs/SLO.md` registra metas (99.5% entrega webhooks <5s P95, uptime 99.9%, precisão relatório 100%) e planos de medição.
+- `docs/certification/ACTION_PLAN.md` e `CHECKLIST.md` migrados para foco M8 (dashboards, docs, Postman, CI).
 
-## Próximo Passo — M8 Launch Readiness
-- Dashboards/alertas: aplicar blueprint em `docs/observability.md` (painéis + regras Prometheus) e versionar JSON no repo de infra.
-- Automatizar limpeza de `processed_webhooks` (job semanal) e monitorar counters pós-limpeza.
-- Revisar parity de reversals/reporting para Shopify/Woo e anexar evidências (`make full-validation`, Postman completo).
-- Consolidar runbooks (incident response atualizado, replay CLI) e preparar pacote de go-live/rollback.
+## 5. Comandos úteis
+```bash
+pytest -q                            # Suite completa (73 testes)
+poetry run alembic upgrade head      # Aplica migration 202510060001 antes dos smokes
+python backend/smoke_test.py --webhooks-only \
+  --capture-server http://127.0.0.1:8082   # Executa smoke sem Docker (requer servidor local)
+make webhooks-smoke                  # Executa via Docker Compose (necessário docker-compose)
+newman run docs/postman/state-tax-wizard.postman_collection.json \
+  --folder "Webhooks" --env-var base_url=http://localhost:8000
+```
 
-## Riscos / Observações
-- Garantir `STRIPE_WEBHOOK_SECRET` configurado em todos os ambientes (smokes/Postman falham sem ele).
-- Respeitar limite de 512 KB em evidências e mascarar segredos (`nonce_preview`, sem payload completo).
-- Monitore o crescimento de `processed_webhooks` (planejar limpeza futura ou TTL).
-- Shopify/WooCommerce order webhooks & reversals continuam pendentes para M8 — alinhar escopo e métricas adicionais.
+> **Nota:** O alvo `make webhooks-smoke` depende de `docker-compose`. Em ambientes sem Docker (como este), usar o script direto (`python backend/smoke_test.py --webhooks-only`) e registrar SKIP controlado.
+
+## 6. Próximas ações (M8 – estimativas de 0,5–1 dia)
+1. Publicar dashboards e alertas no stack observability (Prometheus/Grafana) com queries fornecidas em `docs/observability.md`. (0,5 dia)
+2. Finalizar templates de comunicação (status page, incident report) referenciados em `docs/SUPPORT_PLAYBOOK.md`. (0,5 dia)
+3. Validar Postman/Newman em CI (GitHub Actions) adicionando job `webhooks-postman`. (1 dia)
+4. Ensaiar runbook de rollback com banco seedado (manual/híbrido) e registrar evidência. (0,5 dia)
+5. Completar checklist GO/NO-GO com owners e links para monitorações reais. (0,5 dia)
+
+**Tag:** _M8-Init Ready_

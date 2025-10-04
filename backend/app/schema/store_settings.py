@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,6 +19,15 @@ class StoreSettingsResponse(BaseModel):
         None,
         description="Timestamp of the most recent HMAC secret rotation",
     )
+    webhook_active: bool = Field(..., description="Whether outgoing Taxo webhooks are enabled")
+    webhook_endpoint: Optional[str] = Field(
+        None,
+        description="Destination URL that receives Taxo webhook notifications",
+    )
+    webhook_events: List[str] = Field(
+        default_factory=list,
+        description="List of subscribed webhook event types",
+    )
 
 
 class UpdateStoreSettingsRequest(BaseModel):
@@ -28,6 +37,9 @@ class UpdateStoreSettingsRequest(BaseModel):
     enable_co: bool
     absorb_fee: bool
     label_override: str = Field(min_length=1, max_length=120)
+    webhook_active: Optional[bool] = None
+    webhook_endpoint: Optional[str] = Field(None, max_length=500)
+    webhook_events: Optional[List[str]] = None
 
 
 class RotateHmacSecretResponse(BaseModel):

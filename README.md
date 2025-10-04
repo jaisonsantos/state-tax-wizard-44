@@ -9,7 +9,7 @@ State Tax Wizard is a full-stack demo application that showcases a configurable 
 - **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request, store, and security context.
 - **React frontend** with a fee playground, audit log viewer, CSV export powered by a shared API client, and a persistent header menu for store switching and logout.
 - **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
-- **Stripe webhooks** captured via `/v1/billing/webhooks/stripe` with processed event storage, DLQ/replay, and Prometheus metrics (`webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms`).
+- **Taxo webhooks outbound** entregam eventos `fee.applied`, `fee.skipped`, `report.ready`, `hmac.rotated` com assinatura `X-Taxo-*`, retentativas 1m→24h, DLQ/replay administrativo (`/v1/webhooks/events/{id}/replay`) e métricas `webhooks_delivery_total`/`webhooks_delivery_seconds`.
 - **Integration connectors** for WooCommerce and Shopify guarded by feature flags, a shared TypeScript SDK, and Prometheus counters (`integrations_requests_total`, `integrations_errors_total`).
 
 ## Project structure
@@ -139,12 +139,12 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   make billing-smoke
   ```
   When Stripe variables are unset the script prints `⚠ SKIP: billing_unconfigured`; otherwise it asserts entitlements, usage, checkout (with `portal_session_id`), and portal APIs respond successfully. Stores without Stripe metadata return `400` with `code="stripe_customer_missing"`.
-- Webhooks smoke (Stripe webhook ingestion & replay):
+- Webhooks smoke (outbound delivery + replay):
 
   ```sh
   make webhooks-smoke
   ```
-  Generates a signed webhook payload, validates DLQ/replay endpoints, and asserts new Prometheus counters.
+  Requer Docker Compose; executa `python backend/smoke_test.py --webhooks-only` dentro do contêiner, configura endpoint local de captura e valida métricas `webhooks_delivery_*`. Em ambientes sem Docker, rode o script manualmente (ver `docs/AGENTE.md`).
 
 - Integrations smoke (feature flag + observability):
 
@@ -207,5 +207,5 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 
 ## Roadmap status
 
-- **Current stage**: Milestone 5 — Billing/Stripe integration is complete (subscriptions, usage enforcement, checkout/portal flows, and billing telemetry ship with evidence).
-- **Next focus**: Milestone 6 — Platform integrations alpha (WooCommerce/Shopify connectors and SDK hardening). Track progress in the release plan backlog as items graduate to in-progress. 【F:docs/backlog/00_release_plan.md†L120-L190】
+- **Current stage**: Milestone 7 — Webhooks outbound certificados (eventos Taxo, DLQ/replay, UI/Admin, docs e testes).
+- **Next focus**: Milestone 8 — Launch Readiness (dashboards, alertas, runbooks, automação de smokes/Newman). Consulte `docs/backlog/18_milestone_08_launch.md` para o plano detalhado.

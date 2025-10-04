@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Play, AlertTriangle, RotateCw, Copy } from "lucide-react";
+import { Settings2, Play, AlertTriangle, RotateCw, Copy, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, ApiError, type IntegrationProviderStatus, type IntegrationStatusResponse } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +25,9 @@ export default function Settings() {
   const [hmacRotatedAt, setHmacRotatedAt] = useState<string | null>(null);
   const [rotatingSecret, setRotatingSecret] = useState(false);
   const [lastRotatedSecret, setLastRotatedSecret] = useState<string | null>(null);
+  const [webhookActive, setWebhookActive] = useState(false);
+  const [webhookEndpoint, setWebhookEndpoint] = useState("");
+  const [webhookEvents, setWebhookEvents] = useState<string[]>([]);
   const [applyResult, setApplyResult] = useState<{
     totalFeeCents: number;
     reasonCodes: string[];
@@ -45,6 +49,16 @@ export default function Settings() {
   const { toast } = useToast();
 
   const { selectedStoreId: storeId, stores } = useAuth();
+
+  const webhookEventOptions = useMemo(
+    () => [
+      { value: "fee.applied", label: "Fee applied" },
+      { value: "fee.skipped", label: "Fee skipped" },
+      { value: "report.ready", label: "Report ready" },
+      { value: "hmac.rotated", label: "HMAC rotated" },
+    ],
+    [],
+  );
 
   const storeName = useMemo(() => {
     return stores.find((store) => store.id === storeId)?.name ?? "";
@@ -107,7 +121,7 @@ export default function Settings() {
       case "replay_detected":
         return "Replay detected. Generate a new nonce for each request before retrying.";
       case "missing_nonce":
-        return "Nonce header missing. Include X-RDF-Nonce when signing requests.";
+        return "Nonce header missing. Include X-Taxo-Nonce when signing requests.";
       default:
         return error.message;
     }
@@ -164,6 +178,9 @@ export default function Settings() {
       setLabelOverride("Delivery Fee");
       setHmacRotatedAt(null);
       setLastRotatedSecret(null);
+      setWebhookActive(false);
+      setWebhookEndpoint("");
+      setWebhookEvents([]);
       setIntegrationStatus(null);
       return;
     }
@@ -182,6 +199,9 @@ export default function Settings() {
         setLabelOverride(settings.label_override);
         setPlan(settings.plan ?? null);
         setHmacRotatedAt(settings.hmac_last_rotated_at ?? null);
+        setWebhookActive(settings.webhook_active);
+        setWebhookEndpoint(settings.webhook_endpoint ?? "");
+        setWebhookEvents(settings.webhook_events ?? []);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -219,6 +239,9 @@ export default function Settings() {
         enable_co: enableCO,
         absorb_fee: absorbFee,
         label_override: labelOverride,
+        webhook_active: webhookActive,
+        webhook_endpoint: webhookEndpoint.trim() ? webhookEndpoint.trim() : null,
+        webhook_events: webhookEvents,
       };
       const updated = await apiClient.updateStoreSettings(storeId, payload);
       setEnableMN(updated.enable_mn);
@@ -227,6 +250,9 @@ export default function Settings() {
       setLabelOverride(updated.label_override);
       setPlan(updated.plan ?? null);
       setHmacRotatedAt(updated.hmac_last_rotated_at ?? null);
+      setWebhookActive(updated.webhook_active);
+      setWebhookEndpoint(updated.webhook_endpoint ?? "");
+      setWebhookEvents(updated.webhook_events ?? []);
 
       toast({
         title: "Settings saved",
@@ -241,6 +267,15 @@ export default function Settings() {
     } finally {
       setSettingsSaving(false);
     }
+  };
+
+  const toggleWebhookEvent = (value: string) => {
+    setWebhookEvents((previous) => {
+      if (previous.includes(value)) {
+        return previous.filter((event) => event !== value);
+      }
+      return [...previous, value];
+    });
   };
 
   const handleRotateSecret = async () => {
@@ -522,6 +557,73 @@ export default function Settings() {
                 </Button>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card id="webhook-delivery">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Webhook Delivery
+          </CardTitle>
+          <CardDescription>
+            Configure the endpoint that receives Taxo webhook events and select the event types to deliver.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="font-medium">Enable webhooks</p>
+              <p className="text-xs text-muted-foreground">
+                When enabled, fee and report lifecycle events are signed with your HMAC secret and POSTed to the endpoint below.
+              </p>
+            </div>
+            <Switch
+              checked={webhookActive}
+              onCheckedChange={setWebhookActive}
+              disabled={controlsDisabled}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="webhook-endpoint">Delivery endpoint URL</Label>
+            <Input
+              id="webhook-endpoint"
+              placeholder="https://example.com/webhooks/taxo"
+              value={webhookEndpoint}
+              onChange={(event) => setWebhookEndpoint(event.target.value)}
+              disabled={!webhookActive || controlsDisabled}
+              inputMode="url"
+            />
+            <p className="text-xs text-muted-foreground">
+              The destination must accept HTTPS POST requests with the <span className="font-medium">X-Taxo-*</span> headers.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Subscribed events</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {webhookEventOptions.map((option) => (
+                <label
+                  key={option.value}
+                  className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm"
+                >
+                  <Checkbox
+                    checked={webhookEvents.includes(option.value)}
+                    onCheckedChange={() => toggleWebhookEvent(option.value)}
+                    disabled={!webhookActive || controlsDisabled}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {!webhookActive && (
+            <p className="text-xs text-muted-foreground">
+              Webhook delivery is currently disabled. Toggle the switch above to start emitting events to your integration.
+            </p>
           )}
         </CardContent>
       </Card>

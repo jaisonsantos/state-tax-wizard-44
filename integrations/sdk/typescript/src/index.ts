@@ -35,9 +35,9 @@ export function signFeeRequest(secret: string, payload: FeeRequestPayload, optio
     body,
     headers: {
       'Content-Type': 'application/json',
-      'X-RDF-Timestamp': timestamp,
-      'X-RDF-Nonce': nonce,
-      'X-RDF-Signature': signature,
+      'X-Taxo-Timestamp': timestamp,
+      'X-Taxo-Nonce': nonce,
+      'X-Taxo-Signature': signature,
     },
   };
 }

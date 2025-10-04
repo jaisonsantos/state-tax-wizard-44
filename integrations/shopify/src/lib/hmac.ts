@@ -14,9 +14,9 @@ export function signPayload(secret: string, payload: unknown, timestamp: Date = 
   return {
     headers: {
       'Content-Type': 'application/json',
-      'X-RDF-Timestamp': timestamp.toISOString(),
-      'X-RDF-Nonce': nonce,
-      'X-RDF-Signature': signature,
+      'X-Taxo-Timestamp': timestamp.toISOString(),
+      'X-Taxo-Nonce': nonce,
+      'X-Taxo-Signature': signature,
     },
     body,
   };

@@ -26,9 +26,9 @@ describe('signFeeRequest', () => {
     const expectedSignature = createHmac('sha256', secret).update(canonical).digest('hex');
 
     expect(signed.body).toContain('"store_id":"store-demo"');
-    expect(signed.headers['X-RDF-Timestamp']).toBe(timestamp.toISOString());
-    expect(signed.headers['X-RDF-Nonce']).toBe(nonce);
-    expect(signed.headers['X-RDF-Signature']).toBe(expectedSignature);
+    expect(signed.headers['X-Taxo-Timestamp']).toBe(timestamp.toISOString());
+    expect(signed.headers['X-Taxo-Nonce']).toBe(nonce);
+    expect(signed.headers['X-Taxo-Signature']).toBe(expectedSignature);
     expect(canonical).toBeTruthy();
   });
 });

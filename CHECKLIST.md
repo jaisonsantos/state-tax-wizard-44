@@ -1,19 +1,22 @@
-# Milestone 6 Readiness Checklist
+# Milestone 8 Readiness Checklist (Resumo)
 
-Este checklist complementar aponta para a versão completa em `docs/certification/CHECKLIST.md` e destaca os itens obrigatórios antes de avançar com a execução da M6.
+Este checklist resume os itens críticos antes de executar a rodada "Launch Readiness". Use `docs/certification/CHECKLIST.md` como fonte primária para marcação detalhada.
 
-## Gates herdados da M5 (devem permanecer verdes)
+## Gates herdados (devem permanecer verdes)
+- [x] `alembic upgrade head` inclui migration 202510060001 (webhook outbox). 【F:backend/alembic/versions/202510060001_taxo_webhooks_outbox.py†L32-L108】
+- [x] `pytest -q` (73 testes) executado após merge de M7. 【F:docs/certification/EVIDENCE/pytest.txt†L1-L10】
+- [ ] Smoke webhooks disponível (`python backend/smoke_test.py --webhooks-only` ou `make webhooks-smoke` em ambiente com Docker). 【F:docs/certification/EVIDENCE/webhooks_smoke.txt†L1-L10】
+- [ ] Newman "Webhooks" rodando em CI (planejado para M8). 【F:docs/postman/state-tax-wizard.postman_collection.json†L1820-L2140】
 
-- [ ] `alembic upgrade head` com `GUID` portátil (SQLite/Postgres). 【F:docs/certification/EVIDENCE/migrate.txt†L1-L10】
-- [ ] `pytest -q` + smokes (`analytics`, `reports`, `security`, `billing` modo skip). 【F:docs/certification/EVIDENCE/pytest.txt†L1-L50】【F:docs/certification/EVIDENCE/analytics_smoke.txt†L1-L3】【F:docs/certification/EVIDENCE/security_smoke.txt†L1-L7】【F:docs/certification/EVIDENCE/billing_smoke.txt†L1-L1】
-- [ ] Métricas `/metrics` atualizadas (`billing_events_total`, `checkout_sessions_created_total`, `entitlement_denials_total`). 【F:docs/certification/EVIDENCE/metrics_dump.txt†L1-L18】
-- [ ] Postman Billing com `BILLING_SKIPPED` e README alinhados. 【F:docs/postman/state-tax-wizard.postman_collection.json†L940-L1259】【F:docs/postman/README.md†L1-L120】
+## Novos gates da M8 (planejamento)
+- [ ] Dashboards Grafana publicados (latência, sucesso, DLQ). 【F:docs/observability.md†L1-L80】
+- [ ] Alertas Prometheus configurados (`webhooks_delivery_seconds`, `webhooks_failed_total`, `webhooks_dead_letter_total`). 【F:docs/observability.md†L1-L80】
+- [ ] Runbooks de deploy/rollback e suporte aprovados. 【F:docs/launch/RUNBOOKS.md†L1-L140】【F:docs/SUPPORT_PLAYBOOK.md†L1-L160】
+- [ ] GO LIVE checklist revisado com owners e datas. 【F:docs/launch/GO_LIVE_CHECKLIST_M8.md†L1-L200】
+- [ ] SLOs de webhooks aceitos (P95 ≤5s, sucesso ≥99.5%, DLQ=0). 【F:docs/SLO.md†L1-L120】
 
-## Novos gates da M6 (planejados)
-
-- [ ] Endpoints `/v1/integrations/*` + métricas `integration_*` implementados e observáveis.
-- [ ] Plugins WooCommerce/Shopify compilam e passam `composer test` / `npm run test`.
-- [ ] UI/Admin exibe seção "Integrations" com instruções e links.
-- [ ] Evidências ≤512 KB anexadas (pytest, smokes, Newman/CI, artefatos de build).
-
-> Consulte `docs/certification/CHECKLIST.md` para a versão completa e marque cada item durante a execução. 【F:docs/certification/CHECKLIST.md†L1-L34】
+## Próximos passos
+1. Provisionar stack Prometheus/Grafana para capturar métricas reais e anexar evidências (`metrics_dump.txt`).
+2. Automatizar smoke/Postman no CI e anexar relatórios ≤512 KB.
+3. Executar ensaio do runbook de rollback com base seedada.
+4. Atualizar `docs/certification/CHECKLIST.md` conforme cada gate for concluído.

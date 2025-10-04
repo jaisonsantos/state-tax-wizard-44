@@ -1,81 +1,69 @@
 # Postman & Newman Collection Guide
 
-This guide explains how to run the State Tax Wizard API collection from Postman or Newman so you can validate the HTTP surface area alongside automated checks.
+Esta coleção cobre os fluxos do State Tax Wizard. Use-a para validar APIs, webhooks outbound e rotinas operacionais.
 
-## Prerequisites
-
-- Running instance of the backend (e.g., via `make dev` or `uvicorn backend.app.main:app --reload`).
-- Postman Desktop/CLI **or** Node.js 18+ with [`newman`](https://www.npmjs.com/package/newman) installed globally:
-
+## Pré-requisitos
+- Backend em execução (`make dev` ou `uvicorn backend.app.main:app --reload`).
+- Postman Desktop/CLI **ou** Node.js 18+ com [`newman`](https://www.npmjs.com/package/newman) instalado globalmente:
   ```sh
   npm install --global newman
   ```
-- Network access from your workstation to the API host defined in `{{base_url}}`.
+- Acesso de rede ao host definido em `{{base_url}}`.
+- Opcional: servidor HTTP de captura (ex.: `python -m http.server 8082`) para receber webhooks reais durante os smokes.
 
-## Environment variables
+## Variáveis da coleção
 
-The collection expects the following collection variables:
-
-| Variable | Purpose | Default |
+| Variável | Propósito | Default |
 | --- | --- | --- |
-| `base_url` | Root URL for the API | `http://localhost:8000` |
-| `token` | JWT captured after authenticating | _set by login script_ |
-| `store_id` | Active store for fee scenarios | _set by login script_ |
-| `evidence_dir` | Directory where Newman should write report artifacts | _optional_; used to echo artifact paths into the CI logs |
-| `hmac_secret` | Shared secret used to sign `/v1/fees/apply` requests; auto-updated by the rotation request | `demo-hmac-secret` (matches seed data) |
-| `hmac_timestamp_override` | Forces a specific timestamp for negative tests | _optional_ |
-| `hmac_nonce_override` | Forces a specific nonce to simulate replays | _optional_ |
-| `billing_plan_tier` | Plan tier used by the Billing folder (starter/pro/plus) | `pro` |
-| `stripe_webhook_secret` | Secret used to sign webhook payloads in the Webhooks folder | _required for Webhooks_ |
+| `base_url` | URL raiz do backend | `http://localhost:8000` |
+| `token` | JWT após login | _preenchido pelo login_ |
+| `store_id` | Loja ativa | _preenchido pelo login_ |
+| `evidence_dir` | Diretório para artefatos (quando usado em CI) | _opcional_ |
+| `hmac_secret` | Segredo usado para `/v1/fees/apply`; atualizado pela rotação | `demo-hmac-secret` |
+| `taxo_webhook_secret` | Segredo atual do webhook outbound (capturado em `Rotate HMAC`) | _(vazio)_ |
+| `webhook_endpoint` | Endpoint alvo para entregas (usado na atualização de settings) | `http://127.0.0.1:8082/capture` |
+| `hmac_timestamp_override` / `hmac_nonce_override` | Forces para cenários negativos | _opcional_ |
+| `billing_plan_tier` | Plano usado nos testes de billing | `pro` |
 
-> Sample configuration lives in `docs/postman/local.postman_environment.json`. Duplicate it, update the secrets (`token`, `store_id`, `stripe_webhook_secret`), and reference the file when running Newman (`--environment`).
+> Exemplo de ambiente em `docs/postman/local.postman_environment.json`. Duplique-o, atualize credenciais e aponte via `--environment` no Newman.
 
-When running in Postman, set `base_url` manually if your API is not on `localhost`. The login request will automatically populate `token` and `store_id` via the test script. For Newman, you can override defaults with an environment JSON file or `--env-var` flags.
+## Ordem sugerida
+1. **Auth / Login** – gera `token`/`store_id`.
+2. **Monitoring** – valida `/healthz` e `/metrics`.
+3. **Fees / Apply** – exercita assinatura HMAC (`X-Taxo-*`) com geração automática de timestamp/nonce pela pre-request script.
+4. **Fees / Rotate HMAC secret** – captura novo segredo (atualiza `hmac_secret` + `taxo_webhook_secret`).
+5. **Reports / Analytics / Billing / Integrations** – como antes.
+6. **Webhooks**:
+   - `Webhooks / Update settings (enable)` – configura endpoint e eventos.
+   - `Webhooks / Rotate HMAC secret` – gera segredo dedicado e atualiza variáveis.
+   - Execute smoke (`python backend/smoke_test.py --webhooks-only`) ou acione fluxos na API para gerar eventos reais.
+   - `Webhooks / List events` – confirma armazenamento e captura `event_id`.
+   - `Webhooks / Replay last event` – executa replay manual e valida status.
+7. **Auth / Logout** – encerra a sessão.
 
-## Execution order
+## Scripts automáticos
+- O script `prerequest` adiciona `Authorization: Bearer <token>` automaticamente.
+- Para `fees/apply`, o script gera corpo canonicalizado, `X-Taxo-Timestamp`, `X-Taxo-Nonce` e `X-Taxo-Signature` conforme contrato (`timestamp\nnonce\nbody`).
+- Requisições que dependem de `taxo_webhook_secret` o capturam via `Webhooks / Rotate HMAC secret`.
 
-1. **Auth / Login** — generates a JWT and seeds the collection variables.
-2. **Monitoring** requests — confirm health checks and metrics respond without authentication.
-3. **Protected endpoints** — run quote/apply/audit/report requests after the login step so the `Authorization` header is populated.
-4. **Fees / Rotate HMAC secret** — optionally rotate the secret after validating `Apply fees`; the test script captures the one-time `hmac_secret` response and updates collection variables.
-5. **Analytics** — call **Analytics / Overview** to capture KPI cards, cursor metadata, and Prometheus counter snapshots. When `evidence_dir` is set the test logs `analytics-overview.json` so artifacts can be archived.
-6. **Reports & billing** — use the previously captured `store_id` to scope report generation and billing previews. Reports assert attachment filenames for deterministic downloads, while the Billing folder exercises entitlements, usage, checkout, portal, and webhook samples. When Stripe credentials are missing the tests emit `BILLING_SKIPPED=true` and exit gracefully.
-7. **Integrations** — exercise `/v1/integrations/status` and the negative install request. By default the collection asserts the feature flag is disabled (`503 integration_disabled`); when flags are turned on, capture the provider status as evidence.
-8. **Webhooks** — use the configured `stripe_webhook_secret` to sign a sample event (processed) and validate that tampered signatures return `400 Invalid signature`.
-9. **Auth / Logout** — revoke the active session when you finish to validate the new `/api/auth/logout` endpoint and clear cached `token`/`store_id` variables for the next run.
+## Evidências e automação
+- Use `--env-var evidence_dir=<dir>` no Newman para registrar caminhos de artefatos (logs, CSV, JSON).
+- Scripts das pastas de Analytics, Reports e Webhooks podem escrever `evidence_path=<dir>/...` no console para arquivamento.
+- Para pipeline CI, inclua jobs separados: `newman run ... --folder Webhooks` e smoke CLI (`python backend/smoke_test.py --webhooks-only`).
 
-Running requests in this sequence ensures dependent variables are always available for downstream calls. The **Analytics** folder exercises `/v1/analytics/overview` and the **Reports** folder includes CSV and JSON variants with test scripts that assert the `Content-Type` header matches the requested format and echo the evidence directory so Newman artifacts can be archived.
+## Cenários negativos recomendados
+- **HMAC inválido**: utilize a requisição "Fees / Apply fees (invalid HMAC)" para verificar `403 invalid_signature`.
+- **Timestamp vencido / nonce reutilizado**: use as requisições dedicadas após definir `hmac_timestamp_override`/`hmac_nonce_override`.
+- **Webhooks**: após configurar endpoint inválido, rode `Webhooks / List events` para confirmar status `failed` com `last_error`. Repare em `docs/webhooks/runbook.md` para procedimentos de replay.
+- **Replay manual**: execute `Webhooks / Replay last event` com `last_taxo_event_id` inexistente para validar `404` (edite a URL manualmente para testes negativos).
 
-## Evidence logging & automation
-
-When executing the collection in CI, set `--env-var evidence_dir=<path>` so the analytics and report scripts can log where JSON/CSV payloads are stored. Each test writes a message such as `evidence_path=<dir>/analytics-overview.json` or `evidence_path=<dir>/mn-summary.json` to the Newman console for traceability. The logout script also removes `token` and `store_id`, which keeps chained Newman jobs from accidentally reusing stale credentials. The same variable can point to an artifact directory inside your CI workspace.
-
-## Negative checks
-
-To validate error handling, exercise at least the following scenarios after a successful login run:
-- Re-run a protected request (e.g., **Fees / Quote**) with the `Authorization` header removed to confirm a `401 Unauthorized` response.
-- Call **Auth / Login** with an invalid password to ensure the API returns the expected `401` error payload and does not overwrite the cached token.
-- For idempotent operations (such as fee application), repeat the request with the same payload and verify the response indicates no duplicate fee records were created.
-- Exercise **Reports / Minnesota summary (invalid format)** to validate the `422` response body and capture evidence that unsupported formats are rejected and audited.
-- In the **Fees / Apply fees (invalid HMAC)** request, leave `hmac_secret` untouched so the pre-request script generates an intentionally corrupted signature and verify a `403` response with `detail.code = invalid_signature`.
-- Exercise the dedicated negative requests — **Fees / Apply fees (stale timestamp)** and **Fees / Apply fees (replay)** — which auto-generate signatures using the exact request body to confirm `401`/`409` responses without manual overrides.
-- After running **Fees / Rotate HMAC secret**, resend an apply request with the previously logged signature to confirm the API returns `detail.code = invalid_signature`.
-- You can still force specific values via `hmac_timestamp_override` or `hmac_nonce_override` before calling **Fees / Apply fees (HMAC)** if you need custom test cases. Expect `detail.code = stale_timestamp` for an expired timestamp and `detail.code = replay_detected` when the same nonce is reused.
-- Override `billing_plan_tier` to an unsupported value (e.g., `enterprise`) in the Billing folder to confirm `400 Bad Request`, e verifique também o cenário de loja sem Stripe (espera `400 stripe_customer_missing`). Desligar as variáveis Stripe continua gerando o `503 billing_unconfigured` (SKIP).
-- The **Integrations / Install (disabled)** request expects `503 integration_disabled` until the feature flag is enabled. When the flag is active, update documentation and evidence with the `200` response payload and ensure the metrics counter `integrations_requests_total{provider="woocommerce",route="install"}` increments.
-- In the **Webhooks** folder, intentionally send the `Webhooks / Deliver (invalid signature)` request to verify the API returns `400 Invalid signature` without surfacing `5xx` errors. Use the signed request to confirm `200 processed` and capture the event id for replay automation (`last_webhook_event_id`).
-
-Document the responses in your test evidence to show both happy-path and guardrail coverage.
-
-## Example Newman command
-
-Run the full collection against a local backend using Newman:
-
+## Exemplo Newman
 ```sh
 newman run docs/postman/state-tax-wizard.postman_collection.json \
   --env-var base_url=http://localhost:8000 \
+  --env-var webhook_endpoint=http://127.0.0.1:8082/capture \
   --reporters cli,junit \
   --reporter-junit-export=reports/newman/state-tax-wizard.xml
 ```
 
-This command overrides the `base_url`, writes CLI output, and exports a JUnit report that can be archived in CI.
+Execute com o servidor alvo e um endpoint de captura acessível para observar eventos gerados (fee/report/hmac). Documente evidências ≤512 KB.

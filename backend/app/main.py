@@ -18,6 +18,7 @@ from .routers import (
     rules,
     store_settings,
     user,
+    webhooks,
 )
 from .db.database import engine
 from .models import models
@@ -96,6 +97,7 @@ app.include_router(billing.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(store_settings.router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
+app.include_router(webhooks.router, prefix="/api")
 
 
 @app.get("/metrics")

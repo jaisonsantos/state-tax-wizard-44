@@ -33,9 +33,9 @@ $signature = hash_hmac('sha256', $canonical, $secret);
 
 $headers = [
   'Content-Type' => 'application/json',
-  'X-RDF-Timestamp' => $timestamp,
-  'X-RDF-Nonce' => $nonce,
-  'X-RDF-Signature' => $signature,
+  'X-Taxo-Timestamp' => $timestamp,
+  'X-Taxo-Nonce' => $nonce,
+  'X-Taxo-Signature' => $signature,
 ];
 ```
 
@@ -54,9 +54,9 @@ def build_headers(secret: str, payload: dict) -> tuple[dict[str, str], str]:
     signature = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
     return {
         'Content-Type': 'application/json',
-        'X-RDF-Timestamp': timestamp,
-        'X-RDF-Nonce': nonce,
-        'X-RDF-Signature': signature,
+        'X-Taxo-Timestamp': timestamp,
+        'X-Taxo-Nonce': nonce,
+        'X-Taxo-Signature': signature,
     }, body
 ```
 

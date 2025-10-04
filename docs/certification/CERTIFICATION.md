@@ -28,7 +28,7 @@
 
 ### Milestone 4 – Security (HMAC, Rate Limiting) **(Closed)**
 
-- HMAC enforcement validates `X-RDF-Timestamp` (ISO/epoch), `X-RDF-Nonce`, and `X-RDF-Signature`, persists nonces only after signature verification, emits low-cardinality metrics, and logs nonce previews without leaking secrets. 【F:backend/app/security/hmac.py†L20-L168】【F:backend/app/observability.py†L10-L95】
+- HMAC enforcement validates `X-Taxo-Timestamp` (ISO/epoch), `X-Taxo-Nonce`, and `X-Taxo-Signature`, persists nonces only after signature verification, emits low-cardinality metrics, and logs nonce previews without leaking secrets. 【F:backend/app/security/hmac.py†L20-L168】【F:backend/app/observability.py†L10-L95】
 - The rate limiter now uses Redis (with Lua-backed sliding windows), raises structured 429s, emits `rate_limit_throttles_total`, and has unit tests covering both memory and Redis paths. 【F:backend/app/security/rate_limit.py†L1-L146】【F:backend/tests/test_rate_limiter.py†L1-L40】
 - `POST /v1/stores/{id}/hmac/rotate` generates and audits new secrets; the Settings UI surfaces a copy-once pane and updates rotation timestamps. 【F:backend/app/routers/store_settings.py†L1-L155】【F:src/pages/Settings.tsx†L16-L420】
 - Security smoke exercises apply/replay/stale flows, forces rate-limit throttling, validates counter increments, and confirms rotated secrets invalidate previous signatures. 【F:backend/smoke_test.py†L210-L360】
