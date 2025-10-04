@@ -8,9 +8,9 @@ Every signed request must include the following headers:
 
 | Header | Purpose |
 | ------ | ------- |
-| `X-RDF-Timestamp` | UTC timestamp in ISO 8601 format (e.g. `2025-03-15T18:02:14Z`). Requests more than ±5 minutes from the API clock are rejected with `detail.code = stale_timestamp`. |
-| `X-RDF-Nonce` | Unique identifier for the request. Nonces are persisted for 10 minutes; reuse within that window returns `detail.code = replay_detected`. |
-| `X-RDF-Signature` | Hex-encoded SHA-256 HMAC digest of the canonical payload. A `sha256=` prefix is optional. |
+| `X-Taxo-Timestamp` | UTC timestamp in ISO 8601 format (e.g. `2025-03-15T18:02:14Z`). Requests more than ±5 minutes from the API clock are rejected with `detail.code = stale_timestamp`. |
+| `X-Taxo-Nonce` | Unique identifier for the request. Nonces are persisted for 10 minutes; reuse within that window returns `detail.code = replay_detected`. |
+| `X-Taxo-Signature` | Hex-encoded SHA-256 HMAC digest of the canonical payload. A `sha256=` prefix is optional. |
 
 The canonical payload concatenates the timestamp, nonce, and raw HTTP body separated by newlines:
 
@@ -20,7 +20,7 @@ signature = HMAC_SHA256(secret, canonical)
 ```
 
 > **Importante:** a assinatura é calculada usando **exatamente** o valor enviado em
-`X-RDF-Timestamp` (incluindo `Z` quando presente). O servidor normaliza o
+`X-Taxo-Timestamp` (incluindo `Z` quando presente). O servidor normaliza o
 timestamp apenas para checar skew, não para recomputar a assinatura.
 Timestamps em epoch (segundos) são aceitos por compatibilidade, porém recomenda-se ISO-8601.
 
@@ -41,9 +41,9 @@ function signApplyRequest(secret: string, payload: unknown) {
   return {
     headers: {
       "Content-Type": "application/json",
-      "X-RDF-Timestamp": timestamp,
-      "X-RDF-Nonce": nonce,
-      "X-RDF-Signature": signature,
+      "X-Taxo-Timestamp": timestamp,
+      "X-Taxo-Nonce": nonce,
+      "X-Taxo-Signature": signature,
     },
     body,
   };
@@ -69,9 +69,9 @@ def sign_apply_request(secret: str, payload: dict[str, object]) -> tuple[dict[st
     return (
         {
             "Content-Type": "application/json",
-            "X-RDF-Timestamp": timestamp,
-            "X-RDF-Nonce": nonce,
-            "X-RDF-Signature": signature,
+            "X-Taxo-Timestamp": timestamp,
+            "X-Taxo-Nonce": nonce,
+            "X-Taxo-Signature": signature,
         },
         body,
     )
@@ -88,7 +88,7 @@ def sign_apply_request(secret: str, payload: dict[str, object]) -> tuple[dict[st
 
 | Symptom | Root cause | Resolution |
 | ------- | ---------- | ---------- |
-| `detail.code = missing_signature` | `X-RDF-Signature` header absent | Ensure your HTTP client is not stripping custom headers and that authentication middleware runs before signing. |
+| `detail.code = missing_signature` | `X-Taxo-Signature` header absent | Ensure your HTTP client is not stripping custom headers and that authentication middleware runs before signing. |
 | `detail.code = invalid_signature` | Timestamp/nonce/body mismatch or wrong secret | Confirm the exact request body bytes used by the HTTP client and regenerate the signature with the same string. |
 | `detail.code = replay_detected` | Nonce reused within 10 minutes | Generate a new nonce per request or wait for the TTL to expire. |
 | `detail.code = stale_timestamp` | Timestamp outside ±5 minute skew | Synchronise server clocks (e.g. `systemd-timesyncd`, `ntpd`). |

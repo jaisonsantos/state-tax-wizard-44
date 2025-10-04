@@ -1,56 +1,8 @@
-# HELP billing_events_total Count of billing lifecycle events
-# TYPE billing_events_total counter
-billing_events_total{event="entitlements_requested"} 2.0
-billing_events_total{event="usage_fetched"} 2.0
-billing_events_total{event="usage_requested"} 2.0
-billing_events_total{event="subscription_created"} 4.0
-billing_events_total{event="webhook_processed"} 2.0
-billing_events_total{event="checkout_session_created"} 1.0
-billing_events_total{event="checkout_session_returned"} 1.0
-billing_events_total{event="portal_session_created"} 1.0
-billing_events_total{event="portal_session_returned"} 1.0
-# HELP billing_events_created Count of billing lifecycle events
-# TYPE billing_events_created gauge
-billing_events_created{event="entitlements_requested"} 1.7595820827617984e+09
-billing_events_created{event="usage_fetched"} 1.759582082768998e+09
-billing_events_created{event="usage_requested"} 1.759582082769133e+09
-billing_events_created{event="subscription_created"} 1.7595821252942386e+09
-billing_events_created{event="webhook_processed"} 1.75958212533671e+09
-billing_events_created{event="checkout_session_created"} 1.7595821496795733e+09
-billing_events_created{event="checkout_session_returned"} 1.7595821496798944e+09
-billing_events_created{event="portal_session_created"} 1.7595821500107112e+09
-billing_events_created{event="portal_session_returned"} 1.759582150011026e+09
-# HELP webhooks_received_total Count of incoming webhook events grouped by provider and event type
-# TYPE webhooks_received_total counter
-webhooks_received_total{event="customer.subscription.created",provider="stripe"} 4.0
-# HELP webhooks_received_created Count of incoming webhook events grouped by provider and event type
-# TYPE webhooks_received_created gauge
-webhooks_received_created{event="customer.subscription.created",provider="stripe"} 1.7595821252815945e+09
-# HELP webhooks_processed_total Count of processed webhook events grouped by provider, event type, and outcome
-# TYPE webhooks_processed_total counter
-webhooks_processed_total{event="customer.subscription.created",outcome="processed",provider="stripe"} 4.0
-# HELP webhooks_processed_created Count of processed webhook events grouped by provider, event type, and outcome
-# TYPE webhooks_processed_created gauge
-webhooks_processed_created{event="customer.subscription.created",outcome="processed",provider="stripe"} 1.7595821253366554e+09
-# HELP webhook_processing_latency_ms Webhook processing duration in milliseconds
-# TYPE webhook_processing_latency_ms histogram
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.005",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.01",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.025",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.05",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.075",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.1",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.25",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.5",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="0.75",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="1.0",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="2.5",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="5.0",provider="stripe"} 0.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="7.5",provider="stripe"} 3.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="10.0",provider="stripe"} 3.0
-webhook_processing_latency_ms_bucket{event="customer.subscription.created",le="+Inf",provider="stripe"} 4.0
-webhook_processing_latency_ms_count{event="customer.subscription.created",provider="stripe"} 4.0
-webhook_processing_latency_ms_sum{event="customer.subscription.created",provider="stripe"} 75.36833299673162
-# HELP webhook_processing_latency_ms_created Webhook processing duration in milliseconds
-# TYPE webhook_processing_latency_ms_created gauge
-webhook_processing_latency_ms_created{event="customer.subscription.created",provider="stripe"} 1.7595821253366685e+09
+# Métricas Prometheus – captura pendente (ambiente local sem stack)
+# Instruções quando Prometheus/metrics endpoint estiver disponível:
+#   curl -s $METRICS_URL | grep 'webhooks_\|hmac_\|billing_'
+#   head -n 20 > docs/certification/EVIDENCE/metrics_dump.txt
+# Esperado: contadores `webhooks_delivery_total{event="fee.applied",status="delivered"}`,
+# histograma `webhooks_delivery_seconds_bucket`, `webhooks_failed_total{reason="missing_endpoint"}`,
+# `webhooks_dead_letter_total{event="fee.applied"}`,
+# além de métricas legadas (`billing_events_total`, `fees_applied_total`).

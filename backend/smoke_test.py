@@ -6,9 +6,12 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler
+from socketserver import TCPServer
 from typing import Any, Dict, Tuple
 
 import httpx
@@ -148,9 +151,9 @@ def _signed_headers(
     headers.update(
         {
             "Content-Type": "application/json",
-            "X-RDF-Timestamp": timestamp_value,
-            "X-RDF-Nonce": nonce_value,
-            "X-RDF-Signature": signature,
+            "X-Taxo-Timestamp": timestamp_value,
+            "X-Taxo-Nonce": nonce_value,
+            "X-Taxo-Signature": signature,
         }
     )
     return headers, timestamp_value, nonce_value
@@ -647,9 +650,9 @@ def run_security_only_smoke() -> Dict[str, Any]:
         invalid_headers.update(
             {
                 "Content-Type": "application/json",
-                "X-RDF-Timestamp": new_timestamp,
-                "X-RDF-Nonce": new_nonce,
-                "X-RDF-Signature": old_signature,
+                "X-Taxo-Timestamp": new_timestamp,
+                "X-Taxo-Nonce": new_nonce,
+                "X-Taxo-Signature": old_signature,
             }
         )
         invalid_after_rotation = client.post(
@@ -833,93 +836,143 @@ def run_integrations_only_smoke() -> Dict[str, Any]:
 
 
 def run_webhooks_only_smoke() -> Dict[str, Any]:
-    if not STRIPE_WEBHOOK_SECRET:
-        print("⚠ SKIP: STRIPE_WEBHOOK_SECRET not configured; skipping webhook smoke.")
-        return {"skipped": True, "reason": "webhook_secret_missing"}
+    class _WebhookCaptureHandler(BaseHTTPRequestHandler):
+        def do_POST(self):  # type: ignore[override]
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            record = {
+                "path": self.path,
+                "body": body,
+                "headers": {key: value for key, value in self.headers.items()},
+            }
+            self.server.events.append(record)  # type: ignore[attr-defined]
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
 
-    event_id = f"evt_smoke_{uuid.uuid4().hex}"
+        def log_message(self, format: str, *args):  # noqa: A003 - suppress noisy logging
+            return
 
-    with httpx.Client() as client:
-        login_payload = login(client)
-        store_id = login_payload["stores"][0]["id"]
-        token = login_payload["token"]
+    with TCPServer(("127.0.0.1", 0), _WebhookCaptureHandler) as httpd:
+        httpd.allow_reuse_address = True  # type: ignore[attr-defined]
+        httpd.events = []  # type: ignore[attr-defined]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        endpoint_url = f"http://127.0.0.1:{httpd.server_address[1]}/hooks"
 
-        event_payload = {
-            "id": event_id,
-            "type": "customer.subscription.created",
-            "data": {
-                "object": {
-                    "id": f"sub_{uuid.uuid4().hex[:12]}",
-                    "customer": f"cus_{uuid.uuid4().hex[:12]}",
-                    "metadata": {"store_id": store_id},
-                    "status": "active",
-                    "items": {
-                        "data": [
-                            {
-                                "price": {
-                                    "id": settings.stripe_price_id_pro or "price_pro",
-                                }
-                            }
-                        ]
-                    },
-                    "current_period_start": int(time.time()),
-                    "current_period_end": int(time.time()) + 86_400,
-                    "cancel_at_period_end": False,
+        try:
+            with httpx.Client() as client:
+                login_payload = login(client)
+                store_id = login_payload["stores"][0]["id"]
+                token = login_payload["token"]
+                auth_headers = {"Authorization": f"Bearer {token}"}
+
+                rotate_response = client.post(
+                    f"{API_BASE_URL}/v1/stores/{store_id}/hmac/rotate",
+                    headers=auth_headers,
+                    timeout=20.0,
+                )
+                _raise_for_status(rotate_response, "rotate hmac secret")
+                rotation_payload = rotate_response.json()
+                secret = rotation_payload.get("hmac_secret")
+                if not secret:
+                    raise SmokeFailure("rotation response missing hmac_secret")
+                os.environ["SMOKE_HMAC_SECRET"] = secret
+
+                update_payload = {
+                    "enable_mn": True,
+                    "enable_co": True,
+                    "absorb_fee": False,
+                    "label_override": "Delivery Fee",
+                    "webhook_active": True,
+                    "webhook_endpoint": endpoint_url,
+                    "webhook_events": ["fee.applied", "report.ready", "hmac.rotated"],
                 }
-            },
-        }
+                update_response = client.put(
+                    f"{API_BASE_URL}/v1/stores/{store_id}/settings",
+                    json=update_payload,
+                    headers=auth_headers,
+                    timeout=20.0,
+                )
+                _raise_for_status(update_response, "update webhook settings")
 
-        payload_bytes = json.dumps(event_payload).encode("utf-8")
-        signature = _stripe_signature(payload_bytes, STRIPE_WEBHOOK_SECRET)
-
-        response = client.post(
-            f"{API_BASE_URL}/v1/billing/webhooks/stripe",
-            content=payload_bytes,
-            headers={"stripe-signature": signature},
-            timeout=20.0,
-        )
-        _raise_for_status(response, "webhook delivery")
-        result = response.json()
-        status = result.get("status")
-        if status not in {"processed", "duplicate"}:
-            raise SmokeFailure(f"Unexpected webhook outcome: {status}")
-
-        # Replay endpoint should acknowledge the already processed event
-        replay_response = client.post(
-            f"{API_BASE_URL}/v1/billing/webhooks/stripe/replay/{event_id}",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=20.0,
-        )
-        _raise_for_status(replay_response, "webhook replay")
-
-        metrics_snapshot = fetch_metrics(client)
-        expected_checks = [
-            (
-                "webhooks_received_total",
-                ["provider=\"stripe\"", "event=\"customer.subscription.created\""],
-            ),
-            (
-                "webhooks_processed_total",
-                ["provider=\"stripe\"", "event=\"customer.subscription.created\""],
-            ),
-        ]
-        for metric_name, labels in expected_checks:
-            if metric_name not in metrics_snapshot or not all(
-                label in metrics_snapshot for label in labels
-            ):
-                raise SmokeFailure(
-                    f"metrics missing {metric_name} with labels {', '.join(labels)}"
+                apply_result, _ = apply_fees(
+                    client,
+                    auth_headers,
+                    store_id,
+                    order_id=f"smoke-{uuid.uuid4().hex[:8]}",
+                    state="MN",
+                    return_meta=True,
                 )
 
-    print("Webhooks smoke completed successfully.")
-    print(f"Webhook status: {status}")
-    print(f"Replay status: {replay_response.json().get('status')}")
+                time.sleep(0.5)
+                events = getattr(httpd, "events")  # type: ignore[attr-defined]
+                if not events:
+                    raise SmokeFailure("Webhook endpoint did not receive any requests")
 
-    return {
-        "webhook": result,
-        "replay": replay_response.json(),
-        "metrics": metrics_snapshot,
-    }
+                latest = events[-1]
+                headers = latest["headers"]
+                body = latest["body"]
+                timestamp = headers.get("X-Taxo-Timestamp")
+                nonce = headers.get("X-Taxo-Nonce")
+                signature = headers.get("X-Taxo-Signature")
+                if not (timestamp and nonce and signature):
+                    raise SmokeFailure("Webhook headers missing X-Taxo-* values")
+
+                expected_signature = compute_signature(secret, timestamp, nonce, body)
+                if not hmac.compare_digest(signature, expected_signature):
+                    raise SmokeFailure("Webhook signature validation failed")
+
+                payload = json.loads(body.decode("utf-8"))
+                event_id = payload.get("id")
+                if not event_id:
+                    raise SmokeFailure("Webhook payload missing id")
+
+                list_response = client.get(
+                    f"{API_BASE_URL}/v1/webhooks/events",
+                    params={"store_id": store_id, "limit": 5},
+                    headers=auth_headers,
+                    timeout=20.0,
+                )
+                _raise_for_status(list_response, "list webhook events")
+                events_payload = list_response.json().get("events", [])
+                persisted = next((evt for evt in events_payload if evt["event_id"] == event_id), None)
+                if not persisted:
+                    raise SmokeFailure("Webhook event not persisted in outbox")
+
+                replay_response = client.post(
+                    f"{API_BASE_URL}/v1/webhooks/events/{event_id}/replay",
+                    headers=auth_headers,
+                    timeout=20.0,
+                )
+                _raise_for_status(replay_response, "webhook replay")
+
+                metrics_snapshot = fetch_metrics(client)
+                expected_metrics = [
+                    ("webhooks_delivery_total", ["event=\"fee.applied\"", "status=\"delivered\""]),
+                    ("webhooks_delivery_seconds", ["event=\"fee.applied\""]),
+                ]
+                for metric_name, labels in expected_metrics:
+                    if metric_name not in metrics_snapshot or not all(
+                        label in metrics_snapshot for label in labels
+                    ):
+                        raise SmokeFailure(
+                            f"metrics missing {metric_name} with labels {', '.join(labels)}"
+                        )
+
+                print("Webhooks smoke completed successfully.")
+                print(f"Captured webhook ID: {event_id}")
+                print(f"Replay status: {replay_response.json().get('status')}")
+
+                return {
+                    "apply": apply_result,
+                    "webhook": payload,
+                    "replay": replay_response.json(),
+                    "metrics": metrics_snapshot,
+                }
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=1.0)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entrypoint

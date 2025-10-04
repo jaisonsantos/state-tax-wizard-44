@@ -67,6 +67,9 @@ export interface StoreSettings {
   label_override: string;
   plan?: string | null;
   hmac_last_rotated_at?: string | null;
+  webhook_active: boolean;
+  webhook_endpoint?: string | null;
+  webhook_events: string[];
 }
 
 export interface RotateHmacSecretResponse {
@@ -76,11 +79,39 @@ export interface RotateHmacSecretResponse {
   previous_rotated_at?: string | null;
 }
 
+export interface WebhookEventRecord {
+  event_id: string;
+  event_type: string;
+  status: string;
+  attempts: number;
+  next_retry_at?: string | null;
+  last_error?: string | null;
+  delivered_at?: string | null;
+  dead_letter: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookEventListResponse {
+  events: WebhookEventRecord[];
+}
+
+export interface WebhookReplayResponse {
+  event_id: string;
+  status: string;
+  attempts: number;
+  next_retry_at?: string | null;
+  dead_letter: boolean;
+}
+
 export interface UpdateStoreSettingsPayload {
   enable_mn: boolean;
   enable_co: boolean;
   absorb_fee: boolean;
   label_override: string;
+  webhook_active?: boolean;
+  webhook_endpoint?: string | null;
+  webhook_events?: string[];
 }
 
 export interface LoginResponse {
@@ -454,6 +485,25 @@ class ApiClient {
 
   async rotateHmacSecret(storeId: string): Promise<RotateHmacSecretResponse> {
     return this.request<RotateHmacSecretResponse>(`/v1/stores/${storeId}/hmac/rotate`, {
+      method: 'POST',
+    });
+  }
+
+  async getWebhookEvents(
+    storeId: string,
+    status?: string,
+    limit: number = 50,
+  ): Promise<WebhookEventListResponse> {
+    const params = new URLSearchParams({ store_id: storeId, limit: String(limit) });
+    if (status) {
+      params.set('status', status);
+    }
+
+    return this.request<WebhookEventListResponse>(`/v1/webhooks/events?${params.toString()}`);
+  }
+
+  async replayWebhookEvent(eventId: string): Promise<WebhookReplayResponse> {
+    return this.request<WebhookReplayResponse>(`/v1/webhooks/events/${eventId}/replay`, {
       method: 'POST',
     });
   }

@@ -35,6 +35,16 @@
       "key": "stripe_webhook_secret",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "webhook_endpoint",
+      "value": "http://127.0.0.1:8082/capture",
+      "type": "string"
+    },
+    {
+      "key": "taxo_webhook_secret",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -485,9 +495,9 @@
                   "pm.collectionVariables.set('last_signed_nonce', nonce);",
                   "const message = `${timestamp}\\n${nonce}\\n${resolvedBody}`;",
                   "const signature = crypto.HmacSHA256(message, secret).toString(crypto.enc.Hex);",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Signature', value: signature });",
                   "pm.collectionVariables.set('last_signed_timestamp', timestamp);",
                   "pm.collectionVariables.set('last_signed_body', resolvedBody);",
                   "pm.request.body.raw = resolvedBody;"
@@ -607,7 +617,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.request.headers.remove('x-rdf-signature');"
+                  "pm.request.headers.remove('x-taxo-signature');"
                 ]
               }
             },
@@ -685,14 +695,14 @@
                   "pm.collectionVariables.set('last_signed_nonce', nonce);",
                   "const message = `${timestamp}\\n${nonce}\\n${resolvedBody}`;",
                   "const signature = crypto.HmacSHA256(message, secret).toString(crypto.enc.Hex);",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Signature', value: signature });",
                   "pm.collectionVariables.set('last_signed_timestamp', timestamp);",
                   "pm.collectionVariables.set('last_signed_body', resolvedBody);",
                   "pm.request.body.raw = resolvedBody;",
                   "const tampered = signature.replace(/^[0-9a-f]/, function(char) { return char === 'a' ? 'b' : 'a'; });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: tampered });"
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Signature', value: tampered });"
                 ]
               }
             }
@@ -802,9 +812,9 @@
                   "const message = `${timestamp}\\n${nonce}\\n${body}`;",
                   "const signature = crypto.HmacSHA256(message, secret).toString(crypto.enc.Hex);",
                   "pm.request.body.raw = body;",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Signature', value: signature });"
                 ]
               }
             }
@@ -887,9 +897,9 @@
                   "const message = `${timestamp}\\n${nonce}\\n${body}`;",
                   "const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.body.raw = body;",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Timestamp', value: timestamp });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Nonce', value: nonce });",
-                  "pm.request.headers.upsert({ key: 'X-RDF-Signature', value: signature });"
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Nonce', value: nonce });",
+                  "pm.request.headers.upsert({ key: 'X-Taxo-Signature', value: signature });"
                 ]
               }
             }
@@ -1826,9 +1836,9 @@
       "name": "Webhooks",
       "item": [
         {
-          "name": "Webhooks / Deliver (processed)",
+          "name": "Webhooks / Update settings (enable)",
           "request": {
-            "method": "POST",
+            "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
@@ -1837,19 +1847,139 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"evt_postman_{{$guid}}\",\n  \"type\": \"customer.subscription.created\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"sub_postman_{{$guid}}\",\n      \"customer\": \"cus_postman_{{$timestamp}}\",\n      \"metadata\": {\n        \"store_id\": \"{{store_id}}\"\n      },\n      \"status\": \"active\",\n      \"items\": {\n        \"data\": [\n          {\n            \"price\": {\n              \"id\": \"{{stripe_price_id_pro}}\"\n            }\n          }\n        ]\n      },\n      \"current_period_start\": 1700000000,\n      \"current_period_end\": 1700086400,\n      \"cancel_at_period_end\": false\n    }\n  }\n}"
+              "raw": "{\n  \"enable_mn\": true,\n  \"enable_co\": true,\n  \"absorb_fee\": false,\n  \"label_override\": \"Delivery fee\",\n  \"webhook_active\": true,\n  \"webhook_endpoint\": \"{{webhook_endpoint}}\",\n  \"webhook_events\": [\n    \"fee.applied\",\n    \"report.ready\",\n    \"hmac.rotated\"\n  ]\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/billing/webhooks/stripe",
+              "raw": "{{base_url}}/api/v1/stores/{{store_id}}/settings",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "billing",
+                "stores",
+                "{{store_id}}",
+                "settings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Settings updated', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('webhook_endpoint', json.webhook_endpoint || pm.collectionVariables.get('webhook_endpoint'));",
+                  "pm.collectionVariables.set('webhook_events', (json.webhook_events || []).join(','));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Webhooks / Rotate HMAC secret",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stores/{{store_id}}/hmac/rotate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stores",
+                "{{store_id}}",
+                "hmac",
+                "rotate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HMAC rotated', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('taxo_webhook_secret', json.hmac_secret);",
+                  "pm.collectionVariables.set('hmac_secret', json.hmac_secret);",
+                  "pm.collectionVariables.set('last_hmac_rotated_at', json.rotated_at);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Webhooks / List events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/webhooks/events?store_id={{store_id}}&limit=5",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
                 "webhooks",
-                "stripe"
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "store_id",
+                  "value": "{{store_id}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Events listed', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "if (json.events && json.events.length > 0) {",
+                  "  pm.collectionVariables.set('last_taxo_event_id', json.events[0].event_id);",
+                  "  pm.collectionVariables.set('last_taxo_event_status', json.events[0].status);",
+                  "}",
+                  "pm.collectionVariables.set('webhook_events_count', json.events ? json.events.length : 0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Webhooks / Replay last event",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/webhooks/events/{{last_taxo_event_id}}/replay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "events",
+                "{{last_taxo_event_id}}",
+                "replay"
               ]
             }
           },
@@ -1859,24 +1989,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const secret = pm.collectionVariables.get('stripe_webhook_secret') || pm.environment.get('stripe_webhook_secret');",
-                  "const rawBody = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '{}';",
-                  "if (secret) {",
-                  "  const timestamp = Math.floor(Date.now() / 1000);",
-                  "  const crypto = (typeof CryptoJS !== 'undefined') ? CryptoJS : require('crypto-js');",
-                  "  if (typeof CryptoJS === 'undefined') { globalThis.CryptoJS = crypto; }",
-                  "  const resolvedBody = pm.variables.replaceIn(rawBody);",
-                  "  pm.request.body.raw = resolvedBody;",
-                  "  const signature = crypto.HmacSHA256(`${timestamp}.${resolvedBody}`, secret).toString(crypto.enc.Hex);",
-                  "  pm.request.headers.upsert({ key: 'stripe-signature', value: `t=${timestamp},v1=${signature}` });",
-                  "  try {",
-                  "    const parsed = JSON.parse(resolvedBody);",
-                  "    pm.collectionVariables.set('last_webhook_event_id', parsed.id);",
-                  "  } catch (err) {",
-                  "    console.warn('Unable to parse webhook body', err);",
-                  "  }",
-                  "} else {",
-                  "  console.warn('stripe_webhook_secret not configured; request may fail');",
+                  "if (!pm.collectionVariables.get('last_taxo_event_id')) {",
+                  "  throw new Error('Execute \"Webhooks / List events\" first to capture an event_id.');",
                   "}"
                 ]
               }
@@ -1886,56 +2000,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Webhook processed', function () {",
-                  "  pm.response.to.have.status(200);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Webhooks / Deliver (invalid signature)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "stripe-signature",
-                "value": "t=0,v1=invalid"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"id\": \"evt_postman_{{$guid}}\",\n  \"type\": \"customer.subscription.created\",\n  \"data\": {\n    \"object\": {\n      \"id\": \"sub_postman_{{$guid}}\",\n      \"customer\": \"cus_postman_{{$timestamp}}\",\n      \"metadata\": {\n        \"store_id\": \"{{store_id}}\"\n      },\n      \"status\": \"active\",\n      \"items\": {\n        \"data\": [\n          {\n            \"price\": {\n              \"id\": \"{{stripe_price_id_pro}}\"\n            }\n          }\n        ]\n      },\n      \"current_period_start\": 1700000000,\n      \"current_period_end\": 1700086400,\n      \"cancel_at_period_end\": false\n    }\n  }\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/billing/webhooks/stripe",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "webhooks",
-                "stripe"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Webhook rejected', function () {",
-                  "  pm.response.to.have.status(400);",
-                  "  pm.expect(pm.response.json().detail).to.eql('Invalid signature');",
-                  "});"
+                  "pm.test('Replay requested', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('last_taxo_event_status', json.status);"
                 ]
               }
             }
@@ -1952,22 +2019,46 @@
         "exec": [
           "const token = pm.collectionVariables.get('token');",
           "if (token) {",
-          "    pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${token}` });",
+          "  pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${token}` });",
           "} else {",
-          "    pm.request.headers.remove('Authorization');",
+          "  pm.request.headers.remove('Authorization');",
           "}",
-          "const secret = pm.collectionVariables.get('hmac_secret');",
+          "const secret = pm.collectionVariables.get('hmac_secret') || pm.collectionVariables.get('taxo_webhook_secret') || pm.environment.get('hmac_secret');",
           "const pathSegments = pm.request.url && pm.request.url.path ? pm.request.url.path : [];",
           "const isApply = Array.isArray(pathSegments) && pathSegments.includes('fees') && pathSegments.includes('apply');",
           "if (isApply) {",
-          "    const generated = `ORDER-${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
-          "    pm.collectionVariables.set('order_id', generated);",
+          "  const generated = `ORDER-${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+          "  pm.collectionVariables.set('order_id', generated);",
+          "}",
+          "function canonicalize(value) {",
+          "  if (Array.isArray(value)) {",
+          "    return '[' + value.map(canonicalize).join(',') + ']';",
+          "  }",
+          "  if (value && typeof value === 'object') {",
+          "    return '{' + Object.keys(value).sort().map(function(key) { return JSON.stringify(key) + ':' + canonicalize(value[key]); }).join(',') + '}';",
+          "  }",
+          "  return JSON.stringify(value);",
           "}",
           "if (isApply && secret) {",
-          "    const rawBody = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
-          "    const resolvedBody = pm.variables.replaceIn(rawBody);",
-          "    const signature = CryptoJS.HmacSHA256(resolvedBody, secret).toString();",
-          "    pm.request.headers.upsert({ key: 'x-rdf-signature', value: `sha256=${signature}` });",
+          "  const rawBody = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+          "  const resolvedBody = pm.variables.replaceIn(rawBody);",
+          "  if (resolvedBody) { pm.request.body.raw = resolvedBody; }",
+          "  let canonicalBody = '{}';",
+          "  if (resolvedBody) {",
+          "    try {",
+          "      canonicalBody = canonicalize(JSON.parse(resolvedBody));",
+          "    } catch (err) {",
+          "      console.warn('Unable to canonicalize body', err);",
+          "      canonicalBody = resolvedBody;",
+          "    }",
+          "  }",
+          "  const timestamp = new Date().toISOString();",
+          "  const nonce = CryptoJS.lib.WordArray.random(16).toString();",
+          "  const message = `${timestamp}\n${nonce}\n${canonicalBody}`;",
+          "  const signature = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+          "  pm.request.headers.upsert({ key: 'X-Taxo-Timestamp', value: timestamp });",
+          "  pm.request.headers.upsert({ key: 'X-Taxo-Nonce', value: nonce });",
+          "  pm.request.headers.upsert({ key: 'X-Taxo-Signature', value: signature });",
           "}"
         ]
       }

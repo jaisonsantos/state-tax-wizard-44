@@ -22,18 +22,18 @@ settings. The API also returns `absorbed` at the top level and persists
 payload tampering. When a store setting includes an `hmac_secret`, clients **must**
 send:
 
-- `X-RDF-Timestamp`: ISO-8601 timestamp (recommended) or Unix epoch seconds. The
+- `X-Taxo-Timestamp`: ISO-8601 timestamp (recommended) or Unix epoch seconds. The
   signature uses the **exact** header value provided, including a trailing `Z`
   when present.
-- `X-RDF-Nonce`: unique, one-time value per request.
-- `X-RDF-Signature`: lowercase hexadecimal SHA-256 digest of the canonical payload
+- `X-Taxo-Nonce`: unique, one-time value per request.
+- `X-Taxo-Signature`: lowercase hexadecimal SHA-256 digest of the canonical payload
   (`timestamp + "\n" + nonce + "\n" + body`) using the store secret. The API accepts
   either the bare digest or an explicit algorithm prefix:
 
 ```
-X-RDF-Signature: <hex digest>
+X-Taxo-Signature: <hex digest>
 # or
-X-RDF-Signature: sha256=<hex digest>
+X-Taxo-Signature: sha256=<hex digest>
 ```
 
 If a secret is configured and a required header is **missing**, the API responds

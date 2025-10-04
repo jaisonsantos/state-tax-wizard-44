@@ -22,7 +22,7 @@ Deliver **Security Hardening** by implementing HMAC signatures for webhook/plugi
 - Extend existing `store_settings.hmac_secret` support with a `hmac_secret_rotated_at` timestamp so rotations are auditable.
 - Generate secrets during onboarding/settings update when absent and expose rotation endpoint/flow if required.
 - Create `backend/app/security/hmac.py` helpers that:
-  - Read `X-RDF-Signature`, `X-RDF-Timestamp`, and `X-RDF-Nonce` headers from incoming requests.
+  - Read `X-Taxo-Signature`, `X-Taxo-Timestamp`, and `X-Taxo-Nonce` headers from incoming requests.
   - Validate signature against the raw request body using the store's `hmac_secret`.
   - Enforce ±5 minute timestamp tolerance (configurable) and reject stale/future requests.
 - Wire the helper into `/v1/fees/apply` (and future webhook endpoints) ahead of broader middleware adoption.

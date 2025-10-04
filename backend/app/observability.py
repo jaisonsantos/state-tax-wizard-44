@@ -98,6 +98,30 @@ webhooks_processed_total = Counter(
     ["provider", "event", "outcome"],
 )
 
+webhooks_delivery_total = Counter(
+    "webhooks_delivery_total",
+    "Count of outgoing webhook delivery attempts grouped by event and status",
+    ["event", "status"],
+)
+
+webhooks_delivery_seconds = Histogram(
+    "webhooks_delivery_seconds",
+    "Duration of outgoing webhook deliveries in seconds",
+    ["event"],
+)
+
+webhooks_failed_total = Counter(
+    "webhooks_failed_total",
+    "Count of outgoing webhook delivery failures grouped by event and reason",
+    ["event", "reason"],
+)
+
+webhooks_dead_letter_total = Counter(
+    "webhooks_dead_letter_total",
+    "Count of outgoing webhook events moved to the dead letter queue",
+    ["event"],
+)
+
 # Track webhook processing latency in milliseconds
 webhook_processing_latency_ms = Histogram(
     "webhook_processing_latency_ms",
@@ -162,6 +186,13 @@ def log_security_event(event: Dict[str, Any]) -> None:
     logger.info(json.dumps(event, default=str))
 
 
+def log_webhook_delivery(event: Dict[str, Any]) -> None:
+    """Emit a structured outgoing webhook delivery log."""
+
+    logger = logging.getLogger("webhook")
+    logger.info(json.dumps(event, default=str))
+
+
 def log_billing_event(event: str, **kwargs) -> None:
     """Emit a structured billing event log."""
     from datetime import datetime, timezone
@@ -204,3 +235,22 @@ def record_webhook_processed(provider: str, event: str, outcome: str, duration_m
 
     webhooks_processed_total.labels(provider=provider, event=event, outcome=outcome).inc()
     webhook_processing_latency_ms.labels(provider=provider, event=event).observe(duration_ms)
+
+
+def record_outgoing_webhook_delivery(event: str, status: str, duration_seconds: float) -> None:
+    """Record metrics for outgoing webhook deliveries."""
+
+    webhooks_delivery_total.labels(event=event, status=status).inc()
+    webhooks_delivery_seconds.labels(event=event).observe(duration_seconds)
+
+
+def record_outgoing_webhook_failure(event: str, reason: str) -> None:
+    """Record metrics for outgoing webhook delivery failures."""
+
+    webhooks_failed_total.labels(event=event, reason=reason).inc()
+
+
+def record_outgoing_webhook_dead_letter(event: str) -> None:
+    """Record metrics when a webhook event is moved to the DLQ."""
+
+    webhooks_dead_letter_total.labels(event=event).inc()

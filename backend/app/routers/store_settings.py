@@ -14,6 +14,9 @@ from ..schema.store_settings import (
     UpdateStoreSettingsRequest,
 )
 from ..services.entitlement_service import EntitlementService
+from ..services.taxo_webhook_service import TaxoWebhookService
+
+TAXO_EVENT_CATALOG = {"fee.applied", "fee.skipped", "report.ready", "hmac.rotated"}
 
 
 router = APIRouter(prefix="/v1/stores", tags=["store-settings"])
@@ -77,6 +80,9 @@ async def get_store_settings(
         label_override=settings.label_override,
         plan=plan,
         hmac_last_rotated_at=settings.hmac_secret_rotated_at,
+        webhook_active=bool(settings.webhook_active and settings.webhook_endpoint),
+        webhook_endpoint=settings.webhook_endpoint,
+        webhook_events=list(settings.webhook_events or []),
     )
 
 
@@ -117,8 +123,25 @@ async def rotate_hmac_secret(
 
     db.add(settings)
     db.add(audit_log)
+    queued = TaxoWebhookService.queue_hmac_rotated(
+        db,
+        store_id=store_id,
+        rotated_at=now,
+        previous_rotated_at=previous_rotated_at,
+        actor=auth.email,
+    )
+
     db.commit()
     db.refresh(settings)
+
+    if queued:
+        TaxoWebhookService.dispatch_events(
+            db,
+            store_id,
+            [queued],
+            settings_model=settings,
+        )
+        db.commit()
 
     return RotateHmacSecretResponse(
         store_id=str(store_id),
@@ -153,6 +176,21 @@ async def update_store_settings(
     if plan and settings.plan != plan:
         settings.plan = plan
 
+    if payload.webhook_active is not None:
+        settings.webhook_active = payload.webhook_active
+    if payload.webhook_endpoint is not None:
+        endpoint = payload.webhook_endpoint.strip()
+        settings.webhook_endpoint = endpoint or None
+    if payload.webhook_events is not None:
+        cleaned_events: list[str] = []
+        for candidate in payload.webhook_events:
+            if not candidate:
+                continue
+            event = candidate.strip()
+            if event in TAXO_EVENT_CATALOG and event not in cleaned_events:
+                cleaned_events.append(event)
+        settings.webhook_events = cleaned_events
+
     db.add(settings)
 
     audit_log = AuditLog(
@@ -176,4 +214,7 @@ async def update_store_settings(
         label_override=settings.label_override,
         plan=_resolve_plan_slug(db, store_id, settings.plan),
         hmac_last_rotated_at=settings.hmac_secret_rotated_at,
+        webhook_active=bool(settings.webhook_active and settings.webhook_endpoint),
+        webhook_endpoint=settings.webhook_endpoint,
+        webhook_events=list(settings.webhook_events or []),
     )

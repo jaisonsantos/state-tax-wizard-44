@@ -3,14 +3,16 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..core.deps import AuthContext, assert_store_access, get_auth_context
 from ..db.database import get_db
-from ..models.models import AuditLog
+from ..models.models import AuditLog, StoreSetting
+from ..observability import ensure_request_id
 from ..services.report_service import ReportExportResult, ReportService
+from ..services.taxo_webhook_service import TaxoWebhookService
 
 router = APIRouter(prefix="/v1/reports", tags=["reports"])
 
@@ -68,11 +70,12 @@ def _persist_audit(
 
     audit_log = AuditLog(actor=actor, action="report_export", payload=payload)
     db.add(audit_log)
-    db.commit()
+    db.flush()
 
 
 @router.get("/co/dr1786")
 async def generate_co_dr1786(
+    http_request: Request,
     store_id: str = Query(...),
     from_date: str = Query(...),
     to_date: str = Query(...),
@@ -88,6 +91,13 @@ async def generate_co_dr1786(
     to_dt = _parse_iso_datetime(to_date)
 
     actor = f"user:{auth.email}"
+
+    request_id = ensure_request_id(http_request.headers.get("x-request-id") if http_request else None)
+    store_settings = (
+        db.query(StoreSetting)
+        .filter(StoreSetting.store_id == store_id)
+        .first()
+    )
 
     try:
         result = ReportService.generate_co_dr1786(store_id, from_dt, to_dt, db)
@@ -117,6 +127,7 @@ async def generate_co_dr1786(
             mime_type="text/csv",
             error=str(exc),
         )
+        db.commit()
         raise
 
     _persist_audit(
@@ -132,6 +143,37 @@ async def generate_co_dr1786(
         mime_type="text/csv",
     )
 
+    queued_events = []
+    download_path = (
+        f"/api/v1/reports/co/dr1786?store_id={store_id}"
+        f"&from_date={from_dt.astimezone(timezone.utc).isoformat()}"
+        f"&to_date={to_dt.astimezone(timezone.utc).isoformat()}"
+    )
+    queued = TaxoWebhookService.queue_report_ready(
+        db,
+        store_id=store_id,
+        report=result.report,
+        fmt=result.format,
+        from_date=from_dt,
+        to_date=to_dt,
+        row_count=result.row_count,
+        download_path=download_path,
+        request_id=request_id,
+    )
+    if queued:
+        queued_events.append(queued)
+
+    db.commit()
+
+    if queued_events:
+        TaxoWebhookService.dispatch_events(
+            db,
+            store_id,
+            queued_events,
+            settings_model=store_settings,
+        )
+        db.commit()
+
     return StreamingResponse(
         io.StringIO(result.content if isinstance(result.content, str) else ""),
         media_type="text/csv",
@@ -141,6 +183,7 @@ async def generate_co_dr1786(
 
 @router.get("/mn/summary")
 async def generate_mn_summary(
+    http_request: Request,
     store_id: str = Query(...),
     from_date: str = Query(...),
     to_date: str = Query(...),
@@ -152,13 +195,18 @@ async def generate_mn_summary(
 
     assert_store_access(db, auth, store_id)
 
-    # Parse dates
     from_dt = _parse_iso_datetime(from_date)
     to_dt = _parse_iso_datetime(to_date)
 
     actor = f"user:{auth.email}"
-
     requested_format = format.lower()
+    request_id = ensure_request_id(http_request.headers.get("x-request-id"))
+    store_settings = (
+        db.query(StoreSetting)
+        .filter(StoreSetting.store_id == store_id)
+        .first()
+    )
+
     if requested_format not in {"csv", "json"}:
         error_message = f"Unsupported format '{format}'. Use csv or json."
         ReportService.observe_export(
@@ -185,6 +233,7 @@ async def generate_mn_summary(
             mime_type="application/octet-stream",
             error=error_message,
         )
+        db.commit()
         raise HTTPException(
             status_code=422,
             detail=[
@@ -223,9 +272,10 @@ async def generate_mn_summary(
             to_date=to_dt,
             outcome="failure",
             row_count=0,
-            mime_type="text/csv" if requested_format == "csv" else "application/json",
+            mime_type="application/octet-stream",
             error=str(exc),
         )
+        db.commit()
         raise
 
     mime_type = "text/csv" if requested_format == "csv" else "application/json"
@@ -242,6 +292,38 @@ async def generate_mn_summary(
         row_count=result.row_count,
         mime_type=mime_type,
     )
+
+    queued_events = []
+    download_path = (
+        f"/api/v1/reports/mn/summary?store_id={store_id}"
+        f"&from_date={from_dt.astimezone(timezone.utc).isoformat()}"
+        f"&to_date={to_dt.astimezone(timezone.utc).isoformat()}"
+        f"&format={requested_format}"
+    )
+    queued = TaxoWebhookService.queue_report_ready(
+        db,
+        store_id=store_id,
+        report=result.report,
+        fmt=result.format,
+        from_date=from_dt,
+        to_date=to_dt,
+        row_count=result.row_count,
+        download_path=download_path,
+        request_id=request_id,
+    )
+    if queued:
+        queued_events.append(queued)
+
+    db.commit()
+
+    if queued_events:
+        TaxoWebhookService.dispatch_events(
+            db,
+            store_id,
+            queued_events,
+            settings_model=store_settings,
+        )
+        db.commit()
 
     if requested_format == "csv":
         return StreamingResponse(

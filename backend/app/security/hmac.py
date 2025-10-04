@@ -19,9 +19,9 @@ from ..observability import (
     log_security_event,
 )
 
-HEADER_SIGNATURE = "x-rdf-signature"
-HEADER_TIMESTAMP = "x-rdf-timestamp"
-HEADER_NONCE = "x-rdf-nonce"
+HEADER_SIGNATURE = "x-taxo-signature"
+HEADER_TIMESTAMP = "x-taxo-timestamp"
+HEADER_NONCE = "x-taxo-nonce"
 
 
 def compute_signature(secret: str, timestamp: str, nonce: str, body: bytes) -> str:
@@ -82,7 +82,7 @@ def _raise_failure(store_id: str, status_code: int, code: str, message: str) -> 
 
 def _validate_nonce(db: Session, store_id: str, nonce: str, now: datetime) -> None:
     if not nonce:
-        _raise_failure(store_id, 401, "missing_nonce", "Missing X-RDF-Nonce header")
+        _raise_failure(store_id, 401, "missing_nonce", "Missing X-Taxo-Nonce header")
     if len(nonce) > 128:
         _raise_failure(store_id, 401, "invalid_nonce", "Nonce exceeds maximum length of 128 characters")
 
@@ -198,12 +198,12 @@ def enforce_hmac(
 
     timestamp_header = headers.get(HEADER_TIMESTAMP)
     if not timestamp_header:
-        _raise_failure(store_id_str, 401, "missing_timestamp", "Missing X-RDF-Timestamp header")
+        _raise_failure(store_id_str, 401, "missing_timestamp", "Missing X-Taxo-Timestamp header")
 
     nonce_header = headers.get(HEADER_NONCE)
     signature_header = headers.get(HEADER_SIGNATURE)
     if not signature_header:
-        _raise_failure(store_id_str, 401, "missing_signature", "Missing X-RDF-Signature header")
+        _raise_failure(store_id_str, 401, "missing_signature", "Missing X-Taxo-Signature header")
 
     raw_ts = timestamp_header.strip()
     try:

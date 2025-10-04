@@ -72,6 +72,9 @@ class StoreSetting(Base):
     plan = Column(String(20), default="starter")  # "starter", "pro", "plus"
     hmac_secret = Column(Text, nullable=True)
     hmac_secret_rotated_at = Column(DateTime(timezone=True), nullable=True)
+    webhook_endpoint = Column(Text, nullable=True)
+    webhook_active = Column(Boolean, nullable=False, server_default=text("false"), default=False)
+    webhook_events = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
 
     # Relationships
     store = relationship("Store", back_populates="settings")
@@ -234,4 +237,57 @@ class ProcessedWebhook(Base):
     __table_args__ = (
         Index("ix_processed_webhooks_provider", "provider"),
         Index("ix_processed_webhooks_status", "status"),
+    )
+
+
+class WebhookEvent(Base):
+    __tablename__ = "webhook_events"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    store_id = Column(GUID(), ForeignKey("stores.id"), nullable=False)
+    event_id = Column(String(255), nullable=False, unique=True)
+    event_type = Column(String(100), nullable=False)
+    payload = Column(JSON, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=True)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    dead_letter = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    store = relationship("Store")
+    attempts_log = relationship(
+        "WebhookDeliveryAttempt",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_webhook_events_status", "status"),
+        Index("ix_webhook_events_store", "store_id"),
+    )
+
+
+class WebhookDeliveryAttempt(Base):
+    __tablename__ = "webhook_delivery_attempts"
+
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    event_id = Column(GUID(), ForeignKey("webhook_events.id"), nullable=False)
+    attempt = Column(Integer, nullable=False)
+    requested_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    response_status = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+
+    event = relationship("WebhookEvent", back_populates="attempts_log")
+
+    __table_args__ = (
+        Index("ix_webhook_delivery_attempts_event", "event_id"),
     )

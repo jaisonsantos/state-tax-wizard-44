@@ -1,16 +1,21 @@
-# Certification Decision – Milestone 7
+# Certification Decision – Milestone 7 Review
 
 - `LAST_COMPLETED_MILESTONE`: **M7 – Webhooks & Lifecycle**
 - `CURRENT_ACTIVE_MILESTONE`: **M8 – Launch Readiness**
 
 ## Decision
 - **M7: PASS**
-  - `/v1/billing/webhooks/stripe` now verifies `Stripe-Signature`, persists events in `processed_webhooks`, enforces idempotência/retentativas e devolve respostas determinísticas (`processed`, `duplicate`, `retry`, `dead_letter`). 【F:backend/app/routers/billing.py†L200-L270】【F:backend/app/services/webhook_service.py†L40-L220】【F:backend/app/models/models.py†L220-L260】
-  - `POST /v1/billing/webhooks/stripe/replay/{event_id}` permite reprocessar eventos de DLQ com autenticação, mantendo auditoria e métricas alinhadas. 【F:backend/app/routers/billing.py†L240-L270】
-  - Novos contadores/histograma (`webhooks_received_total`, `webhooks_processed_total`, `webhook_processing_latency_ms`) expostos em `/metrics`, documentados e exercitados via smoke/Postman. 【F:backend/app/observability.py†L77-L160】【F:docs/security/observability.md†L1-L60】【F:backend/smoke_test.py†L800-L960】【F:docs/postman/state-tax-wizard.postman_collection.json†L1700-L1900】
-  - Tooling atualizado: `make webhooks-smoke`, pasta **Webhooks** no Postman (com assinatura automática), evidências (`webhooks_smoke.txt`, `metrics_dump.txt`, `newman_webhooks.txt`) e STATUS/backlog refletem o estado atual. 【F:Makefile†L1-L150】【F:STATUS.md†L6-L70】【F:docs/backlog/17_milestone_07_webhooks.md†L1-L200】
+  - Outgoing webhook service (`TaxoWebhookService`) gera eventos `fee.applied`, `fee.skipped`, `report.ready` e `hmac.rotated`, com cabeçalhos `X-Taxo-Timestamp`, `X-Taxo-Nonce`, `X-Taxo-Signature`, retentativas exponenciais (1m→24h) e DLQ documentada. 【F:backend/app/services/taxo_webhook_service.py†L33-L452】
+  - Migration `202510060001_taxo_webhooks_outbox` adiciona tabelas `webhook_events`/`webhook_delivery_attempts` e campos de configuração no `store_settings`, sustentando replay/admin e observabilidade. 【F:backend/alembic/versions/202510060001_taxo_webhooks_outbox.py†L32-L108】
+  - Rotas `/v1/webhooks/events` (list/replay) e configurações de loja (`webhook_active`, `webhook_endpoint`, `webhook_events`, rotação de segredo) estão disponíveis e cobertas por testes/smoke. 【F:backend/app/routers/webhooks.py†L14-L84】【F:backend/app/routers/store_settings.py†L41-L199】【F:backend/tests/test_taxo_webhook_service.py†L1-L290】
+  - Documentação/Tooling alinhados: `docs/webhooks/*`, Postman (carpeta "Webhooks"), `make webhooks-smoke`, e `STATUS.md` refletem o novo catálogo e operação. 【F:docs/webhooks/events.md†L1-L140】【F:docs/postman/state-tax-wizard.postman_collection.json†L1850-L2140】【F:backend/smoke_test.py†L838-L969】【F:STATUS.md†L1-L160】
 
-## NEXT_SLICE – Milestone 8 (Launch Readiness)
-1. **Operational Hardening** — dashboards/alertas para métricas críticas (`webhooks_*`, `billing_*`, `integrations_*`), runbooks atualizados e playbooks de incidente. 【F:docs/backlog/18_milestone_08_launch.md†L1-L180】
-2. **Paridade de Relatórios & Reversals** — cobrir reversals Shopify/WooCommerce, validar relatórios/analytics com reversals, garantir reconciliação end-to-end. 【F:docs/backlog/18_milestone_08_launch.md†L80-L160】
-3. **Go-live Checklist & Evidências** — consolidar QA final (pytest completo + smokes/Postman), coletar métricas finais e preparar documentação de lançamento/rollback. 【F:docs/backlog/18_milestone_08_launch.md†L180-L260】
+## NEXT_SLICE – M8 Init (Launch Readiness)
+1. **Observabilidade operacional** – Publicar dashboards/alertas de webhooks (latência P95<5s, falhas por motivo) e validar export para on-call. 【F:docs/observability.md†L1-L80】
+2. **Processos de suporte** – Finalizar playbooks (incident template, status-page macros, FAQ) e vincular canais de atendimento. 【F:docs/SUPPORT_PLAYBOOK.md†L20-L160】
+3. **Confiabilidade de release** – Ensaiar runbooks de deploy/rollback, garantir `make webhooks-smoke`/Newman rodando em CI, coletar evidências. 【F:docs/launch/RUNBOOKS.md†L1-L180】【F:docs/certification/CHECKLIST.md†L40-L140】
+
+## Evidence Snapshot
+- `docs/certification/EVIDENCE/pytest.txt` – `pytest -q` (73 passed) pós-implementação M7.
+- `docs/certification/EVIDENCE/webhooks_smoke.txt` – tentativa de `make webhooks-smoke` (SKIP controlado em ambiente sem Docker) + instruções para execução manual.
+- `docs/certification/EVIDENCE/metrics_dump.txt` – notas de captura planejada das métricas `webhooks_delivery_*`, `webhooks_failed_total` e `webhooks_dead_letter_total` (SKIP até provisionamento de stack Prometheus).
