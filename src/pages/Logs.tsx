@@ -25,20 +25,29 @@ type AuditRow = {
   absorbed: boolean;
 };
 
+const AUDIT_PAGE_SIZE = 20;
+
 export default function Logs() {
   const [filterState, setFilterState] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchOrder, setSearchOrder] = useState("");
   const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const { toast } = useToast();
   const { selectedStoreId: storeId } = useAuth();
 
   const fetchAuditLogs = useCallback(
-    async (store_id: string) => {
-      setLoading(true);
+    async (store_id: string, cursor?: string) => {
+      const append = Boolean(cursor);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
       try {
-        const response = await apiClient.getAuditLogs(store_id);
+        const response = await apiClient.getAuditLogs(store_id, 1, AUDIT_PAGE_SIZE, undefined, cursor);
 
         const transformedLogs: AuditRow[] = response.items.map((log) => {
           const firstLine = log.payload.lines?.[0];
@@ -59,7 +68,8 @@ export default function Logs() {
           };
         });
 
-        setAuditLogs(transformedLogs);
+        setAuditLogs((previous) => (append ? [...previous, ...transformedLogs] : transformedLogs));
+        setNextCursor(response.next_cursor ?? null);
       } catch (error) {
         toast({
           title: "Error",
@@ -67,7 +77,11 @@ export default function Logs() {
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        if (append) {
+          setLoadingMore(false);
+        } else {
+          setLoading(false);
+        }
       }
     },
     [toast],
@@ -76,6 +90,7 @@ export default function Logs() {
   useEffect(() => {
     if (!storeId) {
       setAuditLogs([]);
+      setNextCursor(null);
       return;
     }
 
@@ -91,6 +106,13 @@ export default function Logs() {
         description: "Choose a store to refresh audit logs.",
       });
     }
+  };
+
+  const handleLoadMore = () => {
+    if (!storeId || !nextCursor) {
+      return;
+    }
+    void fetchAuditLogs(storeId, nextCursor);
   };
 
   const filteredLogs = useMemo(() => {
@@ -369,6 +391,23 @@ export default function Logs() {
                     description="Adjust your filters or refresh the feed to see recent activity."
                     tone="bordered"
                   />
+                )}
+
+                {nextCursor && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center transition-all hover-lift"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center gap-2 text-sm">
+                        <RefreshCw className="h-4 w-4 animate-spin" /> Loading more activity
+                      </span>
+                    ) : (
+                      "Load more activity"
+                    )}
+                  </Button>
                 )}
               </CardContent>
             </Card>
