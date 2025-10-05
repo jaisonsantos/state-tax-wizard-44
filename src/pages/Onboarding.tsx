@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export default function Onboarding() {
     if (!storeId) {
       setIntegrationStatus(null);
       setHasHydrated(true);
+      setStatusLoading(false);
       return;
     }
 
@@ -53,10 +54,24 @@ export default function Onboarding() {
     }
   }, [storeId, toast]);
 
+  const lastFetchedStoreRef = useRef<string | null>(null);
+
   useEffect(() => {
     setHasHydrated(false);
+    if (!storeId) {
+      setIntegrationStatus(null);
+      setStatusLoading(false);
+      lastFetchedStoreRef.current = null;
+      return;
+    }
+
+    if (lastFetchedStoreRef.current === storeId) {
+      return;
+    }
+
+    lastFetchedStoreRef.current = storeId;
     void refreshStatus();
-  }, [refreshStatus]);
+  }, [storeId, refreshStatus]);
 
   const shopifyStatus = useMemo(
     () => integrationStatus?.providers.find((provider) => provider.provider === "shopify"),

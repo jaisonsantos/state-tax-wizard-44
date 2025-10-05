@@ -1,3 +1,5 @@
+
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +68,30 @@ const helpCategories = [
 ];
 
 export default function Help() {
+  const [hydrating, setHydrating] = useState(true);
+  const hydrationGuardRef = useRef(false);
+
+  useEffect(() => {
+    if (hydrationGuardRef.current) {
+      return;
+    }
+
+    hydrationGuardRef.current = true;
+
+    let timeoutId: number | undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      timeoutId = window.setTimeout(() => setHydrating(false), 180);
+    });
+
+    return () => {
+      hydrationGuardRef.current = false;
+      window.cancelAnimationFrame(frameId);
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
   return (
     <div className="relative space-y-6 max-w-4xl">
       <FadeIn className="surface-gradient border border-border/60 rounded-2xl p-6 shadow-[var(--shadow-card)]">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,6 +39,7 @@ export default function Settings() {
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
   const [installingProvider, setInstallingProvider] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(false);
+  const lastSettingsStoreRef = useRef<string | null>(null);
 
   const overlayMessage = useMemo(() => {
     if (settingsSaving) {
@@ -187,8 +188,17 @@ export default function Settings() {
       setWebhookEvents([]);
       setIntegrationStatus(null);
       setHasHydrated(true);
+      setSettingsLoading(false);
+      setIntegrationsLoading(false);
+      lastSettingsStoreRef.current = null;
       return;
     }
+
+    if (lastSettingsStoreRef.current === storeId) {
+      return;
+    }
+
+    lastSettingsStoreRef.current = storeId;
 
     let cancelled = false;
     setHasHydrated(false);
