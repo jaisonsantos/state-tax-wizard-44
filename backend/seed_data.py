@@ -8,7 +8,9 @@ from secrets import token_hex
 from sqlalchemy.orm import sessionmaker
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import inspect
 from app.db.database import engine
+from app.core.config import settings
 from datetime import datetime, timedelta, timezone
 
 from app.models.models import (
@@ -256,9 +258,17 @@ def _run_migrations() -> None:
 
     base_dir = Path(__file__).resolve().parent
     alembic_cfg = Config(str(base_dir / "alembic.ini"))
-    alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
     alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
-    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as connection:
+        alembic_cfg.attributes["connection"] = connection
+        command.upgrade(alembic_cfg, "head")
+
+    inspector = inspect(engine)
+    if "stores" not in inspector.get_table_names():
+        raise RuntimeError(
+            "Database migration failed: 'stores' table not found after upgrade"
+        )
 
 
 def seed_database():
