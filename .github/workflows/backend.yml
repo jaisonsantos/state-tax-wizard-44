@@ -47,6 +47,11 @@ jobs:
           DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
         run: alembic upgrade head
 
+      - name: Seed database
+        env:
+          DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
+        run: python backend/seed_data.py
+
       - name: Run backend tests
         working-directory: backend
         env:
@@ -100,6 +105,11 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
         run: alembic upgrade head
+
+      - name: Seed database
+        env:
+          DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
+        run: python backend/seed_data.py
 
       - name: Start API
         working-directory: backend
