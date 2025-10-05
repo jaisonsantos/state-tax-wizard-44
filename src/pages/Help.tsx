@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FadeIn, LoadingOverlay, EmptyState } from "@/components/patterns";
 import { HelpCircle, ExternalLink, Mail, MessageCircle, Book, FileText, MapPin } from "lucide-react";
 
 const faqItems = [
@@ -65,31 +67,42 @@ const helpCategories = [
 ];
 
 export default function Help() {
+  const [hydrating, setHydrating] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setHydrating(false), 250);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-3xl font-bold">Help & Documentation</h1>
-        <p className="text-muted-foreground">
-          Everything you need to know about delivery fee compliance
-        </p>
-      </div>
+    <div className="relative space-y-6 max-w-4xl">
+      <LoadingOverlay visible={hydrating} message="Loading documentation..." tone="muted" />
+      <FadeIn className="surface-gradient border border-border/60 rounded-2xl p-6 shadow-[var(--shadow-card)]">
+        <div>
+          <h1 className="text-3xl font-bold">Help &amp; Documentation</h1>
+          <p className="text-muted-foreground">
+            Everything you need to know about delivery fee compliance
+          </p>
+        </div>
+      </FadeIn>
 
       {/* Quick Links */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Book className="h-5 w-5" />
-            Quick Reference
-          </CardTitle>
-          <CardDescription>
-            Essential compliance information and resources
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3">
-              <h4 className="font-medium flex items-center gap-2">
+      <FadeIn delay={0.1}>
+        <Card className="border-glow hover-lift">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Book className="h-5 w-5" />
+              Quick Reference
+            </CardTitle>
+            <CardDescription>
+              Essential compliance information and resources
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
                 <Badge className="bg-minnesota text-minnesota-foreground">MN</Badge>
                 Minnesota Resources
               </h4>
@@ -124,56 +137,68 @@ export default function Help() {
                   <ExternalLink className="h-3 w-3 ml-auto" />
                 </Button>
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* FAQ Sections */}
-      {helpCategories.map((category) => (
-        <Card key={category.title}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <div className={`h-8 w-8 rounded flex items-center justify-center ${category.color}`}>
-                <category.icon className="h-4 w-4" />
               </div>
-              {category.title}
-            </CardTitle>
-          </CardHeader>
-          
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              {category.items.map((item) => (
-                <AccordionItem key={item.id} value={item.id}>
-                  <AccordionTrigger className="text-left">
-                    {item.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground">
-                    {item.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+            </div>
           </CardContent>
         </Card>
+      </FadeIn>
+
+      {/* FAQ Sections */}
+      {helpCategories.map((category, index) => (
+        <FadeIn key={category.title} delay={0.15 + index * 0.05}>
+          <Card className="border-glow hover-lift">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className={`h-8 w-8 rounded flex items-center justify-center ${category.color}`}>
+                  <category.icon className="h-4 w-4" />
+                </div>
+                {category.title}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {category.items.length === 0 ? (
+                <EmptyState
+                  title="No guidance available"
+                  description="We’re preparing documentation for this section. Check back soon."
+                  tone="bordered"
+                />
+              ) : (
+                <Accordion type="single" collapsible className="w-full">
+                  {category.items.map((item) => (
+                    <AccordionItem key={item.id} value={item.id}>
+                      <AccordionTrigger className="text-left">
+                        {item.question}
+                      </AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {item.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
       ))}
 
       {/* Contact Support */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            Contact Support
-          </CardTitle>
-          <CardDescription>
-            Still have questions? We're here to help with compliance and technical issues.
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3">
-              <h4 className="font-medium">Technical Support</h4>
+      <FadeIn delay={0.25}>
+        <Card className="border-glow hover-lift">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Contact Support
+            </CardTitle>
+            <CardDescription>
+              Still have questions? We're here to help with compliance and technical issues.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <h4 className="font-medium">Technical Support</h4>
               <p className="text-sm text-muted-foreground">
                 Help with integration, settings, and troubleshooting
               </p>
@@ -195,22 +220,23 @@ export default function Help() {
             </div>
           </div>
 
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <div className="flex items-start gap-3">
-              <HelpCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div>
-                <h4 className="font-medium mb-1">System Status</h4>
-                <p className="text-sm text-muted-foreground">
-                  Check our status page for real-time system health and any ongoing maintenance.
-                </p>
-                <Button variant="link" size="sm" className="p-0 mt-1">
-                  View Status Page <ExternalLink className="h-3 w-3 ml-1" />
-                </Button>
+            <div className="mt-6 p-4 bg-muted rounded-lg">
+              <div className="flex items-start gap-3">
+                <HelpCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <h4 className="font-medium mb-1">System Status</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Check our status page for real-time system health and any ongoing maintenance.
+                  </p>
+                  <Button variant="link" size="sm" className="p-0 mt-1">
+                    View Status Page <ExternalLink className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </FadeIn>
     </div>
   );
 }

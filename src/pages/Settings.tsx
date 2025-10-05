@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Play, AlertTriangle, RotateCw, Copy, Send } from "lucide-react";
+import { FadeIn, LoadingOverlay, EmptyState } from "@/components/patterns";
+import { Settings2, Play, AlertTriangle, RotateCw, Copy, Send, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, ApiError, type IntegrationProviderStatus, type IntegrationStatusResponse } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -37,6 +38,18 @@ export default function Settings() {
   const [integrationsLoading, setIntegrationsLoading] = useState(false);
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
   const [installingProvider, setInstallingProvider] = useState<string | null>(null);
+
+  const overlayMessage = useMemo(() => {
+    if (settingsLoading) {
+      return "Loading store configuration...";
+    }
+    if (settingsSaving) {
+      return "Saving settings...";
+    }
+    return null;
+  }, [settingsLoading, settingsSaving]);
+
+  const showOverlay = overlayMessage !== null;
   
   // Playground form state
   const [playgroundData, setPlaygroundData] = useState({
@@ -458,58 +471,76 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-3xl font-bold">Rules & Settings</h1>
-        <p className="text-muted-foreground">
-          Configure delivery fee rules for {storeName || "your store"}
-        </p>
-        {displayPlan && (
-          <p className="text-xs text-muted-foreground mt-1">
-            Current plan: <span className="font-medium text-foreground">{displayPlan}</span>
+    <div className="relative space-y-6 max-w-4xl">
+      <LoadingOverlay visible={showOverlay} message={overlayMessage ?? ""} tone="muted" />
+      <FadeIn className="surface-gradient border border-border/60 rounded-2xl p-6 shadow-[var(--shadow-card)]">
+        <div>
+          <h1 className="text-3xl font-bold">Rules &amp; Settings</h1>
+          <p className="text-muted-foreground">
+            Configure delivery fee rules for {storeName || "your store"}
           </p>
-        )}
-        <p className="text-xs text-muted-foreground mt-2">
-          Signed requests are required when using the Apply endpoint. Review <span className="font-medium text-foreground">docs/security/hmac.md</span> for header, nonce, and rotation guidance.
-        </p>
-        {formattedHmacRotation && (
-          <p className="text-xs text-muted-foreground mt-1">
-            HMAC secret last rotated: <span className="font-medium text-foreground">{formattedHmacRotation}</span>
+          {displayPlan && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Current plan: <span className="font-medium text-foreground">{displayPlan}</span>
+            </p>
+          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Signed requests are required when using the Apply endpoint. Review <span className="font-medium text-foreground">docs/security/hmac.md</span> for header, nonce, and rotation guidance.
           </p>
-        )}
-      </div>
+          {formattedHmacRotation && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              HMAC secret last rotated: <span className="font-medium text-foreground">{formattedHmacRotation}</span>
+            </p>
+          )}
+        </div>
+      </FadeIn>
+
+      {!storeId && (
+        <FadeIn delay={0.1}>
+          <EmptyState
+            icon={Store}
+            title="Select a store to manage rules"
+            description="Choose a demo store from the header to enable editing and webhooks."
+            tone="muted"
+          />
+        </FadeIn>
+      )}
 
       {/* Regulatory Banner */}
-      <Card className="bg-warning-muted border-warning/20">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-warning" />
-            <div>
-              <p className="font-medium text-warning-foreground">Regulatory Update</p>
-              <p className="text-sm text-warning-foreground/80">
-                Colorado rate schedule updated July 1st. Minnesota threshold remains $100.
-              </p>
+      <FadeIn delay={0.15}>
+        <Card className="border border-warning/30 bg-warning-muted hover-lift shadow-[var(--shadow-card)]">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              <div>
+                <p className="font-medium text-warning-foreground">Regulatory Update</p>
+                <p className="text-sm text-warning-foreground/80">
+                  Colorado rate schedule updated July 1st. Minnesota threshold remains $100.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </FadeIn>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RotateCw className="h-5 w-5" />
-            HMAC Secret Management
-          </CardTitle>
-          <CardDescription>
-            Rotate your signing secret to invalidate compromised credentials.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Rotating the secret immediately blocks existing signatures. Generate a new secret before distributing
-            credentials to your commerce platform.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
+      <FadeIn delay={0.2}>
+        <Card className="relative border-glow hover-lift">
+          <LoadingOverlay visible={rotatingSecret} message="Rotating HMAC secret..." tone="muted" />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RotateCw className="h-5 w-5" />
+              HMAC Secret Management
+            </CardTitle>
+            <CardDescription>
+              Rotate your signing secret to invalidate compromised credentials.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Rotating the secret immediately blocks existing signatures. Generate a new secret before distributing
+              credentials to your commerce platform.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={handleRotateSecret}
               variant="outline"
@@ -550,131 +581,150 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+      </FadeIn>
 
-      <Card id="webhook-delivery">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            Webhook Delivery
-          </CardTitle>
-          <CardDescription>
-            Configure the endpoint that receives Taxo webhook events and select the event types to deliver.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="font-medium">Enable webhooks</p>
-              <p className="text-xs text-muted-foreground">
-                When enabled, fee and report lifecycle events are signed with your HMAC secret and POSTed to the endpoint below.
-              </p>
-            </div>
-            <Switch
-              checked={webhookActive}
-              onCheckedChange={setWebhookActive}
-              disabled={controlsDisabled}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="webhook-endpoint">Delivery endpoint URL</Label>
-            <Input
-              id="webhook-endpoint"
-              placeholder="https://example.com/webhooks/taxo"
-              value={webhookEndpoint}
-              onChange={(event) => setWebhookEndpoint(event.target.value)}
-              disabled={!webhookActive || controlsDisabled}
-              inputMode="url"
-            />
-            <p className="text-xs text-muted-foreground">
-              The destination must accept HTTPS POST requests with the <span className="font-medium">X-Taxo-*</span> headers.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Subscribed events</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {webhookEventOptions.map((option) => (
-                <label
-                  key={option.value}
-                  className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm"
-                >
-                  <Checkbox
-                    checked={webhookEvents.includes(option.value)}
-                    onCheckedChange={() => toggleWebhookEvent(option.value)}
-                    disabled={!webhookActive || controlsDisabled}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {!webhookActive && (
-            <p className="text-xs text-muted-foreground">
-              Webhook delivery is currently disabled. Toggle the switch above to start emitting events to your integration.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card id="integrations">
-        <CardHeader>
-          <CardTitle>Integrations</CardTitle>
-          <CardDescription>
-            Review platform connector status and align with the WooCommerce/Shopify deployment guides.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {integrationsLoading && (
-            <p className="text-sm text-muted-foreground">Loading integration providers…</p>
-          )}
-          {!integrationsLoading && integrationStatus && (
-            <div className="space-y-3">
-              {integrationStatus.providers.map((provider) => (
-                <div key={provider.provider} className="flex flex-col gap-2 rounded-lg border border-border p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium capitalize">{provider.provider}</p>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant={provider.connected ? "default" : provider.enabled ? "secondary" : "outline"}>
-                          {provider.status}
-                        </Badge>
-                        {provider.notes && <span>{provider.notes}</span>}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" asChild>
-                        <a href={integrationDocsLink(provider)} target="_blank" rel="noreferrer">
-                          View docs
-                        </a>
-                      </Button>
-                      {provider.enabled && !provider.connected && (
-                        <Button
-                          onClick={() => handleInstallIntegration(provider)}
-                          disabled={installingProvider === provider.provider}
-                        >
-                          {installingProvider === provider.provider ? 'Connecting…' : 'Mark as connected'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {!integrationsLoading && !integrationStatus && (
-            <p className="text-sm text-muted-foreground">Select a store to view integration status.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Fee Rules Configuration */}
-        <Card id="fee-rules">
+      <FadeIn delay={0.25}>
+        <Card id="webhook-delivery" className="border-glow hover-lift">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5" />
+              <Send className="h-5 w-5" />
+              Webhook Delivery
+            </CardTitle>
+            <CardDescription>
+              Configure the endpoint that receives Taxo webhook events and select the event types to deliver.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="font-medium">Enable webhooks</p>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, fee and report lifecycle events are signed with your HMAC secret and POSTed to the endpoint below.
+                </p>
+              </div>
+              <Switch
+                checked={webhookActive}
+                onCheckedChange={setWebhookActive}
+                disabled={controlsDisabled}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="webhook-endpoint">Delivery endpoint URL</Label>
+              <Input
+                id="webhook-endpoint"
+                placeholder="https://example.com/webhooks/taxo"
+                value={webhookEndpoint}
+                onChange={(event) => setWebhookEndpoint(event.target.value)}
+                disabled={!webhookActive || controlsDisabled}
+                inputMode="url"
+              />
+              <p className="text-xs text-muted-foreground">
+                The destination must accept HTTPS POST requests with the <span className="font-medium">X-Taxo-*
+              </span> headers.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Subscribed events</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {webhookEventOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-3 text-sm"
+                  >
+                    <Checkbox
+                      checked={webhookEvents.includes(option.value)}
+                      onCheckedChange={() => toggleWebhookEvent(option.value)}
+                      disabled={!webhookActive || controlsDisabled}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-muted-foreground/20 bg-muted/60 p-4">
+                <h4 className="font-medium">Payload Example</h4>
+                <p className="text-xs text-muted-foreground">
+                  Requests are signed with <span className="font-medium">X-Taxo-Signature</span> and <span className="font-medium">X-Taxo-Timestamp</span> headers.
+                </p>
+              </div>
+              <div className="rounded-lg border border-muted-foreground/20 bg-muted/60 p-4">
+                <h4 className="font-medium">Replay Protection</h4>
+                <p className="text-xs text-muted-foreground">
+                  Reject requests where the nonce or timestamp is older than 5 minutes to avoid replay attacks.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </FadeIn>
+      <FadeIn delay={0.3}>
+        <Card id="integrations" className="relative border-glow hover-lift">
+          <LoadingOverlay
+            visible={integrationsLoading || Boolean(installingProvider)}
+            message={installingProvider ? `Connecting ${installingProvider}…` : 'Refreshing integration status...'}
+            tone="muted"
+          />
+          <CardHeader>
+            <CardTitle>Integrations</CardTitle>
+            <CardDescription>
+              Review platform connector status and align with the WooCommerce/Shopify deployment guides.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {integrationsLoading && (
+              <p className="text-sm text-muted-foreground">Loading integration providers…</p>
+            )}
+            {!integrationsLoading && integrationStatus && (
+              <div className="space-y-3">
+                {integrationStatus.providers.map((provider) => (
+                  <div key={provider.provider} className="flex flex-col gap-2 rounded-lg border border-border p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium capitalize">{provider.provider}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant={provider.connected ? 'default' : provider.enabled ? 'secondary' : 'outline'}>
+                            {provider.status}
+                          </Badge>
+                          {provider.notes && <span>{provider.notes}</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" asChild>
+                          <a href={integrationDocsLink(provider)} target="_blank" rel="noreferrer">
+                            View docs
+                          </a>
+                        </Button>
+                        {provider.enabled && !provider.connected && (
+                          <Button
+                            onClick={() => handleInstallIntegration(provider)}
+                            disabled={installingProvider === provider.provider}
+                          >
+                            {installingProvider === provider.provider ? 'Connecting…' : 'Mark as connected'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!integrationsLoading && !integrationStatus && (
+              <p className="text-sm text-muted-foreground">Select a store to view integration status.</p>
+            )}
+          </CardContent>
+        </Card>
+      </FadeIn>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Fee Rules Configuration */}
+        <FadeIn delay={0.35}>
+          <Card id="fee-rules" className="border-glow hover-lift">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
               Fee Rules
             </CardTitle>
             <CardDescription>
@@ -682,7 +732,7 @@ export default function Settings() {
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="space-y-6">
+            <CardContent className="space-y-6">
             {/* Minnesota Settings */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -757,23 +807,25 @@ export default function Settings() {
             {settingsLoading && (
               <p className="text-xs text-muted-foreground text-center">Loading current settings…</p>
             )}
-          </CardContent>
-        </Card>
-
+            </CardContent>
+          </Card>
+        </FadeIn>
         {/* Playground */}
-        <Card id="rules-playground">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Play className="h-5 w-5" />
-              Rules Playground
-            </CardTitle>
-            <CardDescription>
-              Test fee calculations with sample orders
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
+        <FadeIn delay={0.4}>
+          <Card id="rules-playground" className="relative border-glow hover-lift">
+            <LoadingOverlay visible={testing} message="Running sandbox simulation..." tone="muted" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Play className="h-5 w-5" />
+                Rules Playground
+              </CardTitle>
+              <CardDescription>
+                Test fee calculations with sample orders
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
               <Label htmlFor="destination">Delivery Destination</Label>
               <Input
                 id="destination"
@@ -796,9 +848,9 @@ export default function Settings() {
                   <SelectItem value="curbside">Curbside Pickup</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+              </div>
 
-            <div className="grid gap-4 grid-cols-2">
+              <div className="grid gap-4 grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="order-value">Order Value</Label>
                 <Input
@@ -822,9 +874,9 @@ export default function Settings() {
                   placeholder="0.00"
                 />
               </div>
-            </div>
+              </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label htmlFor="items">Items</Label>
               <Textarea
                 id="items"
@@ -833,9 +885,9 @@ export default function Settings() {
                 placeholder="Describe the items in the cart"
                 rows={3}
               />
-            </div>
+              </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
               <Button
                 onClick={handlePlaygroundTest}
                 className="w-full"
@@ -851,10 +903,10 @@ export default function Settings() {
               >
                 {testing ? "Applying..." : "Apply Fee (demo)"}
               </Button>
-            </div>
+              </div>
 
-            {applyResult && (
-              <div className="rounded-md border border-muted p-3 text-sm text-muted-foreground space-y-1">
+              {applyResult && (
+                <div className="rounded-md border border-muted p-3 text-sm text-muted-foreground space-y-1">
                 <p>
                   Demo fee total: <span className="font-medium text-foreground">${(applyResult.totalFeeCents / 100).toFixed(2)}</span>
                 </p>
@@ -868,10 +920,11 @@ export default function Settings() {
                     <span className="font-medium text-foreground">Shown</span>
                   )}
                 </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
       </div>
     </div>
   );
