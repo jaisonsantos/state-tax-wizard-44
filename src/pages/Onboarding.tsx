@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FadeIn, LoadingOverlay, EmptyState } from "@/components/patterns";
 import { CheckCircle, ExternalLink, Download, Store, CreditCard, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +13,17 @@ export default function Onboarding() {
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [installingProvider, setInstallingProvider] = useState<string | null>(null);
+  const overlayMessage = useMemo(() => {
+    if (installingProvider) {
+      return `Connecting ${installingProvider}…`;
+    }
+    if (statusLoading) {
+      return "Checking integration status...";
+    }
+    return null;
+  }, [installingProvider, statusLoading]);
+
+  const showOverlay = overlayMessage !== null;
   const { toast } = useToast();
   const { selectedStoreId: storeId } = useAuth();
   const navigate = useNavigate();
@@ -136,74 +148,96 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-3xl font-bold">Connect Your Store</h1>
-        <p className="text-muted-foreground">
-          Choose your e-commerce platform to start applying compliant delivery fees
-        </p>
-      </div>
+    <div className="relative space-y-6 max-w-4xl">
+      <LoadingOverlay visible={showOverlay} message={overlayMessage ?? ""} tone="muted" />
+      <FadeIn className="surface-gradient border border-border/60 rounded-2xl p-6 shadow-[var(--shadow-card)]">
+        <div>
+          <h1 className="text-3xl font-bold">Connect Your Store</h1>
+          <p className="text-muted-foreground">
+            Choose your e-commerce platform to start applying compliant delivery fees
+          </p>
+        </div>
+      </FadeIn>
+
+      {!storeId && (
+        <FadeIn delay={0.1}>
+          <EmptyState
+            icon={Store}
+            title="Select a store to continue onboarding"
+            description="Use the store selector in the header to create or pick a demo environment."
+            tone="muted"
+          />
+        </FadeIn>
+      )}
 
       {/* Trial Banner */}
-      <Card className="bg-primary-muted border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-3">
-            <CreditCard className="h-6 w-6 text-primary" />
-            <div>
-              <h3 className="font-semibold text-primary">14-Day Free Trial Active</h3>
-              <p className="text-sm text-primary/80">
-                Full access to all features. No credit card required during trial.
-              </p>
+      <FadeIn delay={0.15}>
+        <Card className="border border-primary/30 bg-primary-muted hover-lift shadow-[var(--shadow-card)]">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-6 w-6 text-primary" />
+              <div>
+                <h3 className="font-semibold text-primary">14-Day Free Trial Active</h3>
+                <p className="text-sm text-primary/80">
+                  Full access to all features. No credit card required during trial.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </FadeIn>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Shopify Integration */}
-        <Card className="relative">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Store className="h-8 w-8 text-primary" />
-                <div>
-                  <CardTitle>Shopify</CardTitle>
-                  <CardDescription>Official Shopify App</CardDescription>
+        <FadeIn delay={0.2}>
+          <Card className="relative border-glow hover-lift">
+            <LoadingOverlay
+              visible={installingProvider === "shopify"}
+              message="Connecting Shopify..."
+              tone="muted"
+            />
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Store className="h-8 w-8 text-primary" />
+                  <div>
+                    <CardTitle>Shopify</CardTitle>
+                    <CardDescription>Official Shopify App</CardDescription>
+                  </div>
                 </div>
+                {renderStatusBadge(shopifyStatus)}
               </div>
-              {renderStatusBadge(shopifyStatus)}
-            </div>
-          </CardHeader>
+            </CardHeader>
 
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Install our official Shopify app for seamless checkout integration and automated billing.
-            </p>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Install our official Shopify app for seamless checkout integration and automated billing.
+              </p>
 
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm">Features:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Automatic fee application at checkout</li>
-                <li>• Billing through your Shopify invoice</li>
-                <li>• Real-time compliance updates</li>
-                <li>• No manual configuration required</li>
-              </ul>
-            </div>
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Features:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Automatic fee application at checkout</li>
+                  <li>• Billing through your Shopify invoice</li>
+                  <li>• Real-time compliance updates</li>
+                  <li>• No manual configuration required</li>
+                </ul>
+              </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                onClick={() => shopifyStatus && handleInstallIntegration(shopifyStatus)}
-                className="w-full"
-                disabled={
-                  !shopifyStatus ||
-                  !shopifyStatus.enabled ||
-                  shopifyStatus.connected ||
-                  installingProvider === shopifyStatus.provider
-                }
-              >
-                {installingProvider === "shopify" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={() => shopifyStatus && handleInstallIntegration(shopifyStatus)}
+                  className="w-full"
+                  disabled={
+                    !shopifyStatus ||
+                    !shopifyStatus.enabled ||
+                    shopifyStatus.connected ||
+                    installingProvider === shopifyStatus.provider
+                  }
+                >
+                  {installingProvider === "shopify" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
                   <ExternalLink className="h-4 w-4 mr-2" />
                 )}
                 {shopifyStatus?.connected
@@ -221,59 +255,66 @@ export default function Onboarding() {
                   </a>
                 </Button>
               )}
-            </div>
+              </div>
 
-            {shopifyStatus?.notes && (
-              <p className="text-xs text-muted-foreground">{shopifyStatus.notes}</p>
-            )}
-          </CardContent>
-        </Card>
+              {shopifyStatus?.notes && (
+                <p className="text-xs text-muted-foreground">{shopifyStatus.notes}</p>
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
 
         {/* WooCommerce Integration */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Store className="h-8 w-8 text-colorado" />
-                <div>
-                  <CardTitle>WooCommerce</CardTitle>
-                  <CardDescription>WordPress Plugin</CardDescription>
+        <FadeIn delay={0.25}>
+          <Card className="relative border-glow hover-lift">
+            <LoadingOverlay
+              visible={installingProvider === "woocommerce"}
+              message="Marking WooCommerce connected..."
+              tone="muted"
+            />
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Store className="h-8 w-8 text-colorado" />
+                  <div>
+                    <CardTitle>WooCommerce</CardTitle>
+                    <CardDescription>WordPress Plugin</CardDescription>
+                  </div>
                 </div>
+                {renderStatusBadge(wooStatus)}
               </div>
-              {renderStatusBadge(wooStatus)}
-            </div>
-          </CardHeader>
+            </CardHeader>
 
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Download our WooCommerce plugin and connect your store via API.
-            </p>
-            
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm">Installation Steps:</h4>
-              <ol className="text-sm text-muted-foreground space-y-1">
-                <li>1. Download and install the plugin ZIP</li>
-                <li>2. Enter your store URL and API credentials</li>
-                <li>3. Generate API key in your dashboard</li>
-                <li>4. Configure fee settings</li>
-              </ol>
-            </div>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Download our WooCommerce plugin and connect your store via API.
+              </p>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                onClick={() => wooStatus && handleInstallIntegration(wooStatus)}
-                variant="outline"
-                className="w-full"
-                disabled={
-                  !wooStatus ||
-                  !wooStatus.enabled ||
-                  wooStatus.connected ||
-                  installingProvider === wooStatus.provider
-                }
-              >
-                {installingProvider === "woocommerce" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Installation Steps:</h4>
+                <ol className="text-sm text-muted-foreground space-y-1">
+                  <li>1. Download and install the plugin ZIP</li>
+                  <li>2. Enter your store URL and API credentials</li>
+                  <li>3. Generate API key in your dashboard</li>
+                  <li>4. Configure fee settings</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={() => wooStatus && handleInstallIntegration(wooStatus)}
+                  variant="outline"
+                  className="w-full"
+                  disabled={
+                    !wooStatus ||
+                    !wooStatus.enabled ||
+                    wooStatus.connected ||
+                    installingProvider === wooStatus.provider
+                  }
+                >
+                  {installingProvider === "woocommerce" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
                   <Download className="h-4 w-4 mr-2" />
                 )}
                 {wooStatus?.connected
@@ -291,55 +332,58 @@ export default function Onboarding() {
                   </a>
                 </Button>
               )}
-            </div>
+              </div>
 
-            {wooStatus?.notes && (
-              <p className="text-xs text-muted-foreground">{wooStatus.notes}</p>
-            )}
-          </CardContent>
-        </Card>
+              {wooStatus?.notes && (
+                <p className="text-xs text-muted-foreground">{wooStatus.notes}</p>
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
       </div>
 
       {/* Next Steps */}
       {hasConnectedProvider && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Next Steps</CardTitle>
-            <CardDescription>
-              Complete your setup to start applying delivery fees
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <CheckCircle className="h-5 w-5 text-success" />
-              <span className="text-sm">Store connected successfully</span>
-            </div>
+        <FadeIn delay={0.3}>
+          <Card className="border-glow hover-lift">
+            <CardHeader>
+              <CardTitle>Next Steps</CardTitle>
+              <CardDescription>
+                Complete your setup to start applying delivery fees
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-3 rounded-lg bg-muted p-3">
+                <CheckCircle className="h-5 w-5 text-success" />
+                <span className="text-sm">Store connected successfully</span>
+              </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleNavigate("/settings", "fee-rules")}
-              >
-                Configure Rules
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleNavigate("/settings", "rules-playground")}
-              >
-                Test Integration
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleNavigate("/dashboard")}
-              >
-                View Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleNavigate("/settings", "fee-rules")}
+                >
+                  Configure Rules
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleNavigate("/settings", "rules-playground")}
+                >
+                  Test Integration
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleNavigate("/dashboard")}
+                >
+                  View Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </FadeIn>
       )}
 
       {!storeId && (

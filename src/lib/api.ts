@@ -315,6 +315,8 @@ export interface AuditLogPayload {
   delivery_method?: string;
   lines?: AuditLogPayloadLine[];
   status?: string;
+  jurisdiction?: string;
+  absorbed?: boolean;
   [key: string]: unknown;
 }
 
