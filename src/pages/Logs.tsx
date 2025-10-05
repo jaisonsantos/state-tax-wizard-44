@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FadeIn, EmptyState } from "@/components/patterns";
+import { FadeIn, LoadingOverlay, EmptyState } from "@/components/patterns";
 import { Activity, Search, Filter, Download, RefreshCw, Inbox } from "lucide-react";
 import { apiClient, downloadBlob } from "@/lib/api";
 import { resolveNextAuditCursor } from "@/lib/auditCursor";
@@ -46,19 +46,24 @@ export default function Logs() {
       store_id: string,
       options: { cursor?: string | null; append?: boolean; page?: number } = {},
     ) => {
-      const append = Boolean(options.append);
       const cursor = options.cursor ?? null;
+      const append = options.append ?? Boolean(cursor);
       const requestedPage = options.page ?? 1;
+
       if (append) {
-    async (store_id: string, cursor?: string, append?: boolean) => {
-      const shouldAppend = append ?? Boolean(cursor);
-      if (shouldAppend) {
         setLoadingMore(true);
       } else {
         setLoading(true);
       }
+
       try {
-        const response = await apiClient.getAuditLogs(store_id, requestedPage, AUDIT_PAGE_SIZE, undefined, cursor ?? undefined);
+        const response = await apiClient.getAuditLogs(
+          store_id,
+          requestedPage,
+          AUDIT_PAGE_SIZE,
+          undefined,
+          cursor ?? undefined,
+        );
 
         const transformedLogs: AuditRow[] = response.items.map((log) => {
           const firstLine = log.payload.lines?.[0];
@@ -79,24 +84,29 @@ export default function Logs() {
           };
         });
 
-        setAuditLogs((previous) => (append ? [...previous, ...transformedLogs] : transformedLogs));
-        const responseCursor = response.next_cursor ?? null;
-        setNextCursor(responseCursor);
+        setAuditLogs((previous) =>
+          append ? [...previous, ...transformedLogs] : transformedLogs,
+        );
+
+        const next = resolveNextAuditCursor(response);
+        setNextCursor(next);
+
         const effectivePage = response.page ?? requestedPage;
         setCurrentPage(effectivePage);
+
         const totalRecords = response.total;
         const pageLimit = response.limit ?? AUDIT_PAGE_SIZE;
         const hasTotal =
-          totalRecords !== null && totalRecords !== undefined &&
-          response.page !== null && response.page !== undefined;
+          totalRecords !== null &&
+          totalRecords !== undefined &&
+          response.page !== null &&
+          response.page !== undefined;
         const moreAvailable =
-          Boolean(responseCursor) ||
-          (hasTotal ? totalRecords > effectivePage * pageLimit : response.items.length === pageLimit);
+          Boolean(next) ||
+          (hasTotal
+            ? totalRecords > effectivePage * pageLimit
+            : response.items.length === pageLimit);
         setHasMore(moreAvailable);
-        setAuditLogs((previous) =>
-          shouldAppend ? [...previous, ...transformedLogs] : transformedLogs,
-        );
-        setNextCursor(resolveNextAuditCursor(response));
       } catch (error) {
         toast({
           title: "Error",
@@ -104,7 +114,7 @@ export default function Logs() {
           variant: "destructive",
         });
       } finally {
-        if (shouldAppend) {
+        if (append) {
           setLoadingMore(false);
         } else {
           setLoading(false);
@@ -122,10 +132,6 @@ export default function Logs() {
       setNextCursor(null);
       setCurrentPage(1);
       setHasMore(false);
-      return;
-    }
-
-    void fetchAuditLogs(storeId, { append: false, cursor: null, page: 1 });
       setLoading(false);
       setLoadingMore(false);
       lastStoreRef.current = null;
@@ -137,7 +143,10 @@ export default function Logs() {
     }
 
     lastStoreRef.current = storeId;
-    void fetchAuditLogs(storeId);
+    setCurrentPage(1);
+    setHasMore(false);
+    setNextCursor(null);
+    void fetchAuditLogs(storeId, { append: false, cursor: null, page: 1 });
   }, [storeId, fetchAuditLogs]);
 
   const handleRefresh = () => {
@@ -145,6 +154,8 @@ export default function Logs() {
       setCurrentPage(1);
       setHasMore(false);
       setNextCursor(null);
+      setLoading(false);
+      setLoadingMore(false);
       void fetchAuditLogs(storeId, { append: false, cursor: null, page: 1 });
     } else {
       toast({
@@ -158,15 +169,23 @@ export default function Logs() {
     if (!storeId) {
       return;
     }
+
     if (nextCursor) {
-      void fetchAuditLogs(storeId, { append: true, cursor: nextCursor, page: currentPage + 1 });
+      void fetchAuditLogs(storeId, {
+        append: true,
+        cursor: nextCursor,
+        page: currentPage + 1,
+      });
       return;
     }
 
     if (hasMore) {
-      void fetchAuditLogs(storeId, { append: true, cursor: null, page: currentPage + 1 });
+      void fetchAuditLogs(storeId, {
+        append: true,
+        cursor: null,
+        page: currentPage + 1,
+      });
     }
-    void fetchAuditLogs(storeId, nextCursor, true);
   };
 
   const filteredLogs = useMemo(() => {
@@ -362,7 +381,11 @@ export default function Logs() {
           </FadeIn>
 
           <FadeIn delay={0.2}>
-                <Card className="relative border-glow hover-lift">
+            <Card className="relative border-glow hover-lift">
+              <LoadingOverlay
+                visible={loading && filteredLogs.length === 0}
+                message="Syncing audit activity..."
+              />
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5" />
