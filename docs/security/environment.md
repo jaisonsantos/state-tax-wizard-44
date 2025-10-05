@@ -127,7 +127,7 @@ GitHub Actions workflows under `.github/workflows` provide parity with these
 runbooks:
 
 - `backend.yml` provisions PostgreSQL, applies migrations, seeds the database,
-  and runs `pytest`.
+  copies `.env.example` to `.env` for Compose parity, and runs `pytest`.
 - `frontend.yml` performs `npm install`, `npm run typecheck`, and `npm run build`.
 - The smoke test can be invoked in CI by running `make up`, `make migrate`,
   `make seed`, and `make smoke` sequentially on a runner with Docker access.
