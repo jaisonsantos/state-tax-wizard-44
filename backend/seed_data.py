@@ -264,6 +264,14 @@ def _run_migrations() -> None:
         alembic_cfg.attributes["connection"] = connection
         command.upgrade(alembic_cfg, "head")
 
+        # Alembic should commit internally, but on some drivers (psycopg3) the
+        # transaction may remain open until we explicitly finalize it. Make sure
+        # we don't return the connection to the pool with pending DDL that will
+        # be rolled back on close.
+        if connection.in_transaction():
+            connection.commit()
+
+    with engine.connect() as connection:
         inspector = inspect(connection)
         if "stores" not in inspector.get_table_names():
             raise RuntimeError(
