@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FadeIn } from "@/components/ui/fade-in";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { FileText, Download, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, downloadBlob, type DownloadResult } from "@/lib/api";
@@ -211,37 +214,43 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-3xl font-bold">Reports</h1>
-        <p className="text-muted-foreground">
+    <div className="max-w-6xl space-y-8">
+      <FadeIn className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Reports</h1>
+        <p className="text-sm text-muted-foreground">
           {storeId
             ? "Generate and download compliance reports for tax filing"
             : "Select a store to access compliance reports"}
         </p>
-      </div>
+      </FadeIn>
 
       {exportError && (
-        <Alert variant="destructive">
-          <AlertTitle>Export failed</AlertTitle>
-          <AlertDescription>{exportError}</AlertDescription>
-        </Alert>
+        <FadeIn variant="fade">
+          <Alert variant="destructive" className="border-destructive/40 bg-destructive/10">
+            <AlertTitle>Export failed</AlertTitle>
+            <AlertDescription>{exportError}</AlertDescription>
+          </Alert>
+        </FadeIn>
       )}
 
       {!storeId && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">
+        <FadeIn variant="fade">
+          <Card className="border-none bg-muted/30">
+            <CardContent className="p-4 text-sm text-muted-foreground">
               Choose a store from the selector above to enable report exports.
-            </p>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </FadeIn>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Colorado DR-1786 Report */}
-        <Card>
-          <CardHeader>
+        <FadeIn className="relative">
+          <Card className="relative h-full border-none bg-gradient-to-br from-colorado-muted/60 via-background to-background shadow-sm">
+            {generatingReport === "co_dr1786" && (
+              <LoadingOverlay transparent message="Generating Colorado report" className="rounded-2xl" />
+            )}
+            <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded bg-colorado/10 flex items-center justify-center">
                 <FileText className="h-4 w-4 text-colorado" />
@@ -251,9 +260,9 @@ export default function Reports() {
             <CardDescription>
               Official Colorado Department of Revenue form for delivery fee reporting
             </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="space-y-4">
+            </CardHeader>
+
+            <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="grid gap-3 grid-cols-2">
                 <div className="space-y-2">
@@ -285,7 +294,7 @@ export default function Reports() {
               </div>
             </div>
 
-            <div className="p-3 bg-colorado-muted rounded-lg">
+            <div className="rounded-xl border border-colorado/30 bg-colorado-muted/60 p-3">
               <h4 className="font-medium text-sm mb-2">Report Includes:</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Transaction dates and order IDs</li>
@@ -297,7 +306,7 @@ export default function Reports() {
 
             <Button
               onClick={() => handleGenerateReport("co_dr1786")}
-              className="w-full"
+              className="w-full justify-center transition-all hover-lift"
               disabled={!!generatingReport || !storeId}
             >
               {generatingReport === "co_dr1786" ? (
@@ -307,12 +316,17 @@ export default function Reports() {
               )}
               {generatingReport === "co_dr1786" ? "Generating…" : "Generate CO DR-1786 Report"}
             </Button>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </FadeIn>
 
         {/* Minnesota Summary Report */}
-        <Card>
-          <CardHeader>
+        <FadeIn className="relative">
+          <Card className="relative h-full border-none bg-gradient-to-br from-minnesota-muted/60 via-background to-background shadow-sm">
+            {generatingReport === "mn_summary" && (
+              <LoadingOverlay transparent message="Generating Minnesota report" className="rounded-2xl" />
+            )}
+            <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded bg-minnesota/10 flex items-center justify-center">
                 <FileText className="h-4 w-4 text-minnesota" />
@@ -322,9 +336,9 @@ export default function Reports() {
             <CardDescription>
               Comprehensive summary report for Minnesota delivery fee compliance
             </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="space-y-4">
+            </CardHeader>
+
+            <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="grid gap-3 grid-cols-2">
                 <div className="space-y-2">
@@ -365,7 +379,7 @@ export default function Reports() {
               </div>
             </div>
 
-            <div className="p-3 bg-minnesota-muted rounded-lg">
+            <div className="rounded-xl border border-minnesota/30 bg-minnesota-muted/60 p-3">
               <h4 className="font-medium text-sm mb-2">Report Includes:</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Total fees collected by month</li>
@@ -377,7 +391,7 @@ export default function Reports() {
 
             <Button
               onClick={() => handleGenerateReport("mn_summary")}
-              className="w-full"
+              className="w-full justify-center transition-all hover-lift"
               variant="outline"
               disabled={!!generatingReport || !storeId}
             >
@@ -388,29 +402,31 @@ export default function Reports() {
               )}
               {generatingReport === "mn_summary" ? "Generating…" : "Generate MN Summary Report"}
             </Button>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </FadeIn>
       </div>
 
       {/* Export History */}
-      <Card>
-        <CardHeader>
+      <FadeIn>
+        <Card className="border-none bg-background shadow-sm">
+          <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+            <Calendar className="h-5 w-5 text-primary" />
             Export History
           </CardTitle>
           <CardDescription>
             Previously generated reports and downloads
           </CardDescription>
-        </CardHeader>
+          </CardHeader>
 
-        <CardContent>
-          {historyError && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Unable to load export history</AlertTitle>
-              <AlertDescription>{historyError}</AlertDescription>
-            </Alert>
-          )}
+          <CardContent className="space-y-4">
+            {historyError && (
+              <Alert variant="destructive" className="border-destructive/40 bg-destructive/10">
+                <AlertTitle>Unable to load export history</AlertTitle>
+                <AlertDescription>{historyError}</AlertDescription>
+              </Alert>
+            )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -499,10 +515,17 @@ export default function Reports() {
                   ))
                 : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                        {storeId
-                          ? "No exports recorded yet. Generate a report to populate this history."
-                          : "Select a store to view export history."}
+                      <TableCell colSpan={7}>
+                        <EmptyState
+                          subtle
+                          title={storeId ? "No exports yet" : "Store not selected"}
+                          description={
+                            storeId
+                              ? "Generate a report to populate this history."
+                              : "Select a store to view export history."
+                          }
+                          className="mx-auto max-w-xl"
+                        />
                       </TableCell>
                     </TableRow>
                   )}
@@ -511,7 +534,7 @@ export default function Reports() {
           {nextCursor && storeId && historyRows.length > 0 && (
             <Button
               variant="outline"
-              className="mt-4 w-full"
+              className="mt-4 w-full justify-center transition-all hover-lift"
               onClick={handleLoadMoreHistory}
               disabled={loadingMore}
             >
@@ -525,7 +548,8 @@ export default function Reports() {
             </Button>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </FadeIn>
     </div>
   );
 }
