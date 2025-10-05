@@ -40,9 +40,9 @@ export default function Logs() {
   const { selectedStoreId: storeId } = useAuth();
 
   const fetchAuditLogs = useCallback(
-    async (store_id: string, cursor?: string) => {
-      const append = Boolean(cursor);
-      if (append) {
+    async (store_id: string, cursor?: string, append?: boolean) => {
+      const shouldAppend = append ?? Boolean(cursor);
+      if (shouldAppend) {
         setLoadingMore(true);
       } else {
         setLoading(true);
@@ -69,7 +69,9 @@ export default function Logs() {
           };
         });
 
-        setAuditLogs((previous) => (append ? [...previous, ...transformedLogs] : transformedLogs));
+        setAuditLogs((previous) =>
+          shouldAppend ? [...previous, ...transformedLogs] : transformedLogs,
+        );
         setNextCursor(resolveNextAuditCursor(response));
       } catch (error) {
         toast({
@@ -78,7 +80,7 @@ export default function Logs() {
           variant: "destructive",
         });
       } finally {
-        if (append) {
+        if (shouldAppend) {
           setLoadingMore(false);
         } else {
           setLoading(false);
@@ -123,7 +125,7 @@ export default function Logs() {
     if (!storeId || !nextCursor) {
       return;
     }
-    void fetchAuditLogs(storeId, nextCursor);
+    void fetchAuditLogs(storeId, nextCursor, true);
   };
 
   const filteredLogs = useMemo(() => {
