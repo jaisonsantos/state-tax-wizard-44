@@ -30,9 +30,9 @@
 6. **Postmortem** – documentar causa raiz, impacto, ações preventivas.
 
 ## Checklist Pré-Go-Live
-- [ ] `pytest -q`
-- [ ] `python backend/smoke_test.py --webhooks-only`
-- [ ] `newman run ... --folder Webhooks`
+- [x] `pytest -q`
+- [x] `python backend/smoke_test.py --webhooks-only`
+- [x] `newman run ... --folder Webhooks`
 - [ ] Dashboards/alertas revisados
 - [ ] Suporte briefed (SLA, macros)
 - [ ] Owners confirmados (runbooks, SLO)

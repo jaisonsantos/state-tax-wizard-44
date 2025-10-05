@@ -52,22 +52,39 @@ async def get_entitlements(
     # Get subscription
     subscription = EntitlementService.get_subscription(db, store_id)
     limits = EntitlementService.get_plan_limits(subscription.plan_tier)
+    warn_threshold = limits.get("warn_threshold_pct", EntitlementService.WARN_THRESHOLD_PCT)
+
+    limits_payload = {
+        "transactions_per_month": limits.get("transactions_per_month"),
+        "deliveries_included": limits.get("deliveries_included"),
+        "warn_threshold_pct": warn_threshold,
+        "unlimited": limits.get("unlimited", False),
+        "commit_deliveries": limits.get("commit_deliveries"),
+        "overage_fee": limits.get("overage_fee"),
+        "advanced_reports": limits.get("advanced_reports", False),
+        "analytics_dashboard": limits.get("analytics_dashboard", False),
+        "integrations": limits.get("integrations", False),
+    }
 
     payload = Entitlements(
         plan=subscription.plan_tier,
+        display_name=limits.get("display_name"),
         trial_ends_at=subscription.trial_end,
         provider=subscription.provider,
         status=subscription.status,
+        monthly_price=limits.get("monthly_price"),
+        annual_price=limits.get("annual_price"),
+        deliveries_included=limits.get("deliveries_included"),
+        warn_threshold_pct=warn_threshold,
+        unlimited=limits.get("unlimited", False),
+        commit_deliveries=limits.get("commit_deliveries"),
+        overage_fee=limits.get("overage_fee"),
         current_period_start=getattr(subscription, "current_period_start", None),
         current_period_end=subscription.current_period_end,
         cancel_at_period_end=getattr(subscription, "cancel_at_period_end", False),
         features=list(limits.get("features", [])),
-        limits={
-            "transactions_per_month": limits.get("transactions_per_month"),
-            "advanced_reports": limits.get("advanced_reports", False),
-            "analytics_dashboard": limits.get("analytics_dashboard", False),
-            "integrations": limits.get("integrations", False),
-        },
+        limits=limits_payload,
+        stripe_prices_configured=EntitlementService.get_price_configuration(),
     )
 
     log_billing_event(
@@ -75,6 +92,7 @@ async def get_entitlements(
         store_id=store_id,
         plan_tier=subscription.plan_tier,
         status=subscription.status,
+        warn_threshold_pct=warn_threshold,
     )
 
     return payload
@@ -99,6 +117,7 @@ async def get_usage(
         plan_tier=response.plan,
         transactions_used=response.transactions_used,
         unlimited=response.unlimited,
+        warnings=len(response.warnings or []),
     )
 
     return response
@@ -116,10 +135,32 @@ async def create_checkout_session(
     assert_store_access(db, auth, store_id)
 
     plan_tier = request.plan_tier.lower()
-    price_attr = f"stripe_price_id_{plan_tier}"
+    if not EntitlementService.plan_exists(plan_tier):
+        log_billing_event("unsupported_plan_tier", plan_tier=plan_tier)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "unsupported_plan_tier",
+                "message": "Requested plan tier is not available for checkout.",
+            },
+        )
+
+    plan_config = EntitlementService.get_plan_limits(plan_tier)
+    price_attr = plan_config.get("stripe_price_attr")
+
+    if not price_attr:
+        log_billing_event("price_id_missing", plan_tier=plan_tier, reason="plan_not_available")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "unsupported_plan_tier",
+                "message": "Requested plan tier is not available for checkout.",
+            },
+        )
+
     price_id = getattr(settings, price_attr, None)
     if not price_id:
-        log_billing_event("price_id_missing", plan_tier=plan_tier)
+        log_billing_event("price_id_missing", plan_tier=plan_tier, reason="env_missing")
         raise HTTPException(
             status_code=503,
             detail={

@@ -16,6 +16,6 @@
 3. **Confiabilidade de release** – Ensaiar runbooks de deploy/rollback, garantir `make webhooks-smoke`/Newman rodando em CI, coletar evidências. 【F:docs/launch/RUNBOOKS.md†L1-L180】【F:docs/certification/CHECKLIST.md†L40-L140】
 
 ## Evidence Snapshot
-- `docs/certification/EVIDENCE/pytest.txt` – `pytest -q` (73 passed) pós-implementação M7.
+- `docs/certification/EVIDENCE/pytest.txt` – `pytest -q` (75 passed) pós-implementação M7.
 - `docs/certification/EVIDENCE/webhooks_smoke.txt` – tentativa de `make webhooks-smoke` (SKIP controlado em ambiente sem Docker) + instruções para execução manual.
 - `docs/certification/EVIDENCE/metrics_dump.txt` – notas de captura planejada das métricas `webhooks_delivery_*`, `webhooks_failed_total` e `webhooks_dead_letter_total` (SKIP até provisionamento de stack Prometheus).

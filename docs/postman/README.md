@@ -26,13 +26,14 @@ Esta coleção cobre os fluxos do State Tax Wizard. Use-a para validar APIs, web
 | `billing_plan_tier` | Plano usado nos testes de billing | `pro` |
 
 > Exemplo de ambiente em `docs/postman/local.postman_environment.json`. Duplique-o, atualize credenciais e aponte via `--environment` no Newman.
+> Para validar Enterprise via Checkout configure também `STRIPE_PRICE_ID_E10K`, `STRIPE_PRICE_ID_E25K`, `STRIPE_PRICE_ID_E50K` no backend; quando ausentes os testes confirmam o fallback "Fale com vendas".
 
 ## Ordem sugerida
 1. **Auth / Login** – gera `token`/`store_id`.
 2. **Monitoring** – valida `/healthz` e `/metrics`.
 3. **Fees / Apply** – exercita assinatura HMAC (`X-Taxo-*`) com geração automática de timestamp/nonce pela pre-request script.
 4. **Fees / Rotate HMAC secret** – captura novo segredo (atualiza `hmac_secret` + `taxo_webhook_secret`).
-5. **Reports / Analytics / Billing / Integrations** – como antes.
+5. **Reports / Analytics / Billing / Integrations** – como antes (a pasta Billing agora valida `warn_threshold_pct`, `warnings[]`, `stripe_prices_configured` e `billing_unconfigured`).
 6. **Webhooks**:
    - `Webhooks / Update settings (enable)` – configura endpoint e eventos.
    - `Webhooks / Rotate HMAC secret` – gera segredo dedicado e atualiza variáveis.
@@ -49,13 +50,15 @@ Esta coleção cobre os fluxos do State Tax Wizard. Use-a para validar APIs, web
 ## Evidências e automação
 - Use `--env-var evidence_dir=<dir>` no Newman para registrar caminhos de artefatos (logs, CSV, JSON).
 - Scripts das pastas de Analytics, Reports e Webhooks podem escrever `evidence_path=<dir>/...` no console para arquivamento.
-- Para pipeline CI, inclua jobs separados: `newman run ... --folder Webhooks` e smoke CLI (`python backend/smoke_test.py --webhooks-only`).
+- O workflow `Backend CI / smoke-newman` (ver `.github/workflows/backend.yml`) executa `python backend/smoke_test.py --webhooks-only` e, em seguida, `newman run ... --folder Webhooks` com um ambiente gerado dinamicamente. O relatório CLI consolidado é salvo em `docs/certification/EVIDENCE/newman_webhooks.md`.
+- O teste "Webhooks / List events" agora falha caso nenhum evento esteja disponível, garantindo que o smoke CLI continue gerando `fee.applied` antes da validação.
 
 ## Cenários negativos recomendados
 - **HMAC inválido**: utilize a requisição "Fees / Apply fees (invalid HMAC)" para verificar `403 invalid_signature`.
 - **Timestamp vencido / nonce reutilizado**: use as requisições dedicadas após definir `hmac_timestamp_override`/`hmac_nonce_override`.
 - **Webhooks**: após configurar endpoint inválido, rode `Webhooks / List events` para confirmar status `failed` com `last_error`. Repare em `docs/webhooks/runbook.md` para procedimentos de replay.
 - **Replay manual**: execute `Webhooks / Replay last event` com `last_taxo_event_id` inexistente para validar `404` (edite a URL manualmente para testes negativos).
+- **Checkout sem price ID**: altere `billing_plan_tier` para `enterprise_e10k` sem configurar `STRIPE_PRICE_ID_E10K`; espere `503 billing_unconfigured`.
 
 ## Exemplo Newman
 ```sh

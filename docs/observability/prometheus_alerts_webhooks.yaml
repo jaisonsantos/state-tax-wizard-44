@@ -1,0 +1,38 @@
+# Prometheus alert rules for Taxo webhooks launch
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: taxo-webhooks-alerts
+  labels:
+    app: taxo-api
+spec:
+  groups:
+    - name: taxo-webhooks
+      rules:
+        - alert: TaxoWebhookLatencyP95High
+          expr: histogram_quantile(0.95, sum(rate(webhooks_delivery_seconds_bucket{service="taxo-api",environment="$environment"}[5m])) by (le)) > 5
+          for: 5m
+          labels:
+            severity: warning
+            service: taxo-api
+          annotations:
+            summary: Webhook delivery latency above 5 seconds (p95)
+            description: "Investigate capture endpoint availability and DLQ backlog."
+        - alert: TaxoWebhookDeliveryErrors
+          expr: increase(webhooks_failed_total{service="taxo-api",environment="$environment"}[10m]) > 0
+          for: 10m
+          labels:
+            severity: critical
+            service: taxo-api
+          annotations:
+            summary: Webhook delivery failures detected
+            description: "Check /api/v1/webhooks/events?status=pending, validate merchant endpoint and credentials."
+        - alert: TaxoWebhookDeadLetter
+          expr: increase(webhooks_dead_letter_total{service="taxo-api",environment="$environment"}[15m]) > 0
+          for: 15m
+          labels:
+            severity: critical
+            service: taxo-api
+          annotations:
+            summary: Webhook events stuck in DLQ
+            description: "Follow docs/webhooks/runbook.md to replay or temporarily disable deliveries."

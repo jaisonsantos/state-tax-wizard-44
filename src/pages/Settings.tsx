@@ -12,6 +12,7 @@ import { Settings2, Play, AlertTriangle, RotateCw, Copy, Send } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, ApiError, type IntegrationProviderStatus, type IntegrationStatusResponse } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { getPricingPlanDisplayName } from "@/lib/pricing";
 
 export default function Settings() {
   const [enableMN, setEnableMN] = useState(true);
@@ -75,18 +76,7 @@ export default function Settings() {
     return parsed.toLocaleString();
   }, [hmacRotatedAt]);
 
-  const displayPlan = useMemo(() => {
-    if (!plan) {
-      return null;
-    }
-
-    const normalised = plan.trim();
-    if (!normalised) {
-      return null;
-    }
-
-    return normalised.charAt(0).toUpperCase() + normalised.slice(1);
-  }, [plan]);
+  const displayPlan = useMemo(() => getPricingPlanDisplayName(plan), [plan]);
 
   const refreshIntegrations = useCallback(() => {
     if (!storeId) {

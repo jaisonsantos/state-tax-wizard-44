@@ -5,9 +5,9 @@
 | Item | Owner | Status | Evidência/Notas |
 | --- | --- | --- | --- |
 | ✅ Webhook catálogo (`fee.applied`, `fee.skipped`, `report.ready`, `hmac.rotated`) funcionando em staging | Platform Eng | GREEN | `pytest -q`, smoke manual (`python backend/smoke_test.py --webhooks-only`) |
-| ☐ Dashboards Grafana `Taxo – Webhooks` publicados (latência P95, taxa de sucesso, DLQ) | Observability | TODO | Queries prontas em `docs/observability.md` |
-| ☐ Alertas Prometheus configurados (`webhooks_delivery_seconds_p95`, `webhooks_failed_total`, `webhooks_dead_letter_total`) | Observability | TODO | Ver `docs/webhooks/runbook.md` |
-| ☐ Pipeline CI roda `pytest -q` + smoke webhooks + Newman folder "Webhooks" | DevEx | TODO | Adicionar job `webhooks-smoke` e `newman-webhooks` |
+| ✅ Dashboards Grafana `Taxo – Webhooks` publicados (latência P95, taxa de sucesso, DLQ) | Observability | GREEN | `docs/observability/webhooks_dashboard.json` (UID `taxo-webhooks`) |
+| ✅ Alertas Prometheus configurados (`webhooks_delivery_seconds_p95`, `webhooks_failed_total`, `webhooks_dead_letter_total`) | Observability | GREEN | `docs/observability/prometheus_alerts_webhooks.yaml` |
+| ✅ Pipeline CI roda `pytest -q` + smoke webhooks + Newman folder "Webhooks" | DevEx | GREEN | Workflow `Backend CI / smoke-newman` em `.github/workflows/backend.yml` |
 | ☐ Guia de suporte (FAQ, macros, escalonamento) publicado | Support Ops | IN PROGRESS | `docs/SUPPORT_PLAYBOOK.md` |
 | ☐ Runbook de deploy/rollback validado (ensaio) | Platform Eng | TODO | `docs/launch/RUNBOOKS.md` |
 | ☐ Comunicação externa (status page + release notes) preparada | Product Marketing | TODO | Templates em `docs/SUPPORT_PLAYBOOK.md` |

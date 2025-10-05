@@ -24,9 +24,16 @@ jobs:
       - name: Wait for database
         run: |
           for i in {1..30}; do
-            docker compose -f docker-compose.yml exec -T db pg_isready -U user -d rdf && break
+            if docker compose -f docker-compose.yml exec -T db pg_isready -U user -d rdf; then
+              ready=1
+              break
+            fi
             sleep 2
           done
+          if [ -z "$ready" ]; then
+            echo "Database did not become ready" >&2
+            exit 1
+          fi
 
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
@@ -42,3 +49,141 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
         run: pytest -q
+
+  smoke-newman:
+    needs: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Start services
+        run: docker compose -f docker-compose.yml up -d db redis
+
+      - name: Wait for database
+        run: |
+          for i in {1..30}; do
+            if docker compose -f docker-compose.yml exec -T db pg_isready -U user -d rdf; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$ready" ]; then
+            echo "Database did not become ready" >&2
+            exit 1
+          fi
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
+        run: alembic upgrade head
+
+      - name: Start API
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://user:pass@localhost:5432/rdf
+          APP_ENV: ci
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          echo $! > ../.api_pid
+
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:8000/healthz > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not start" >&2
+          exit 1
+
+      - name: Run webhooks smoke
+        env:
+          SMOKE_API_BASE_URL: http://127.0.0.1:8000/api
+          SMOKE_METRICS_URL: http://127.0.0.1:8000/metrics
+          SMOKE_EMAIL: smoke-tester@example.com
+          SMOKE_PASSWORD: change-me
+        run: |
+          set -o pipefail
+          python backend/smoke_test.py --webhooks-only | tee webhooks_smoke.txt
+
+      - name: Generate Newman environment
+        run: |
+          python <<'PY'
+import json
+import pathlib
+import httpx
+
+BASE_URL = "http://127.0.0.1:8000"
+payload = {"email": "smoke-tester@example.com", "password": "change-me"}
+
+with httpx.Client(timeout=20.0) as client:
+    response = client.post(f"{BASE_URL}/api/auth/login", json=payload)
+    response.raise_for_status()
+    data = response.json()
+
+store_id = data["stores"][0]["id"] if data.get("stores") else ""
+
+env = {
+    "id": "taxo-ci-webhooks",
+    "name": "CI Webhooks",
+    "values": [
+        {"key": "base_url", "value": BASE_URL, "enabled": True},
+        {"key": "token", "value": data["token"], "enabled": True},
+        {"key": "store_id", "value": store_id, "enabled": True},
+        {"key": "webhook_endpoint", "value": "http://127.0.0.1:8082/capture", "enabled": True},
+        {"key": "hmac_secret", "value": "demo-hmac-secret", "enabled": True}
+    ]
+}
+
+pathlib.Path("ci.newman_environment.json").write_text(json.dumps(env, indent=2))
+PY
+
+      - name: Run Newman Webhooks folder
+        run: |
+          set -o pipefail
+          npx --yes newman@5.3.2 run docs/postman/state-tax-wizard.postman_collection.json \
+            --folder Webhooks \
+            --environment ci.newman_environment.json \
+            --reporters cli \
+            --color on | tee newman_webhooks.txt
+
+      - name: Capture metrics snapshot
+        run: |
+          curl -s http://127.0.0.1:8000/metrics | grep -E 'webhooks_|billing_|report_' > metrics-webhooks.txt
+
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webhooks-validation
+          path: |
+            webhooks_smoke.txt
+            newman_webhooks.txt
+            metrics-webhooks.txt
+
+      - name: Tear down services
+        if: always()
+        run: |
+          if [ -f .api_pid ]; then
+            kill $(cat .api_pid) || true
+          fi
+          docker compose -f docker-compose.yml down

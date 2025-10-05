@@ -56,7 +56,11 @@ security-smoke: ## Smoke test HMAC + rate limiting
 
 billing-smoke: ## Smoke test billing endpoints (requires Stripe configuration)
 	@echo "==> Testing billing endpoints..."
-	docker-compose exec -T api python smoke_test.py --billing-only
+	@if [ -z "$$STRIPE_SECRET_KEY" ]; then \
+		echo "⚠ SKIP: STRIPE_SECRET_KEY not set; export credentials to run billing smoke"; \
+	else \
+		docker-compose exec -T api python smoke_test.py --billing-only; \
+	fi
 
 integrations-smoke: ## Smoke test integrations endpoints (feature flags)
 	@echo "==> Testing integration readiness..."

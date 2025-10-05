@@ -74,6 +74,18 @@ entitlement_denials_total = Counter(
     ["feature", "plan"],
 )
 
+entitlement_warnings_total = Counter(
+    "entitlement_warnings_total",
+    "Count of entitlement warning events emitted for a plan",
+    ["plan"],
+)
+
+enterprise_overage_total = Counter(
+    "enterprise_overage_total",
+    "Count of enterprise overage detections per plan",
+    ["plan"],
+)
+
 integrations_requests_total = Counter(
     "integrations_requests_total",
     "Total number of integration API requests processed",

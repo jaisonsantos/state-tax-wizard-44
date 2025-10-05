@@ -1,0 +1,8 @@
+key,display_name,monthly_price,annual_price,deliveries_included,commit_deliveries,overage_fee,features
+free,"Free / Dev",0,0,20,,,"CO/MN cálculo básico|Dashboard básico|Suporte comunidade"
+starter,Starter,10,100,100,,,"Cálculo & aplicação automática|Atualizações automáticas|Relatório mensal|Suporte por e-mail (D+1)"
+pro,Pro,29,290,1000,,,"Tudo do Starter|CSV avançado|Webhooks/API|Suporte prioritário"
+plus,Plus,79,790,5000,,,"Tudo do Pro|Multi-store|Onboarding assistido|SLA"
+enterprise_e10k,"Enterprise 10k",149,1484.04,,10000,0.02,"Tudo do Plus|Commit 10k|Overage monitorado"
+enterprise_e25k,"Enterprise 25k",299,2978.04,,25000,0.015,"Tudo do Plus|Commit 25k|Overage monitorado"
+enterprise_e50k,"Enterprise 50k",499,4970.04,,50000,0.01,"Tudo do Plus|Commit 50k|Overage monitorado"

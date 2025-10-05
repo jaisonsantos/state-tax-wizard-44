@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.models import Store, Subscription
 from app.services import stripe_service
+from app.services.entitlement_service import EntitlementService
 from app.services.webhook_service import WebhookService
 
 
@@ -47,6 +48,9 @@ def _configure_billing(monkeypatch) -> None:
     monkeypatch.setattr(settings, "stripe_price_id_starter", "price_starter", raising=False)
     monkeypatch.setattr(settings, "stripe_price_id_pro", "price_pro", raising=False)
     monkeypatch.setattr(settings, "stripe_price_id_plus", "price_plus", raising=False)
+    monkeypatch.setattr(settings, "stripe_price_id_e10k", "price_e10k", raising=False)
+    monkeypatch.setattr(settings, "stripe_price_id_e25k", "price_e25k", raising=False)
+    monkeypatch.setattr(settings, "stripe_price_id_e50k", "price_e50k", raising=False)
     monkeypatch.setattr(stripe, "api_key", "sk_test_dummy", raising=False)
 
 
@@ -87,7 +91,9 @@ def test_entitlements_and_usage_success(client: TestClient, monkeypatch, db_sess
     entitlements_payload = entitlements_response.json()
     assert entitlements_payload["plan"] == "starter"
     assert "features" in entitlements_payload
-    assert entitlements_payload["limits"]["transactions_per_month"] == 1000
+    assert entitlements_payload["limits"]["transactions_per_month"] == 100
+    assert entitlements_payload["warn_threshold_pct"] == 80
+    assert "stripe_prices_configured" in entitlements_payload
 
     usage_response = client.get(
         f"/api/v1/billing/usage?store_id={store_id}",
@@ -98,6 +104,8 @@ def test_entitlements_and_usage_success(client: TestClient, monkeypatch, db_sess
     assert usage_payload["plan"] == "starter"
     assert "transactions_used" in usage_payload
     assert "period_start" in usage_payload
+    assert "warn_threshold_pct" in usage_payload
+    assert "warnings" in usage_payload
 
 
 def test_checkout_session_uses_service_and_returns_payload(
@@ -129,6 +137,37 @@ def test_checkout_session_uses_service_and_returns_payload(
     payload = response.json()
     assert payload["session_id"] == "cs_test"
     assert payload["url"] == "https://checkout.example"
+
+
+def test_checkout_session_rejects_unknown_plan(
+    client: TestClient, monkeypatch
+) -> None:
+    token, store_id = _login(client)
+    _configure_billing(monkeypatch)
+
+    mutated_limits = EntitlementService.PLAN_LIMITS.copy()
+    mutated_limits.pop("enterprise_e10k", None)
+    monkeypatch.setattr(EntitlementService, "PLAN_LIMITS", mutated_limits, raising=False)
+    monkeypatch.setattr(
+        EntitlementService,
+        "ENTERPRISE_PLAN_KEYS",
+        {key for key in EntitlementService.ENTERPRISE_PLAN_KEYS if key != "enterprise_e10k"},
+        raising=False,
+    )
+
+    response = client.post(
+        f"/api/v1/billing/create-checkout-session?store_id={store_id}",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "plan_tier": "enterprise_e10k",
+            "success_url": "https://app.example/success",
+            "cancel_url": "https://app.example/cancel",
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["detail"]["code"] == "unsupported_plan_tier"
 
 
 def test_portal_session_returns_url(client: TestClient, monkeypatch) -> None:

@@ -1,0 +1,149 @@
+{
+  "uid": "taxo-webhooks",
+  "title": "Taxo – Webhooks",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Delivery Success Rate",
+      "datasource": "$datasource",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(webhooks_delivery_total{status=\"delivered\",environment=\"$environment\"}[5m])) / sum(rate(webhooks_delivery_total{environment=\"$environment\"}[5m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.997 },
+              { "color": "red", "value": 0.995 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Delivery Latency (p95)",
+      "datasource": "$datasource",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(webhooks_delivery_seconds_bucket{environment=\"$environment\"}[5m])) by (le, event))",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 4 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Failures by Reason (5m)",
+      "datasource": "$datasource",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(webhooks_failed_total{environment=\"$environment\"}[5m])",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead Letters (5m)",
+      "datasource": "$datasource",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(webhooks_dead_letter_total{environment=\"$environment\"}[5m])",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Attempt Timeline (5m)",
+      "datasource": "$datasource",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(webhook_delivery_attempts_total{environment=\"$environment\"}[5m])",
+          "legendFormat": "{{event}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Correlated Counters",
+      "datasource": "$datasource",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(fees_applied_total{environment=\"$environment\"}[5m])",
+          "legendFormat": "fees.applied"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(report_exports_total{environment=\"$environment\"}[5m])",
+          "legendFormat": "report.ready"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(billing_events_total{environment=\"$environment\"}[5m])",
+          "legendFormat": "billing"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "environment",
+        "type": "textbox",
+        "label": "Environment",
+        "query": "staging",
+        "current": { "text": "staging", "value": "staging" }
+      },
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus"
+      }
+    ]
+  }
+}

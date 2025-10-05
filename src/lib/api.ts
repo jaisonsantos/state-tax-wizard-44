@@ -196,6 +196,11 @@ export interface Entitlements {
 
 export interface BillingLimits {
   transactions_per_month: number | null;
+  deliveries_included: number | null;
+  warn_threshold_pct: number;
+  unlimited: boolean;
+  commit_deliveries: number | null;
+  overage_fee: number | null;
   advanced_reports: boolean;
   analytics_dashboard: boolean;
   integrations: boolean;
@@ -203,14 +208,30 @@ export interface BillingLimits {
 
 export interface BillingEntitlements {
   plan: string;
+  display_name?: string | null;
   provider: string;
   status: string;
+  monthly_price?: number | null;
+  annual_price?: number | null;
+  deliveries_included?: number | null;
+  warn_threshold_pct: number;
+  unlimited: boolean;
+  commit_deliveries?: number | null;
+  overage_fee?: number | null;
   trial_ends_at: string | null;
   cancel_at_period_end: boolean;
   current_period_start: string | null;
   current_period_end: string | null;
   features: string[];
   limits: BillingLimits;
+  stripe_prices_configured: Record<string, boolean>;
+}
+
+export interface BillingEnterpriseOverage {
+  commit_deliveries: number;
+  overage_units: number;
+  overage_fee: number | null;
+  estimated_overage_cost: number;
 }
 
 export interface BillingUsage {
@@ -222,6 +243,9 @@ export interface BillingUsage {
   percentage_used: number;
   period_start: string | null;
   period_end: string | null;
+  warn_threshold_pct: number;
+  warnings: string[];
+  enterprise_overage: BillingEnterpriseOverage | null;
 }
 
 export interface BillingCheckoutSession {
@@ -405,12 +429,14 @@ class ApiClient {
         parsedBody = await response.text();
       }
 
+      let detailPayload: unknown = null;
       if (parsedBody && typeof parsedBody === 'object' && 'detail' in (parsedBody as Record<string, unknown>)) {
         const detail = (parsedBody as Record<string, unknown>).detail;
         if (typeof detail === 'string') {
           message = detail;
         } else if (detail && typeof detail === 'object') {
           const detailRecord = detail as Record<string, unknown>;
+          detailPayload = detailRecord;
           if (typeof detailRecord.message === 'string') {
             message = detailRecord.message;
           }
@@ -420,6 +446,14 @@ class ApiClient {
         }
       } else if (typeof parsedBody === 'string' && parsedBody.trim().length > 0) {
         message = parsedBody;
+      }
+
+      if (code === 'transaction_limit_exceeded' && typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('billing:limit-exceeded', {
+            detail: detailPayload ?? parsedBody ?? { message },
+          }),
+        );
       }
 
       throw new ApiError(response.status, message, code, parsedBody);

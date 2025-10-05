@@ -14,6 +14,13 @@ _[← Milestone 7 — Webhooks](17_milestone_07_webhooks.md) • [Backlog Overvi
 
 Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-end testing, finalizing documentation, conducting security audit, and preparing rollout procedures for production deployment.
 
+### Progress (M8 – Launch Readiness)
+
+- ✅ Observability assets publicados: painel Grafana versionado (`docs/observability/webhooks_dashboard.json`) e alertas Prometheus (`docs/observability/prometheus_alerts_webhooks.yaml`).
+- ✅ Automação CI: job `Backend CI / smoke-newman` roda `pytest -q`, smoke webhooks e coleção Postman "Webhooks" com ambiente gerado automaticamente.
+- ✅ Documentação atualizada (`STATUS.md`, `CHECKLIST.md`, `docs/certification/CHECKLIST.md`) refletindo novos artefatos e evidências.
+- ⏳ Próximo foco: ensaio de deploy/rollback + validação operacional de suporte (owners, matriz de severidade assinada).
+
 ## Implementation Plan
 
 ### 1. Infrastructure & DevOps
@@ -134,6 +141,25 @@ Deliver **MVP Launch Readiness** by hardening infrastructure, completing end-to-
     - System overview (frontend, API, database, integrations).
     - Data flow diagram (order → fee calculation → persistence → reporting).
     - Deployment architecture (cloud services, networking).
+
+### 4.1 Help Center parity plan
+
+- **Quick Reference links** (UI: [`src/pages/Help.tsx`](../../src/pages/Help.tsx)):
+  - Wire buttons to definitive destinations instead of placeholders:
+    - `MN Delivery Fee Law (HF 2887)` → `https://www.revisor.mn.gov/bills/text.php?number=HF2887&type=bill&session=93&version=latest`.
+    - `MN Department of Revenue Guidance` → host PDF summary at `docs/help/mn-guidance.md` and publish public URL.
+    - `CO Retail Delivery Fee (SB 21-260)` → `https://leg.colorado.gov/bills/sb21-260`.
+    - `DR-1786 Form Instructions` → publish maintained instructions in `docs/help/co-dr1786.md` (mirrors Postman guidance).
+  - Update UI buttons to render `<Button asChild><a ... /></Button>` ensuring keyboard navigation and analytics tracking.
+- **Support contact actions**:
+  - Convert "Email Technical Support" and "Email Compliance Team" to `mailto:` links mapped to aliases defined in `docs/SUPPORT_PLAYBOOK.md` (`support@statetaxwizard.com`, `compliance@statetaxwizard.com`).
+  - Add tooltip copy referencing SLA/OLA from the support playbook and include link to open Zendesk form when available.
+- **Status page CTA**:
+  - Replace placeholder button with link to hosted status page once `docs/SUPPORT_PLAYBOOK.md` → "Status Page" template is published live (target: `https://status.statetaxwizard.com`).
+  - Document update workflow: incidents mirrored between status page and Help CTA, referencing `docs/security/incident-response.md`.
+- **FAQ ownership**:
+  - Register Help FAQ source of truth in `docs/user-guide/faq.md` and establish lint job to diff UI vs markdown to avoid drift.
+  - Add content review cadence (monthly) to Launch Runbook, ensuring compliance/legal review of jurisdiction copy.
 
 ### 5. Release Automation
 

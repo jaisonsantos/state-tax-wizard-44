@@ -26,3 +26,9 @@
 - [x] `docs/launch/RUNBOOKS.md` cobre deploy, rollback, incidentes, smoke e métricas. 【F:docs/launch/RUNBOOKS.md†L1-L200】
 - [x] `docs/SUPPORT_PLAYBOOK.md` define SLAs, macros de comunicação e matriz de severidade. 【F:docs/SUPPORT_PLAYBOOK.md†L1-L180】
 - [x] `docs/SLO.md` registra objetivos (latência, uptime, precisão) e métodos de medição. 【F:docs/SLO.md†L1-L160】
+
+## Execução M8 – Launch Readiness
+- [x] Dashboards e alertas versionados (`docs/observability/webhooks_dashboard.json`, `docs/observability/prometheus_alerts_webhooks.yaml`) e referenciados no playbook. 【F:docs/observability.md†L1-L120】
+- [x] Pipeline CI roda smoke (`python backend/smoke_test.py --webhooks-only`) + Newman "Webhooks" e publica artefatos. 【F:.github/workflows/backend.yml†L1-L200】【F:docs/certification/EVIDENCE/webhooks_smoke.txt†L1-L40】【F:docs/certification/EVIDENCE/newman_webhooks.md†L1-L20】
+- [ ] Dry-run de deploy/rollback documentado com evidência (pendente). 【F:docs/launch/RUNBOOKS.md†L1-L200】
+- [ ] Playbook de suporte validado com owners e matriz de severidade assinada. 【F:docs/SUPPORT_PLAYBOOK.md†L1-L180】
