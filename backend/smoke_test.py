@@ -904,6 +904,8 @@ def run_webhooks_only_smoke() -> Dict[str, Any]:
                 if not secret:
                     raise SmokeFailure("rotation response missing hmac_secret")
                 os.environ["SMOKE_HMAC_SECRET"] = secret
+                global SMOKE_HMAC_SECRET
+                SMOKE_HMAC_SECRET = secret
 
                 update_payload = {
                     "enable_mn": True,

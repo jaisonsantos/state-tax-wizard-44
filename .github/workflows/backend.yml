@@ -129,34 +129,34 @@ jobs:
       - name: Generate Newman environment
         run: |
           python <<'PY'
-import json
-import pathlib
-import httpx
+          import json
+          import pathlib
+          import httpx
 
-BASE_URL = "http://127.0.0.1:8000"
-payload = {"email": "smoke-tester@example.com", "password": "change-me"}
+          BASE_URL = "http://127.0.0.1:8000"
+          payload = {"email": "smoke-tester@example.com", "password": "change-me"}
 
-with httpx.Client(timeout=20.0) as client:
-    response = client.post(f"{BASE_URL}/api/auth/login", json=payload)
-    response.raise_for_status()
-    data = response.json()
+          with httpx.Client(timeout=20.0) as client:
+              response = client.post(f"{BASE_URL}/api/auth/login", json=payload)
+              response.raise_for_status()
+              data = response.json()
 
-store_id = data["stores"][0]["id"] if data.get("stores") else ""
+          store_id = data["stores"][0]["id"] if data.get("stores") else ""
 
-env = {
-    "id": "taxo-ci-webhooks",
-    "name": "CI Webhooks",
-    "values": [
-        {"key": "base_url", "value": BASE_URL, "enabled": True},
-        {"key": "token", "value": data["token"], "enabled": True},
-        {"key": "store_id", "value": store_id, "enabled": True},
-        {"key": "webhook_endpoint", "value": "http://127.0.0.1:8082/capture", "enabled": True},
-        {"key": "hmac_secret", "value": "demo-hmac-secret", "enabled": True}
-    ]
-}
+          env = {
+              "id": "taxo-ci-webhooks",
+              "name": "CI Webhooks",
+              "values": [
+                  {"key": "base_url", "value": BASE_URL, "enabled": True},
+                  {"key": "token", "value": data["token"], "enabled": True},
+                  {"key": "store_id", "value": store_id, "enabled": True},
+                  {"key": "webhook_endpoint", "value": "http://127.0.0.1:8082/capture", "enabled": True},
+                  {"key": "hmac_secret", "value": "demo-hmac-secret", "enabled": True}
+              ]
+          }
 
-pathlib.Path("ci.newman_environment.json").write_text(json.dumps(env, indent=2))
-PY
+          pathlib.Path("ci.newman_environment.json").write_text(json.dumps(env, indent=2))
+          PY
 
       - name: Run Newman Webhooks folder
         run: |
