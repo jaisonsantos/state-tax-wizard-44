@@ -205,3 +205,26 @@ evidence-clean: ## Remove accidentally large evidence files
 
 stripe-listen: ## Start Stripe CLI webhook forwarder (keep this running while testing)
 	stripe listen --events checkout.session.completed,invoice.paid,invoice.payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted --forward-to http://localhost:8000/api/v1/billing/webhooks/stripe
+
+# --- GO/LIVE helpers --------------------------------------------------------
+
+.PHONY: e2e-dry-run
+e2e-dry-run: down clean build up migrate seed \
+            smoke analytics-smoke reports-smoke security-smoke webhooks-smoke
+	@echo "[E2E] Dump metrics & evidence"
+	@$(MAKE) metrics > docs/certification/EVIDENCE/metrics_dump.txt
+	@$(MAKE) evidence-scan
+	@echo "[E2E] DONE. Capture Grafana snapshot e anexe aos docs."
+
+.PHONY: canary
+canary:
+	@echo "[CANARY] Habilitando release para piloto (5%/1 loja)."
+	# coloque aqui sua flag/variável de ambiente/rota de admin para canário
+
+.PHONY: rollback
+rollback: down
+	@echo "[ROLLBACK] Voltando para N-1 e validando saúde."
+	# se tiver restore: invoque aqui
+	@$(MAKE) up
+	@curl -sS http://localhost:8080/healthz || true
+	@$(MAKE) test-quick || true
