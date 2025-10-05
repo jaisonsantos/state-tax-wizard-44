@@ -56,6 +56,40 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _drop_stale_alembic_type(connection, version_table: str = "alembic_version") -> None:
+    """Remove lingering composite types that block version table creation."""
+
+    if connection.dialect.name != "postgresql":
+        return
+
+    schema = connection.exec_driver_sql("SELECT current_schema()").scalar()
+
+    table_exists = connection.exec_driver_sql(
+        "SELECT to_regclass(%(regclass)s)",
+        {"regclass": f"{schema}.{version_table}"},
+    ).scalar()
+
+    if table_exists:
+        return
+
+    type_exists = connection.exec_driver_sql(
+        """
+        SELECT 1
+        FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = %(type_name)s
+          AND n.nspname = %(schema)s
+        LIMIT 1
+        """,
+        {"type_name": version_table, "schema": schema},
+    ).scalar()
+
+    if type_exists:
+        connection.exec_driver_sql(
+            f'DROP TYPE IF EXISTS "{schema}"."{version_table}" CASCADE'
+        )
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -65,6 +99,16 @@ def run_migrations_online() -> None:
     """
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = get_url()
+
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        _drop_stale_alembic_type(connection)
+        context.configure(connection=connection, target_metadata=target_metadata)
+
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -72,6 +116,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        _drop_stale_alembic_type(connection)
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
