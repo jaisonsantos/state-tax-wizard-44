@@ -264,11 +264,11 @@ def _run_migrations() -> None:
         alembic_cfg.attributes["connection"] = connection
         command.upgrade(alembic_cfg, "head")
 
-    inspector = inspect(engine)
-    if "stores" not in inspector.get_table_names():
-        raise RuntimeError(
-            "Database migration failed: 'stores' table not found after upgrade"
-        )
+        inspector = inspect(connection)
+        if "stores" not in inspector.get_table_names():
+            raise RuntimeError(
+                "Database migration failed: 'stores' table not found after upgrade"
+            )
 
 
 def seed_database():

@@ -99,6 +99,16 @@ def run_migrations_online() -> None:
     """
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = get_url()
+
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        _drop_stale_alembic_type(connection)
+        context.configure(connection=connection, target_metadata=target_metadata)
+
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
