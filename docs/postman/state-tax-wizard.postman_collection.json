@@ -2050,7 +2050,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "const token = pm.collectionVariables.get('token');",
+          "const token = pm.collectionVariables.get('token') || pm.environment.get('token') || pm.variables.get('token');",
           "if (token) {",
           "  pm.request.headers.upsert({ key: 'Authorization', value: `Bearer ${token}` });",
           "} else {",
