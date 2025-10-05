@@ -253,6 +253,13 @@ def seed_fee_history(db, store: Store, days: int = 30) -> None:
             )
 
 
+def _stores_table_exists(connection) -> bool:
+    """Return True if the stores table exists for the provided connection."""
+
+    inspector = inspect(connection)
+    return "stores" in inspector.get_table_names()
+
+
 def _run_migrations() -> None:
     """Ensure the database schema is up to date before seeding."""
 
@@ -260,20 +267,27 @@ def _run_migrations() -> None:
     alembic_cfg = Config(str(base_dir / "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
     alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
-    with engine.connect() as connection:
-        alembic_cfg.attributes["connection"] = connection
-        command.upgrade(alembic_cfg, "head")
-
-        # Alembic should commit internally, but on some drivers (psycopg3) the
-        # transaction may remain open until we explicitly finalize it. Make sure
-        # we don't return the connection to the pool with pending DDL that will
-        # be rolled back on close.
-        if connection.in_transaction():
-            connection.commit()
 
     with engine.connect() as connection:
-        inspector = inspect(connection)
-        if "stores" not in inspector.get_table_names():
+        # The tests bootstrap SQLite schemas using ``Base.metadata.create_all``.
+        # Running Alembic migrations on top of that causes duplicate table
+        # creation attempts. Skip migrations altogether when the stores table is
+        # already present on SQLite connections.
+        if connection.dialect.name == "sqlite" and _stores_table_exists(connection):
+            pass
+        else:
+            alembic_cfg.attributes["connection"] = connection
+            command.upgrade(alembic_cfg, "head")
+
+            # Alembic should commit internally, but on some drivers (psycopg3)
+            # the transaction may remain open until we explicitly finalize it.
+            # Make sure we don't return the connection to the pool with pending
+            # DDL that will be rolled back on close.
+            if connection.in_transaction():
+                connection.commit()
+
+    with engine.connect() as connection:
+        if not _stores_table_exists(connection):
             raise RuntimeError(
                 "Database migration failed: 'stores' table not found after upgrade"
             )
