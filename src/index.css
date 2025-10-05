@@ -174,20 +174,92 @@
   }
 }
 
+/* --- merged utilities (sem conflitos) --- */
 @layer utilities {
-  .hover-lift {
-    @apply transition-transform duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/20;
+  /* animações existentes */
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+    animation-fill-mode: both;
   }
 
+  .animate-fade-up {
+    animation: fade-up 0.5s ease-out;
+    animation-fill-mode: both;
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out;
+    animation-fill-mode: both;
+  }
+
+  .animate-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .animate-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.08),
+      transparent
+    );
+    animation: shimmer 1.8s infinite;
+  }
+
+  /* números estáveis para contadores */
+  .count-up {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* hover-lift unificada */
+  .hover-lift {
+    @apply transition-transform duration-300 ease-out;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-1;
+    box-shadow: var(--shadow-elegant);
+  }
+
+  /* superfícies adicionais */
   .surface-gradient {
-    @apply bg-gradient-to-br from-background via-primary/5 to-primary-muted/40;
+    /* usa o gradiente primário definido em :root para evitar dependência de cores do theme */
+    background-image: var(--gradient-primary);
   }
 
   .surface-muted {
-    @apply bg-muted/60 backdrop-blur-sm;
+    /* equivalente a bg-muted/60 + blur */
+    background-color: hsl(var(--muted) / 0.6);
+    backdrop-filter: blur(4px);
   }
 
   .border-glow {
-    @apply border border-border/60 shadow-[var(--shadow-card)];
+    /* borda sutil + sombra de card */
+    border: 1px solid hsl(var(--border) / 0.6);
+    box-shadow: var(--shadow-card);
   }
+}
+
+/* keyframes preservados */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }

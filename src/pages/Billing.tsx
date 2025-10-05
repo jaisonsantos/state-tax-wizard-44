@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FadeIn } from "@/components/ui/fade-in";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -266,346 +269,395 @@ export default function Billing() {
 
   if (loading) {
     return (
-      <div className="space-y-6 max-w-6xl">
-        <div>
-          <h1 className="text-3xl font-bold">Billing & Plans</h1>
-          <p className="text-muted-foreground">Carregando informações de billing...</p>
+      <div className="max-w-6xl space-y-8">
+        <FadeIn className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">Billing & Plans</h1>
+          <p className="text-sm text-muted-foreground">Carregando informações de billing...</p>
+        </FadeIn>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="border-none bg-muted/40 p-6">
+              <div className="space-y-4">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-3/4" />
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-3xl font-bold">Billing & Plans</h1>
-        <p className="text-muted-foreground">
+    <div className="max-w-6xl space-y-8">
+      <FadeIn className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Billing & Plans</h1>
+        <p className="text-sm text-muted-foreground">
           {storeId
             ? "Gerencie assinaturas, limites e upgrades do State Tax Wizard."
             : "Selecione uma loja para visualizar detalhes de billing."}
         </p>
-      </div>
+      </FadeIn>
 
       {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Erro</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <FadeIn variant="fade">
+          <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        </FadeIn>
       )}
 
       {!storeId && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              <p className="text-sm text-muted-foreground">
-                Escolha uma loja no seletor acima para carregar as informações de billing.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <FadeIn variant="fade" className="rounded-2xl">
+          <Card className="border-none bg-muted/40">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <p className="text-sm text-muted-foreground">
+                  Escolha uma loja no seletor acima para carregar as informações de billing.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </FadeIn>
       )}
 
       {storeId && isTrialing && trialDaysLeft > 0 && (
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-6 w-6 text-primary" />
-                <div>
-                  <h3 className="font-semibold text-foreground">Período de trial ativo</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Restam {trialDaysLeft} dias. Ative um plano para liberar recursos de produção.
-                  </p>
+        <FadeIn>
+          <Card className="border-none bg-gradient-to-r from-primary/10 via-primary/5 to-background">
+            <CardContent className="p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-6 w-6 text-primary" />
+                  <div className="space-y-1">
+                    <h3 className="text-base font-semibold text-foreground">Período de trial ativo</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Restam {trialDaysLeft} dias. Ative um plano para liberar recursos de produção.
+                    </p>
+                  </div>
                 </div>
+                <Button className="w-full sm:w-auto hover-lift" onClick={() => handlePlanAction(currentPlan)}>
+                  Escolher plano
+                </Button>
               </div>
-              <Button onClick={() => handlePlanAction(currentPlan)}>Escolher plano</Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </FadeIn>
       )}
 
       {storeId && entitlements && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Assinatura atual
-            </CardTitle>
-          </CardHeader>
+        <FadeIn>
+          <Card className="relative border-none bg-background shadow-sm">
+            {portalLoading && <LoadingOverlay message="Abrindo portal" transparent className="rounded-2xl" />}
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Assinatura atual
+              </CardTitle>
+            </CardHeader>
 
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">{currentPlan.displayName}</h3>
-                <p className="text-muted-foreground">
-                  Faturado via {entitlements.provider === "shopify" ? "Shopify" : "Stripe"}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {limitLabel({ ...currentPlan, deliveriesIncluded: entitlements.deliveries_included ?? currentPlan.deliveriesIncluded, commitDeliveries: entitlements.commit_deliveries ?? currentPlan.commitDeliveries })}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold">
-                  {currentPlan.monthlyPrice > 0 ? `${formatCurrency(currentPlan.monthlyPrice)}/mês` : "Gratuito"}
-                </div>
-                <Badge className={isTrialing ? "bg-primary text-primary-foreground" : "bg-success text-success-foreground"}>
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  {isTrialing ? "Trial" : entitlements.status || "Ativo"}
-                </Badge>
-              </div>
-            </div>
-
-            {usage && (
-              <div className="p-4 bg-muted rounded-lg space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="font-medium">Uso no período atual</h4>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {usage.unlimited
-                      ? `${usage.transactions_used} entregas (sem limite)`
-                      : `${usage.transactions_used} / ${usage.transactions_limit} entregas`}
-                  </span>
-                </div>
-                {!usage.unlimited && <Progress value={Math.min(usagePercentage, 100)} className="h-2" />}
-                {showUsageWarning && (
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      {usage.warnings.map((warning) => (
-                        <div key={warning}>{warning}</div>
-                      ))}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {enterpriseOverageMessage && (
-                  <Alert>
-                    <Building className="h-4 w-4" />
-                    <AlertDescription>{enterpriseOverageMessage}</AlertDescription>
-                  </Alert>
-                )}
-                {!showUsageWarning && !enterpriseOverageMessage && (
+            <CardContent className="space-y-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold">{currentPlan.displayName}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Faturado via {entitlements.provider === "shopify" ? "Shopify" : "Stripe"}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Alerta programado para {warnThreshold}% do limite mensal.
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div>
-                  <h4 className="font-medium mb-2">Forma de cobrança</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {entitlements.provider === "shopify"
-                      ? "Cobrança consolidada na fatura mensal da Shopify."
-                      : "Billing seguro via Stripe com suporte a VAT."}
+                    {limitLabel({
+                      ...currentPlan,
+                      deliveriesIncluded: entitlements.deliveries_included ?? currentPlan.deliveriesIncluded,
+                      commitDeliveries: entitlements.commit_deliveries ?? currentPlan.commitDeliveries,
+                    })}
                   </p>
                 </div>
-                <div>
-                  <h4 className="font-medium mb-2">Próxima renovação</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {isTrialing && entitlements.trial_ends_at
-                      ? `Trial encerra em ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
-                      : entitlements.current_period_end
-                      ? new Date(entitlements.current_period_end).toLocaleDateString()
-                      : "N/A"}
-                  </p>
+                <div className="space-y-2 text-right">
+                  <div className="text-3xl font-semibold text-foreground">
+                    {currentPlan.monthlyPrice > 0 ? `${formatCurrency(currentPlan.monthlyPrice)}/mês` : "Gratuito"}
+                  </div>
+                  <Badge
+                    className={
+                      isTrialing
+                        ? "animate-pulse bg-primary text-primary-foreground"
+                        : "bg-success/90 text-success-foreground"
+                    }
+                  >
+                    <CheckCircle className="mr-1 h-3 w-3" />
+                    {isTrialing ? "Trial" : entitlements.status || "Ativo"}
+                  </Badge>
                 </div>
               </div>
-            </div>
 
-            {entitlements.provider === "stripe" && (
-              <Button
-                variant="outline"
-                onClick={handleManageSubscription}
-                disabled={portalLoading}
-                className="w-full"
-              >
-                {portalLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Abrindo portal...
-                  </>
-                ) : (
-                  <>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Gerenciar assinatura
-                  </>
-                )}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+              {usage && (
+                <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/40 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-medium">Uso no período atual</h4>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {usage.unlimited
+                        ? `${usage.transactions_used} entregas (sem limite)`
+                        : `${usage.transactions_used} / ${usage.transactions_limit} entregas`}
+                    </span>
+                  </div>
+                  {!usage.unlimited && (
+                    <Progress value={Math.min(usagePercentage, 100)} className="h-2 bg-background">
+                      {/* indicator handles animation */}
+                    </Progress>
+                  )}
+                  {showUsageWarning && (
+                    <Alert className="border-warning/40 bg-warning/10">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        {usage.warnings.map((warning) => (
+                          <div key={warning}>{warning}</div>
+                        ))}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {enterpriseOverageMessage && (
+                    <Alert className="border-primary/40 bg-primary/10">
+                      <Building className="h-4 w-4" />
+                      <AlertDescription>{enterpriseOverageMessage}</AlertDescription>
+                    </Alert>
+                  )}
+                  {!showUsageWarning && !enterpriseOverageMessage && (
+                    <p className="text-xs text-muted-foreground">
+                      Alerta programado para {warnThreshold}% do limite mensal.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Forma de cobrança</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {entitlements.provider === "shopify"
+                        ? "Cobrança consolidada na fatura mensal da Shopify."
+                        : "Billing seguro via Stripe com suporte a VAT."}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Próxima renovação</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {isTrialing && entitlements.trial_ends_at
+                        ? `Trial encerra em ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
+                        : entitlements.current_period_end
+                        ? new Date(entitlements.current_period_end).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {entitlements.provider === "stripe" && (
+                <Button
+                  variant="outline"
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  className="w-full justify-center transition-all hover-lift"
+                >
+                  {portalLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Abrindo portal...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Gerenciar assinatura
+                    </>
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </FadeIn>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Planos principais</CardTitle>
-          <CardDescription>
-            Escolha o plano que melhor se encaixa na sua operação. Todos oferecem trial de 14 dias.
-          </CardDescription>
-        </CardHeader>
+      <FadeIn>
+        <Card className="border-none bg-background shadow-sm">
+          <CardHeader>
+            <CardTitle>Planos principais</CardTitle>
+            <CardDescription>
+              Escolha o plano que melhor se encaixa na sua operação. Todos oferecem trial de 14 dias.
+            </CardDescription>
+          </CardHeader>
 
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {CORE_PLANS.map((plan) => {
-              const savings = computeAnnualSavings(plan);
-              const isCurrent = entitlements?.plan === plan.key;
-              const isDisabled = !storeId || isCurrent || checkoutLoading === plan.key;
-              const buttonLabel = isCurrent
-                ? "Plano atual"
-                : plan.monthlyPrice === 0
-                ? "Ativar"
-                : "Selecionar plano";
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {CORE_PLANS.map((plan, index) => {
+                const savings = computeAnnualSavings(plan);
+                const isCurrent = entitlements?.plan === plan.key;
+                const isDisabled = !storeId || isCurrent || checkoutLoading === plan.key;
+                const buttonLabel = isCurrent
+                  ? "Plano atual"
+                  : plan.monthlyPrice === 0
+                  ? "Ativar"
+                  : "Selecionar plano";
 
-              return (
-                <div
-                  key={plan.key}
-                  className={`relative border rounded-lg p-6 flex flex-col ${
-                    plan.highlight ? "border-primary shadow-lg" : "border-border"
-                  }`}
-                >
-                  {plan.highlight && (
-                    <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
-                      Mais popular
-                    </Badge>
-                  )}
+                return (
+                  <FadeIn key={plan.key} delay={index * 0.05} className="h-full">
+                    <div
+                      className={`relative flex h-full flex-col gap-4 rounded-2xl border p-6 transition-all ${
+                        plan.highlight
+                          ? "border-primary/60 bg-gradient-to-br from-primary/10 via-background to-background shadow-lg"
+                          : "border-border bg-muted/20"
+                      } hover-lift`}
+                    >
+                      {plan.highlight && (
+                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 animate-pulse bg-primary text-primary-foreground">
+                          Mais popular
+                        </Badge>
+                      )}
 
-                  <div className="text-center mb-4 space-y-1">
-                    <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
-                      {plan.displayName}
-                      {getPlanBadge(plan.key)}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{plan.description}</p>
-                    <div className="mt-3">
-                      <span className="text-3xl font-bold">
-                        {plan.monthlyPrice > 0 ? formatCurrency(plan.monthlyPrice) : "Grátis"}
-                      </span>
-                      {plan.monthlyPrice > 0 && <span className="text-muted-foreground">/mês</span>}
+                      <div className="space-y-2 text-center">
+                        <h3 className="flex items-center justify-center gap-2 text-lg font-semibold">
+                          {plan.displayName}
+                          {getPlanBadge(plan.key)}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">{plan.description}</p>
+                        <div className="mt-3 flex items-baseline justify-center gap-1">
+                          <span className="text-3xl font-bold">
+                            {plan.monthlyPrice > 0 ? formatCurrency(plan.monthlyPrice) : "Grátis"}
+                          </span>
+                          {plan.monthlyPrice > 0 && <span className="text-sm text-muted-foreground">/mês</span>}
+                        </div>
+                        {plan.annualPrice > 0 && savings !== null && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(plan.annualPrice)}/ano (economize {savings}% no anual)
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">{limitLabel(plan)}</p>
+                      </div>
+
+                      <ul className="space-y-2 text-sm">
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-left">
+                            <CheckCircle className="h-4 w-4 flex-shrink-0 text-success" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+
+                      <Button
+                        className="mt-auto w-full justify-center transition-all hover-lift"
+                        variant={isCurrent ? "outline" : "default"}
+                        disabled={isDisabled}
+                        onClick={() => handlePlanAction(plan)}
+                      >
+                        {checkoutLoading === plan.key ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Processando...
+                          </>
+                        ) : (
+                          buttonLabel
+                        )}
+                      </Button>
                     </div>
-                    {plan.annualPrice > 0 && savings !== null && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(plan.annualPrice)}/ano (economize {savings}% no anual)
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">{limitLabel(plan)}</p>
-                  </div>
+                  </FadeIn>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </FadeIn>
 
-                  <ul className="space-y-2 mb-6 text-sm">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
+      <FadeIn>
+        <Card className="border-none bg-background shadow-sm">
+          <CardHeader>
+            <CardTitle>Planos Enterprise</CardTitle>
+            <CardDescription>
+              Compromissos sob contrato com overage monitorado. Configure direto via Stripe ou fale com vendas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-3">
+              {ENTERPRISE_PLANS.map((plan, index) => {
+                const savings = computeAnnualSavings(plan);
+                const isCurrent = entitlements?.plan === plan.key;
+                const configured = isPlanConfigured(plan.key);
+                const buttonLabel = isCurrent
+                  ? "Plano atual"
+                  : configured
+                  ? "Configurar"
+                  : "Fale com vendas";
+                const isDisabled = !storeId || isCurrent || checkoutLoading === plan.key;
 
-                  <Button
-                    className="w-full mt-auto"
-                    variant={isCurrent ? "outline" : "default"}
-                    disabled={isDisabled}
-                    onClick={() => handlePlanAction(plan)}
-                  >
-                    {checkoutLoading === plan.key ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      buttonLabel
-                    )}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                return (
+                  <FadeIn key={plan.key} delay={index * 0.05} className="h-full">
+                    <div className="relative flex h-full flex-col gap-4 rounded-2xl border border-border/70 bg-muted/10 p-6 hover-lift">
+                      <div className="space-y-2 text-center">
+                        <h3 className="flex items-center justify-center gap-2 text-lg font-semibold">
+                          {plan.displayName}
+                          {getPlanBadge(plan.key)}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">{plan.description}</p>
+                        <div className="mt-3 flex items-baseline justify-center gap-1">
+                          <span className="text-3xl font-bold">{formatCurrency(plan.monthlyPrice)}</span>
+                          <span className="text-sm text-muted-foreground">/mês</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCurrency(plan.annualPrice)}/ano{" "}
+                          {savings !== null && `(economize ${savings}%)`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{limitLabel(plan)}</p>
+                        {plan.overageFee && (
+                          <p className="text-xs text-muted-foreground">
+                            Overage registrado a {formatCurrency(plan.overageFee)} por entrega
+                          </p>
+                        )}
+                      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Planos Enterprise</CardTitle>
-          <CardDescription>
-            Compromissos sob contrato com overage monitorado. Configure direto via Stripe ou fale com vendas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-3">
-            {ENTERPRISE_PLANS.map((plan) => {
-              const savings = computeAnnualSavings(plan);
-              const isCurrent = entitlements?.plan === plan.key;
-              const configured = isPlanConfigured(plan.key);
-              const buttonLabel = isCurrent
-                ? "Plano atual"
-                : configured
-                ? "Configurar"
-                : "Fale com vendas";
-              const isDisabled = !storeId || isCurrent || checkoutLoading === plan.key;
+                      <ul className="space-y-2 text-sm">
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-left">
+                            <CheckCircle className="h-4 w-4 flex-shrink-0 text-success" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
 
-              return (
-                <div key={plan.key} className="border rounded-lg p-6 flex flex-col">
-                  <div className="text-center mb-4 space-y-1">
-                    <h3 className="text-lg font-semibold flex items-center justify-center gap-2">
-                      {plan.displayName}
-                      {getPlanBadge(plan.key)}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{plan.description}</p>
-                    <div className="mt-3">
-                      <span className="text-3xl font-bold">{formatCurrency(plan.monthlyPrice)}</span>
-                      <span className="text-muted-foreground">/mês</span>
+                      <Button
+                        className="mt-auto w-full justify-center transition-all hover-lift"
+                        variant={isCurrent ? "outline" : "default"}
+                        disabled={isDisabled}
+                        onClick={() => handlePlanAction(plan)}
+                      >
+                        {checkoutLoading === plan.key ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Processando...
+                          </>
+                        ) : (
+                          buttonLabel
+                        )}
+                      </Button>
+
+                      {!configured && !isCurrent && (
+                        <p className="text-center text-xs text-muted-foreground">
+                          Configure preços STRIPE_PRICE_ID_* para habilitar checkout automático.
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {formatCurrency(plan.annualPrice)}/ano{" "}
-                      {savings !== null && `(economize ${savings}%)`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{limitLabel(plan)}</p>
-                    {plan.overageFee && (
-                      <p className="text-xs text-muted-foreground">
-                        Overage registrado a {formatCurrency(plan.overageFee)} por entrega
-                      </p>
-                    )}
-                  </div>
-
-                  <ul className="space-y-2 mb-6 text-sm">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    className="w-full mt-auto"
-                    variant={isCurrent ? "outline" : "default"}
-                    disabled={isDisabled}
-                    onClick={() => handlePlanAction(plan)}
-                  >
-                    {checkoutLoading === plan.key ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      buttonLabel
-                    )}
-                  </Button>
-
-                  {!configured && !isCurrent && (
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Configure preços STRIPE_PRICE_ID_* para habilitar checkout automático.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                  </FadeIn>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </FadeIn>
 
       <Dialog
         open={contactOpen}
