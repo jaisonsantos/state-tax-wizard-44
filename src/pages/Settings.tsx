@@ -38,17 +38,18 @@ export default function Settings() {
   const [integrationsLoading, setIntegrationsLoading] = useState(false);
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
   const [installingProvider, setInstallingProvider] = useState<string | null>(null);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const lastSettingsStoreRef = useRef<string | null>(null);
 
   const overlayMessage = useMemo(() => {
-    if (settingsLoading) {
-      return "Loading store configuration...";
-    }
     if (settingsSaving) {
       return "Saving settings...";
     }
+    if (settingsLoading && !hasHydrated) {
+      return "Loading store configuration...";
+    }
     return null;
-  }, [settingsLoading, settingsSaving]);
+  }, [settingsLoading, settingsSaving, hasHydrated]);
 
   const showOverlay = overlayMessage !== null;
   
@@ -186,6 +187,7 @@ export default function Settings() {
       setWebhookEndpoint("");
       setWebhookEvents([]);
       setIntegrationStatus(null);
+      setHasHydrated(true);
       setSettingsLoading(false);
       setIntegrationsLoading(false);
       lastSettingsStoreRef.current = null;
@@ -199,6 +201,7 @@ export default function Settings() {
     lastSettingsStoreRef.current = storeId;
 
     let cancelled = false;
+    setHasHydrated(false);
     setSettingsLoading(true);
     setLastRotatedSecret(null);
 
@@ -227,6 +230,7 @@ export default function Settings() {
       .finally(() => {
         if (cancelled) return;
         setSettingsLoading(false);
+        setHasHydrated(true);
         refreshIntegrations();
       });
 

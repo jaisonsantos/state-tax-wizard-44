@@ -50,6 +50,8 @@ export default function Reports() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
   const { toast } = useToast();
   const { selectedStoreId: storeId } = useAuth();
 
@@ -58,6 +60,8 @@ export default function Reports() {
       setHistory([]);
       setHistoryError(null);
       setNextCursor(null);
+      setHistoryPage(1);
+      setHistoryHasMore(false);
       return;
     }
 
@@ -91,12 +95,27 @@ export default function Reports() {
           });
 
         setHistory(rows);
+        const cursor = response.next_cursor ?? null;
+        setNextCursor(cursor);
+        const effectivePage = response.page ?? 1;
+        setHistoryPage(effectivePage);
+        const totalRecords = response.total;
+        const limit = response.limit ?? HISTORY_PAGE_SIZE;
+        const hasTotal =
+          totalRecords !== null && totalRecords !== undefined &&
+          response.page !== null && response.page !== undefined;
+        const moreAvailable =
+          Boolean(cursor) ||
+          (hasTotal ? totalRecords > effectivePage * limit : response.items.length === limit);
+        setHistoryHasMore(moreAvailable);
         setNextCursor(resolveNextAuditCursor(response));
       } catch (error) {
         if (!active) return;
         setHistory([]);
         setHistoryError(error instanceof Error ? error.message : "Unable to load export history");
         setNextCursor(null);
+        setHistoryPage(1);
+        setHistoryHasMore(false);
       } finally {
         if (active) {
           setHistoryLoading(false);
@@ -128,10 +147,18 @@ export default function Reports() {
   }, [history]);
 
   const handleLoadMoreHistory = async () => {
-    if (!storeId || !nextCursor) return;
+    if (!storeId) return;
+    if (!nextCursor && !historyHasMore) return;
     setLoadingMore(true);
     try {
-      const response = await apiClient.getAuditLogs(storeId, 1, HISTORY_PAGE_SIZE, "report_export", nextCursor);
+      const pageToRequest = historyPage + 1;
+      const response = await apiClient.getAuditLogs(
+        storeId,
+        pageToRequest,
+        HISTORY_PAGE_SIZE,
+        "report_export",
+        nextCursor ?? undefined,
+      );
       const rows: ReportHistoryRow[] = response.items
         .filter((item) => item.action === "report_export")
         .map((item) => {
@@ -152,6 +179,19 @@ export default function Reports() {
         });
 
       setHistory((current) => [...current, ...rows]);
+      const cursor = response.next_cursor ?? null;
+      setNextCursor(cursor);
+      const effectivePage = response.page ?? pageToRequest;
+      setHistoryPage(effectivePage);
+      const totalRecords = response.total;
+      const limit = response.limit ?? HISTORY_PAGE_SIZE;
+      const hasTotal =
+        totalRecords !== null && totalRecords !== undefined &&
+        response.page !== null && response.page !== undefined;
+      const moreAvailable =
+        Boolean(cursor) ||
+        (hasTotal ? totalRecords > effectivePage * limit : response.items.length === limit);
+      setHistoryHasMore(moreAvailable);
       setNextCursor(resolveNextAuditCursor(response));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load additional exports";
@@ -534,7 +574,7 @@ export default function Reports() {
                   )}
             </TableBody>
           </Table>
-          {nextCursor && storeId && historyRows.length > 0 && (
+          {(storeId && historyRows.length > 0 && (nextCursor || historyHasMore)) && (
             <Button
               variant="outline"
               className="mt-4 w-full justify-center transition-all hover-lift"

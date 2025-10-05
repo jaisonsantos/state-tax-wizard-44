@@ -6,8 +6,9 @@
 #
 # Para execução manual fora da pipeline:
 #   1. Inicie o backend (`uvicorn app.main:app --host 0.0.0.0 --port 8000`).
-#   2. Rode `python backend/smoke_test.py --webhooks-only` para gerar ao menos um evento `fee.applied`.
-#   3. Gere um environment JSON com token/store_id (ver `.github/workflows/backend.yml`, passo "Generate Newman environment").
-#   4. Execute o comando Newman acima e capture a saída neste arquivo.
+#   2. Copie `.env.example` para `.env` (mesmo nos ambientes locais) para reproduzir o setup da pipeline.
+#   3. Rode `python backend/smoke_test.py --webhooks-only` para gerar ao menos um evento `fee.applied`.
+#   4. Gere um environment JSON com token/store_id (ver `.github/workflows/backend.yml`, passo "Generate Newman environment").
+#   5. Execute o comando Newman acima e capture a saída neste arquivo.
 #
 # A primeira execução na pipeline atualiza este documento automaticamente com o log real (≤512 KB).

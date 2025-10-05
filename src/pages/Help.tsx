@@ -1,9 +1,10 @@
+
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { FadeIn, LoadingOverlay, EmptyState } from "@/components/patterns";
+import { FadeIn, EmptyState } from "@/components/patterns";
 import { HelpCircle, ExternalLink, Mail, MessageCircle, Book, FileText, MapPin } from "lucide-react";
 
 const faqItems = [
@@ -93,7 +94,6 @@ export default function Help() {
 
   return (
     <div className="relative space-y-6 max-w-4xl">
-      <LoadingOverlay visible={hydrating} message="Loading documentation..." tone="muted" />
       <FadeIn className="surface-gradient border border-border/60 rounded-2xl p-6 shadow-[var(--shadow-card)]">
         <div>
           <h1 className="text-3xl font-bold">Help &amp; Documentation</h1>

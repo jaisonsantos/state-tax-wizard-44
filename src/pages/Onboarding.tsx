@@ -13,15 +13,16 @@ export default function Onboarding() {
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [installingProvider, setInstallingProvider] = useState<string | null>(null);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const overlayMessage = useMemo(() => {
     if (installingProvider) {
       return `Connecting ${installingProvider}…`;
     }
-    if (statusLoading) {
+    if (statusLoading && !hasHydrated) {
       return "Checking integration status...";
     }
     return null;
-  }, [installingProvider, statusLoading]);
+  }, [installingProvider, statusLoading, hasHydrated]);
 
   const showOverlay = overlayMessage !== null;
   const { toast } = useToast();
@@ -31,6 +32,7 @@ export default function Onboarding() {
   const refreshStatus = useCallback(async () => {
     if (!storeId) {
       setIntegrationStatus(null);
+      setHasHydrated(true);
       setStatusLoading(false);
       return;
     }
@@ -48,12 +50,14 @@ export default function Onboarding() {
       });
     } finally {
       setStatusLoading(false);
+      setHasHydrated(true);
     }
   }, [storeId, toast]);
 
   const lastFetchedStoreRef = useRef<string | null>(null);
 
   useEffect(() => {
+    setHasHydrated(false);
     if (!storeId) {
       setIntegrationStatus(null);
       setStatusLoading(false);
