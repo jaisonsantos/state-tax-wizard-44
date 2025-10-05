@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FadeIn, LoadingOverlay, EmptyState } from "@/components/patterns";
 import { Activity, Search, Filter, Download, RefreshCw, Inbox } from "lucide-react";
 import { apiClient, downloadBlob } from "@/lib/api";
+import { resolveNextAuditCursor } from "@/lib/auditCursor";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 
@@ -69,7 +70,7 @@ export default function Logs() {
         });
 
         setAuditLogs((previous) => (append ? [...previous, ...transformedLogs] : transformedLogs));
-        setNextCursor(response.next_cursor ?? null);
+        setNextCursor(resolveNextAuditCursor(response));
       } catch (error) {
         toast({
           title: "Error",
@@ -87,13 +88,23 @@ export default function Logs() {
     [toast],
   );
 
+  const lastStoreRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!storeId) {
       setAuditLogs([]);
       setNextCursor(null);
+      setLoading(false);
+      setLoadingMore(false);
+      lastStoreRef.current = null;
       return;
     }
 
+    if (lastStoreRef.current === storeId) {
+      return;
+    }
+
+    lastStoreRef.current = storeId;
     void fetchAuditLogs(storeId);
   }, [storeId, fetchAuditLogs]);
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +38,7 @@ export default function Settings() {
   const [integrationsLoading, setIntegrationsLoading] = useState(false);
   const [integrationStatus, setIntegrationStatus] = useState<IntegrationStatusResponse | null>(null);
   const [installingProvider, setInstallingProvider] = useState<string | null>(null);
+  const lastSettingsStoreRef = useRef<string | null>(null);
 
   const overlayMessage = useMemo(() => {
     if (settingsLoading) {
@@ -185,8 +186,17 @@ export default function Settings() {
       setWebhookEndpoint("");
       setWebhookEvents([]);
       setIntegrationStatus(null);
+      setSettingsLoading(false);
+      setIntegrationsLoading(false);
+      lastSettingsStoreRef.current = null;
       return;
     }
+
+    if (lastSettingsStoreRef.current === storeId) {
+      return;
+    }
+
+    lastSettingsStoreRef.current = storeId;
 
     let cancelled = false;
     setSettingsLoading(true);

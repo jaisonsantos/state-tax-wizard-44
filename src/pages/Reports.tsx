@@ -14,6 +14,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { FileText, Download, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient, downloadBlob, type DownloadResult } from "@/lib/api";
+import { resolveNextAuditCursor } from "@/lib/auditCursor";
 import { useAuth } from "@/context/AuthContext";
 
 type ReportKey = "co_dr1786" | "mn_summary";
@@ -90,7 +91,7 @@ export default function Reports() {
           });
 
         setHistory(rows);
-        setNextCursor(response.next_cursor ?? null);
+        setNextCursor(resolveNextAuditCursor(response));
       } catch (error) {
         if (!active) return;
         setHistory([]);
@@ -151,7 +152,7 @@ export default function Reports() {
         });
 
       setHistory((current) => [...current, ...rows]);
-      setNextCursor(response.next_cursor ?? null);
+      setNextCursor(resolveNextAuditCursor(response));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load additional exports";
       setHistoryError(message);
