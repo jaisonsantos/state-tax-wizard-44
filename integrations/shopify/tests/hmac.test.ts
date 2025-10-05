@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { signPayload, verifyShopifyWebhook } from '../src/lib/hmac.js';
+import { signPayload, verifyShopifyWebhook } from '../src/lib/hmac';
 
 describe('signPayload', () => {
   it('generates canonical signature with timestamp and nonce', () => {

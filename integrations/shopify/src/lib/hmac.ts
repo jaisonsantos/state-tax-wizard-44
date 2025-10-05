@@ -28,5 +28,12 @@ export function verifyShopifyWebhook(payload: string, header: string | undefined
   }
 
   const hmac = crypto.createHmac('sha256', secret).update(payload, 'utf8').digest('base64');
-  return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(header));
+  const expected = Buffer.from(hmac, 'base64');
+  const received = Buffer.from(header, 'base64');
+
+  if (expected.length === 0 || expected.length !== received.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expected, received);
 }
