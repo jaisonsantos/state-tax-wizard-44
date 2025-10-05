@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,10 +68,27 @@ const helpCategories = [
 
 export default function Help() {
   const [hydrating, setHydrating] = useState(true);
+  const hydrationGuardRef = useRef(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setHydrating(false), 250);
-    return () => window.clearTimeout(timer);
+    if (hydrationGuardRef.current) {
+      return;
+    }
+
+    hydrationGuardRef.current = true;
+
+    let timeoutId: number | undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      timeoutId = window.setTimeout(() => setHydrating(false), 180);
+    });
+
+    return () => {
+      hydrationGuardRef.current = false;
+      window.cancelAnimationFrame(frameId);
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   return (
