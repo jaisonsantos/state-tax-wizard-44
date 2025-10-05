@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     stripe_price_id_starter: Optional[str] = None
     stripe_price_id_pro: Optional[str] = None
     stripe_price_id_plus: Optional[str] = None
+    stripe_price_id_e10k: Optional[str] = None
+    stripe_price_id_e25k: Optional[str] = None
+    stripe_price_id_e50k: Optional[str] = None
     shopify_app_key: Optional[str] = "stub_key"
     shopify_app_secret: Optional[str] = "stub_secret"
     integrations_woo_enabled: bool = False

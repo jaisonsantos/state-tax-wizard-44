@@ -389,11 +389,37 @@ def run_billing_only_smoke() -> Dict[str, Any]:
         portal_payload = portal_response.json()
 
     print("Billing smoke completed successfully.")
-    print(f"Plan: {entitlements['plan']} status={entitlements['status']}")
+    configured_prices = [
+        plan for plan, enabled in (entitlements.get("stripe_prices_configured") or {}).items() if enabled
+    ]
+    limit_summary = entitlements.get("deliveries_included") or entitlements.get("commit_deliveries")
+    print(
+        f"Plan: {entitlements['plan']} status={entitlements['status']} "
+        f"warn_threshold={entitlements.get('warn_threshold_pct', 'n/a')}%"
+    )
+    if limit_summary:
+        print(f"Included deliveries: {limit_summary}")
     print(
         "Usage: "
         f"{usage['transactions_used']}/"
-        f"{usage.get('transactions_limit') or 'unlimited'} transactions"
+        f"{usage.get('transactions_limit') or 'unlimited'} transactions "
+        f"({usage.get('percentage_used', 0):.1f}% used)"
+    )
+    if usage.get("warnings"):
+        print("Warnings:")
+        for warning in usage["warnings"]:
+            print(f"  - {warning}")
+    else:
+        print("Warnings: none")
+    if usage.get("enterprise_overage"):
+        overage = usage["enterprise_overage"]
+        print(
+            "Enterprise overage: "
+            f"{overage.get('overage_units')} over commit {overage.get('commit_deliveries')}"
+        )
+    print(
+        "Configured Stripe price IDs: "
+        + (", ".join(configured_prices) if configured_prices else "nenhum configurado")
     )
     print(f"Checkout session id: {checkout_payload.get('session_id')}")
     print(f"Portal URL prefix: {portal_payload.get('portal_url', '')[:32]}")

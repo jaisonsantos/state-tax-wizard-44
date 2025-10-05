@@ -8,7 +8,7 @@ The Billing API manages subscription lifecycle, usage tracking, checkout/portal 
 
 ### `GET /v1/billing/entitlements`
 
-Returns the current plan tier, feature entitlements, and Stripe metadata for a store.
+Returns the current plan tier, limits, and Stripe price configuration for a store.
 
 | Query parameter | Type | Required | Description |
 | --------------- | ---- | -------- | ----------- |
@@ -19,26 +19,53 @@ Returns the current plan tier, feature entitlements, and Stripe metadata for a s
 ```json
 {
   "plan": "pro",
+  "display_name": "Pro",
   "provider": "stripe",
   "status": "active",
+  "monthly_price": 29,
+  "annual_price": 290,
+  "deliveries_included": 1000,
+  "warn_threshold_pct": 80,
+  "unlimited": false,
+  "commit_deliveries": null,
+  "overage_fee": null,
   "trial_ends_at": null,
   "cancel_at_period_end": false,
   "current_period_start": "2025-01-01T00:00:00+00:00",
   "current_period_end": "2025-02-01T00:00:00+00:00",
   "features": [
-    "basic_reports",
-    "advanced_reports",
     "fee_calculation",
-    "analytics_dashboard"
+    "advanced_reports",
+    "analytics_dashboard",
+    "webhooks"
   ],
   "limits": {
-    "transactions_per_month": 10000,
+    "transactions_per_month": 1000,
+    "deliveries_included": 1000,
+    "warn_threshold_pct": 80,
+    "unlimited": false,
+    "commit_deliveries": null,
+    "overage_fee": null,
     "advanced_reports": true,
     "analytics_dashboard": true,
     "integrations": false
+  },
+  "stripe_prices_configured": {
+    "free": false,
+    "starter": true,
+    "pro": true,
+    "plus": true,
+    "enterprise_e10k": false,
+    "enterprise_e25k": false,
+    "enterprise_e50k": false
   }
 }
 ```
+
+- `deliveries_included` — limite mensal para planos Free/Starter/Pro/Plus.
+- `commit_deliveries` — compromisso mensal para tiers Enterprise.
+- `warn_threshold_pct` — percentual que dispara avisos (80%).
+- `stripe_prices_configured` — mapa indicando quais price IDs (`STRIPE_PRICE_ID_*`) estão configurados.
 
 **Error responses**
 
@@ -63,11 +90,27 @@ Returns usage metrics for the store's current billing period.
   "plan": "pro",
   "status": "active",
   "transactions_used": 4523,
-  "transactions_limit": 10000,
+  "transactions_limit": 1000,
   "unlimited": false,
-  "percentage_used": 45.23,
+  "percentage_used": 90.46,
   "period_start": "2025-10-01T00:00:00+00:00",
-  "period_end": "2025-11-01T00:00:00+00:00"
+  "period_end": "2025-11-01T00:00:00+00:00",
+  "warn_threshold_pct": 80,
+  "warnings": [
+    "4523 of 1000 deliveries used (90.5% of allocation)."
+  ],
+  "enterprise_overage": null
+}
+```
+
+If the store is on an enterprise plan and exceeds its commit, `enterprise_overage` contains:
+
+```json
+{
+  "commit_deliveries": 10000,
+  "overage_units": 250,
+  "overage_fee": 0.02,
+  "estimated_overage_cost": 5.0
 }
 ```
 
@@ -104,7 +147,7 @@ Creates a Stripe Checkout session for subscription upgrades.
 
 **Error responses**
 
-- `400 Bad Request` — unsupported plan tier.
+- `400 Bad Request` — `{ "detail": { "code": "unsupported_plan_tier", "message": "Requested plan tier is not available for checkout." } }`.
 - `401/403` — auth failures, as above.
 - `503 Service Unavailable` — Stripe credentials or price IDs missing.
 

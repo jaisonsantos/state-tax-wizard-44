@@ -29,7 +29,7 @@
 | 4. Observabilidade/dashboards | ✅ Métricas `webhooks_delivery_total`/`seconds`/`failed_total`/`dead_letter_total` + `docs/observability.md` (seção "Webhooks Outbound") e painel descritivo. 【F:backend/app/observability.py†L89-L256】【F:docs/observability.md†L1-L80】 |
 | 5. Postman + `make webhooks-smoke` | ✅ Coleção Postman "Webhooks" cobre listagem/replay/assinatura; smoke script exercita fluxo (ver nota infra). 【F:docs/postman/state-tax-wizard.postman_collection.json†L1850-L2140】【F:backend/smoke_test.py†L838-L969】 |
 | 6. Admin/Ops (config endpoint + secret) | ✅ UI/Admin atualiza endpoint/eventos; runbook descreve rotação + DLQ. 【F:src/pages/Settings.tsx†L560-L626】【F:docs/webhooks/runbook.md†L1-L160】 |
-| 7. Compatibilidade (pytest + smokes) | ✅ `pytest -q` (73 testes) verde; smoke dependente de Docker documentado (ver §6). 【F:docs/certification/EVIDENCE/pytest.txt†L1-L10】【F:docs/certification/EVIDENCE/webhooks_smoke.txt†L1-L20】 |
+| 7. Compatibilidade (pytest + smokes) | ✅ `pytest -q` (75 testes) verde; smoke dependente de Docker documentado (ver §6). 【F:docs/certification/EVIDENCE/pytest.txt†L1-L40】【F:docs/certification/EVIDENCE/webhooks_smoke.txt†L1-L20】 |
 | 8. Documentação atualizada | ✅ `STATUS.md`, backlog M7, `docs/webhooks/*`, certificações e launch assets sincronizados. 【F:STATUS.md†L1-L120】【F:docs/backlog/17_milestone_07_webhooks.md†L1-L120】【F:docs/certification/DECISION.md†L1-L80】 |
 
 **Decisão:** `M7 = PASS`.
@@ -43,7 +43,7 @@
 
 ## 5. Comandos úteis
 ```bash
-pytest -q                            # Suite completa (73 testes)
+pytest -q                            # Suite completa (75 testes)
 poetry run alembic upgrade head      # Aplica migration 202510060001 antes dos smokes
 python backend/smoke_test.py --webhooks-only \
   --capture-server http://127.0.0.1:8082   # Executa smoke sem Docker (requer servidor local)
@@ -55,9 +55,9 @@ newman run docs/postman/state-tax-wizard.postman_collection.json \
 > **Nota:** O alvo `make webhooks-smoke` depende de `docker-compose`. Em ambientes sem Docker (como este), usar o script direto (`python backend/smoke_test.py --webhooks-only`) e registrar SKIP controlado.
 
 ## 6. Próximas ações (M8 – estimativas de 0,5–1 dia)
-1. Publicar dashboards e alertas no stack observability (Prometheus/Grafana) com queries fornecidas em `docs/observability.md`. (0,5 dia)
+1. ✅ Publicar dashboards e alertas no stack observability (Prometheus/Grafana) com queries fornecidas em `docs/observability.md`. (0,5 dia)
 2. Finalizar templates de comunicação (status page, incident report) referenciados em `docs/SUPPORT_PLAYBOOK.md`. (0,5 dia)
-3. Validar Postman/Newman em CI (GitHub Actions) adicionando job `webhooks-postman`. (1 dia)
+3. ✅ Validar Postman/Newman em CI (GitHub Actions) adicionando job `webhooks-postman`. (1 dia)
 4. Ensaiar runbook de rollback com banco seedado (manual/híbrido) e registrar evidência. (0,5 dia)
 5. Completar checklist GO/NO-GO com owners e links para monitorações reais. (0,5 dia)
 

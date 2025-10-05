@@ -6,7 +6,7 @@
 - **Objetivo:** validar que as rotas e serviços recém-implementados permanecem estáveis em produção.
 - **Ações:**
   - Publicar guia de deploy/rollback (`docs/launch/RUNBOOKS.md`) e registrar pré-requisitos (`alembic upgrade head`, variáveis `SMOKE_HMAC_SECRET`, `WEBHOOK_CAPTURE_URL`).
-  - Automatizar smoke `python backend/smoke_test.py --webhooks-only` em ambiente CI (job `webhooks-smoke`) com `pytest -q` como pré-cheque.
+  - ✅ Automatizar smoke `python backend/smoke_test.py --webhooks-only` em ambiente CI (job `Backend CI / smoke-newman`) com `pytest -q` como pré-cheque.
   - Definir procedimento de rotação emergencial do HMAC (script + atualização imediata do endpoint) e registrar em runbook.
 - **Comandos chave:** `pytest -q`, `poetry run alembic upgrade head`, `python backend/smoke_test.py --webhooks-only`.
 - **Riscos:** ausência de Docker em ambientes locais → documentar alternativa com `uvicorn` + servidor de captura manual.
@@ -25,22 +25,22 @@
 ## 3. Observabilidade & Metrics
 - **Objetivo:** alinhar métricas/alertas a SLOs definidos.
 - **Ações:**
-  - Mapear métricas `webhooks_delivery_total`, `webhooks_delivery_seconds`, `webhooks_failed_total`, `webhooks_dead_letter_total` para dashboards (queries em `docs/observability.md`).
-  - Especificar alertas: P95 >5s por 5 min, falhas consecutivas >3, DLQ >0 por >15 min.
-  - Adicionar seção no runbook com passos para coleta manual (`curl $METRICS_URL | grep webhooks`).
+  - ✅ Mapear métricas `webhooks_delivery_total`, `webhooks_delivery_seconds`, `webhooks_failed_total`, `webhooks_dead_letter_total` para dashboards (queries em `docs/observability.md` + JSON exportado).
+  - ✅ Especificar alertas: P95 >5s por 5 min, falhas consecutivas >3, DLQ >0 por >15 min (`docs/observability/prometheus_alerts_webhooks.yaml`).
+  - ✅ Adicionar seção no runbook com passos para coleta manual (`curl $METRICS_URL | grep webhooks`).
 - **Comandos chave:** `make metrics-dump` (quando Docker disponível) ou instrução manual.
 - **Riscos:** stack Prometheus não provisionado → manter SKIP documentado.
-- **DoD:** dashboards/alertas descritos, métricas documentadas em SLO.
+- **DoD:** dashboards/alertas descritos, métricas documentadas em SLO. ✅
 
 ## 4. Postman & QA
 - **Objetivo:** assegurar cobertura automatizada dos fluxos novos.
 - **Ações:**
-  - Atualizar coleção com pasta "Webhooks" (list, replay, inválido, stale, replay) e scripts de assinatura `X-Taxo-*`.
-  - Criar documentação em `docs/postman/README.md` detalhando preparo do ambiente (captura server, secrets).
-  - Adicionar passo no CHECKLIST para rodar `newman run ... --folder "Webhooks"`.
+  - ✅ Atualizar coleção com pasta "Webhooks" (list, replay, inválido, stale, replay) e scripts de assinatura `X-Taxo-*`; testes validam presença de eventos antes do replay.
+  - ✅ Criar documentação em `docs/postman/README.md` detalhando preparo do ambiente (captura server, secrets) e execução em CI.
+  - ✅ Adicionar passo no CHECKLIST para rodar `newman run ... --folder "Webhooks"`.
 - **Comandos chave:** `newman run docs/postman/state-tax-wizard.postman_collection.json --folder Webhooks`.
 - **Riscos:** Newman sem Node ≥18 → registrar no README.
-- **DoD:** execução Newman registrada e sem falhas críticas.
+- **DoD:** execução Newman registrada e sem falhas críticas (automatizada na pipeline). ✅
 
 ## 5. Documentation & Certification
 - **Objetivo:** manter alinhamento repo ↔ docs.

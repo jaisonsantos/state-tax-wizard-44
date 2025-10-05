@@ -7,6 +7,7 @@ State Tax Wizard is a full-stack demo application that showcases a configurable 
 - **FastAPI backend** with JWT authentication, seeded demo data, idempotent fee application, and replay-protected HMAC signing on `/v1/fees/apply`.
 - **Fee rules for Minnesota and Colorado** that persist `OrderFee` records and structured `AuditLog` entries.
 - **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request, store, and security context.
+- **Billing & pricing tiers** cobrindo Free/Starter/Pro/Plus, commits Enterprise com overage monitorado e alertas de uso (80%).
 - **React frontend** with a fee playground, audit log viewer, CSV export powered by a shared API client, and a persistent header menu for store switching and logout.
 - **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
 - **Taxo webhooks outbound** entregam eventos `fee.applied`, `fee.skipped`, `report.ready`, `hmac.rotated` com assinatura `X-Taxo-*`, retentativas 1m→24h, DLQ/replay administrativo (`/v1/webhooks/events/{id}/replay`) e métricas `webhooks_delivery_total`/`webhooks_delivery_seconds`.
@@ -83,7 +84,7 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
 - `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The security smoke defaults to `demo-hmac-secret` but you should override it once secrets are rotated.
 - `REDIS_URL` (optional) configures the distributed rate limiter. When running via Docker Compose the API service automatically connects to the bundled Redis container; set `REDIS_URL=redis://redis:6379/0` if you provision Redis yourself.
 - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` enable live billing flows; when unset the API returns `503` with `code="billing_unconfigured"`. If a store lacks Stripe metadata the portal endpoint responds with `400` (`code="stripe_customer_missing"`). Smokes/Newman exit gracefully in both cases.
-- `STRIPE_PRICE_ID_STARTER`, `STRIPE_PRICE_ID_PRO`, and `STRIPE_PRICE_ID_PLUS` map plan tiers to Stripe price IDs. Populate them once products exist in your Stripe dashboard.
+- `STRIPE_PRICE_ID_STARTER`, `STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_PLUS`, `STRIPE_PRICE_ID_E10K`, `STRIPE_PRICE_ID_E25K` e `STRIPE_PRICE_ID_E50K` mapeiam tiers aos price IDs do Stripe. Ausência → `503 billing_unconfigured` nos endpoints de checkout/portal e o frontend mostra modal “Fale com vendas”.
 - `SMOKE_BILLING_PLAN` selects which plan tier the billing smoke exercises (defaults to `pro`).
 - `HMAC_MAX_SKEW_SECONDS` and `HMAC_REPLAY_TTL_SECONDS` remain tunable via `.env`.
 
@@ -138,7 +139,7 @@ docker-compose.yml      # Local development stack (API, Postgres, frontend, Prom
   ```sh
   make billing-smoke
   ```
-  When Stripe variables are unset the script prints `⚠ SKIP: billing_unconfigured`; otherwise it asserts entitlements, usage, checkout (with `portal_session_id`), and portal APIs respond successfully. Stores without Stripe metadata return `400` with `code="stripe_customer_missing"`.
+  Exibe resumo do plano (limites, threshold, warnings) e CTAs de checkout/portal. Se `STRIPE_SECRET_KEY` estiver ausente o alvo responde `⚠ SKIP: STRIPE_SECRET_KEY not set`; stores sem metadata retornam `400 code="stripe_customer_missing"`.
 - Webhooks smoke (outbound delivery + replay):
 
   ```sh
@@ -198,6 +199,7 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 - Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
 - Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
 - Postman collection: follow [`docs/postman/README.md`](docs/postman/README.md) for setup, execution order, and Newman automation tips when importing `docs/postman/state-tax-wizard.postman_collection.json`.
+- Pricing grid & estratégia: consulte [`docs/market/PRICING_MODEL.md`](docs/market/PRICING_MODEL.md) e [`docs/market/PRICING_GRID.csv`](docs/market/PRICING_GRID.csv).
 - Backlog overview: explore [`docs/backlog/README.md`](docs/backlog/README.md) for milestone context, dependencies, and iteration checklists.
 - Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
 - Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token`, `store_id` e configure `hmac_secret` antes de testar as rotas assinadas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
@@ -208,4 +210,4 @@ GitHub Actions workflows are provided under `.github/workflows/`:
 ## Roadmap status
 
 - **Current stage**: Milestone 7 — Webhooks outbound certificados (eventos Taxo, DLQ/replay, UI/Admin, docs e testes).
-- **Next focus**: Milestone 8 — Launch Readiness (dashboards, alertas, runbooks, automação de smokes/Newman). Consulte `docs/backlog/18_milestone_08_launch.md` para o plano detalhado.
+- **Next focus**: Milestone 8 — Launch Readiness (ensaio de deploy/rollback, governança de suporte, owners dos alertas). Consulte `docs/backlog/18_milestone_08_launch.md` para o plano detalhado.

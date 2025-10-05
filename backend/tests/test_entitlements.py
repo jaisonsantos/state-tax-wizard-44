@@ -8,7 +8,9 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.models import OrderFee, Store, StoreSetting, Subscription
+from app.observability import enterprise_overage_total, entitlement_warnings_total
 from app.services.entitlement_service import EntitlementService
 
 
@@ -39,17 +41,26 @@ def demo_store(db_session: Session) -> Store:
 
 
 def test_get_plan_limits() -> None:
+    free = EntitlementService.get_plan_limits("free")
+    assert free["transactions_per_month"] == 20
+    assert free["deliveries_included"] == 20
+
     starter = EntitlementService.get_plan_limits("starter")
-    assert starter["transactions_per_month"] == 1000
+    assert starter["transactions_per_month"] == 100
+    assert starter["deliveries_included"] == 100
     assert not starter["advanced_reports"]
 
     pro = EntitlementService.get_plan_limits("pro")
-    assert pro["transactions_per_month"] == 10000
+    assert pro["transactions_per_month"] == 1000
     assert pro["advanced_reports"]
 
     plus = EntitlementService.get_plan_limits("plus")
-    assert plus["transactions_per_month"] is None
+    assert plus["transactions_per_month"] == 5000
     assert plus["integrations"]
+
+    enterprise = EntitlementService.get_plan_limits("enterprise_e10k")
+    assert enterprise["transactions_per_month"] == 10000
+    assert enterprise["overage_fee"] == 0.02
 
 
 def _create_subscription(
@@ -116,12 +127,37 @@ def patched_starter_limit(monkeypatch: pytest.MonkeyPatch) -> None:
         "transactions_per_month",
         5,
     )
+    monkeypatch.setitem(
+        EntitlementService.PLAN_LIMITS["starter"],
+        "deliveries_included",
+        5,
+    )
+
+
+@pytest.fixture
+def patched_enterprise_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(
+        EntitlementService.PLAN_LIMITS["enterprise_e10k"],
+        "transactions_per_month",
+        5,
+    )
+    monkeypatch.setitem(
+        EntitlementService.PLAN_LIMITS["enterprise_e10k"],
+        "commit_deliveries",
+        5,
+    )
+
+
+@pytest.fixture
+def prod_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "prod", raising=False)
 
 
 def test_enforce_transaction_limit_within_quota(
     db_session: Session,
     demo_store: Store,
     patched_starter_limit,
+    prod_env,
 ) -> None:
     _create_subscription(db_session, str(demo_store.id), plan="starter")
     _bulk_insert_fees(db_session, str(demo_store.id), count=4)
@@ -133,6 +169,7 @@ def test_enforce_transaction_limit_exceeded(
     db_session: Session,
     demo_store: Store,
     patched_starter_limit,
+    prod_env,
 ) -> None:
     _create_subscription(db_session, str(demo_store.id), plan="starter")
     _bulk_insert_fees(db_session, str(demo_store.id), count=5)
@@ -145,6 +182,7 @@ def test_enforce_transaction_limit_exceeded(
     assert isinstance(detail, dict)
     assert detail.get("code") == "transaction_limit_exceeded"
     assert detail.get("limit") == 5
+    assert detail.get("percentage_used") >= 100
 
 
 def test_enforce_transaction_limit_unlimited(db_session: Session, demo_store: Store) -> None:
@@ -168,3 +206,47 @@ def test_get_current_usage(db_session: Session, demo_store: Store, patched_start
     assert usage["percentage_used"] == 40.0
     assert usage["period_start"] is not None
     assert usage["period_start"].tzinfo is not None
+    assert usage["warn_threshold_pct"] == EntitlementService.WARN_THRESHOLD_PCT
+    assert usage["warnings"] == []
+    assert usage["enterprise_overage"] is None
+
+
+def test_get_current_usage_emits_warning(
+    db_session: Session,
+    demo_store: Store,
+    patched_starter_limit,
+) -> None:
+    _create_subscription(db_session, str(demo_store.id), plan="starter")
+    _bulk_insert_fees(db_session, str(demo_store.id), count=4)
+
+    metric = entitlement_warnings_total.labels(plan="starter")
+    before = metric._value.get()
+
+    usage = EntitlementService.get_current_usage(db_session, str(demo_store.id))
+
+    assert usage["warnings"], "Expected warnings at 80% usage"
+    after = metric._value.get()
+    assert after == before + 1
+
+
+
+def test_enterprise_overage_allows_usage(
+    db_session: Session,
+    demo_store: Store,
+    patched_enterprise_limit,
+) -> None:
+    _create_subscription(db_session, str(demo_store.id), plan="enterprise_e10k")
+    _bulk_insert_fees(db_session, str(demo_store.id), count=6)
+
+    metric = enterprise_overage_total.labels(plan="enterprise_e10k")
+    before = metric._value.get()
+
+    usage = EntitlementService.get_current_usage(db_session, str(demo_store.id))
+    assert usage["enterprise_overage"] is not None
+    assert usage["enterprise_overage"]["overage_units"] == 1
+
+    EntitlementService.enforce_transaction_limit(db_session, str(demo_store.id))
+
+    after = metric._value.get()
+    assert after == before + 1
+

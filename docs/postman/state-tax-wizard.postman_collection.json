@@ -982,6 +982,19 @@
                   "  pm.expect(status).to.eql(200);",
                   "  pm.expect(body).to.have.property('plan');",
                   "  pm.expect(body).to.have.property('limits');",
+                  "  pm.expect(body).to.have.property('warn_threshold_pct');",
+                  "  pm.expect(body).to.have.property('stripe_prices_configured');",
+                  "});",
+                  "pm.test('Stripe price configuration map covers all tiers', function () {",
+                  "  const expectedPlans = ['free', 'starter', 'pro', 'plus', 'enterprise_e10k', 'enterprise_e25k', 'enterprise_e50k'];",
+                  "  expectedPlans.forEach(function (plan) {",
+                  "    pm.expect(body.stripe_prices_configured).to.have.property(plan);",
+                  "  });",
+                  "});",
+                  "pm.test('Limits expose deliveries and commit details', function () {",
+                  "  pm.expect(body.limits).to.have.property('deliveries_included');",
+                  "  pm.expect(body.limits).to.have.property('commit_deliveries');",
+                  "  pm.expect(body.limits).to.have.property('warn_threshold_pct');",
                   "});"
                 ]
               }
@@ -1035,6 +1048,11 @@
                   "  pm.expect(pm.response.code).to.eql(200);",
                   "  pm.expect(body).to.have.property('transactions_used');",
                   "  pm.expect(body).to.have.property('transactions_limit');",
+                  "  pm.expect(body).to.have.property('warn_threshold_pct');",
+                  "  pm.expect(body).to.have.property('warnings');",
+                  "});",
+                  "pm.test('Usage response includes enterprise overage metadata', function () {",
+                  "  pm.expect(body).to.have.property('enterprise_overage');",
                   "});"
                 ]
               }
@@ -1954,11 +1972,20 @@
                 "exec": [
                   "pm.test('Events listed', function () { pm.response.to.have.status(200); });",
                   "const json = pm.response.json();",
-                  "if (json.events && json.events.length > 0) {",
-                  "  pm.collectionVariables.set('last_taxo_event_id', json.events[0].event_id);",
-                  "  pm.collectionVariables.set('last_taxo_event_status', json.events[0].status);",
+                  "const events = Array.isArray(json.events) ? json.events : [];",
+                  "pm.collectionVariables.set('webhook_events_count', events.length);",
+                  "pm.test('At least one webhook event is available', function () { pm.expect(events.length, 'webhook events').to.be.above(0); });",
+                  "if (events.length > 0) {",
+                  "  pm.collectionVariables.set('last_taxo_event_id', events[0].event_id);",
+                  "  pm.collectionVariables.set('last_taxo_event_status', events[0].status);",
+                  "  pm.test('Webhook event payload includes delivery metadata', function () {",
+                  "    pm.expect(events[0]).to.have.property('status');",
+                  "    pm.expect(events[0]).to.have.property('event_type');",
+                  "  });",
                   "}",
-                  "pm.collectionVariables.set('webhook_events_count', json.events ? json.events.length : 0);"
+                  "pm.test('Replay prerequisites captured', function () {",
+                  "  pm.expect(pm.collectionVariables.get('last_taxo_event_id')).to.be.a('string').and.not.empty;",
+                  "});"
                 ]
               }
             }
@@ -2002,7 +2029,13 @@
                 "exec": [
                   "pm.test('Replay requested', function () { pm.response.to.have.status(200); });",
                   "const json = pm.response.json();",
-                  "pm.collectionVariables.set('last_taxo_event_status', json.status);"
+                  "pm.collectionVariables.set('last_taxo_event_status', json.status);",
+                  "pm.test('Replay status acknowledged', function () {",
+                  "  pm.expect(['pending', 'delivered']).to.include(json.status);",
+                  "});",
+                  "pm.test('Event id confirmed', function () {",
+                  "  pm.expect(json.event_id).to.eql(pm.collectionVariables.get('last_taxo_event_id'));",
+                  "});"
                 ]
               }
             }

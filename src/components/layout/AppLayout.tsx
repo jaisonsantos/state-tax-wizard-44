@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { BillingLimitModal } from "@/components/BillingLimitModal";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -133,6 +134,7 @@ export function AppLayout() {
       
       <Toaster />
       <Sonner />
+      <BillingLimitModal />
     </SidebarProvider>
   );
 }

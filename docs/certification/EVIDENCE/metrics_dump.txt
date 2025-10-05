@@ -1,8 +1,25 @@
-# Métricas Prometheus – captura pendente (ambiente local sem stack)
-# Instruções quando Prometheus/metrics endpoint estiver disponível:
-#   curl -s $METRICS_URL | grep 'webhooks_\|hmac_\|billing_'
-#   head -n 20 > docs/certification/EVIDENCE/metrics_dump.txt
-# Esperado: contadores `webhooks_delivery_total{event="fee.applied",status="delivered"}`,
-# histograma `webhooks_delivery_seconds_bucket`, `webhooks_failed_total{reason="missing_endpoint"}`,
-# `webhooks_dead_letter_total{event="fee.applied"}`,
-# além de métricas legadas (`billing_events_total`, `fees_applied_total`).
+# HELP fees_applied_total Total number of fee applications processed
+# TYPE fees_applied_total counter
+# HELP fees_absorbed_total Count of fees absorbed instead of shown to shoppers
+# TYPE fees_absorbed_total counter
+# HELP report_exports_total Total number of report exports generated
+# TYPE report_exports_total counter
+# HELP hmac_validation_failures_total Count of failed HMAC validation attempts
+# TYPE hmac_validation_failures_total counter
+# HELP hmac_replay_attempts_total Count of replayed HMAC nonce attempts
+# TYPE hmac_replay_attempts_total counter
+# HELP rate_limit_throttles_total Count of requests throttled by the rate limiter
+# TYPE rate_limit_throttles_total counter
+# HELP billing_events_total Count of billing lifecycle events
+# TYPE billing_events_total counter
+billing_events_total{event="billing_unconfigured"} 1.0
+# HELP billing_events_created Count of billing lifecycle events
+# TYPE billing_events_created gauge
+billing_events_created{event="billing_unconfigured"} 1.7596257216624708e+09
+# HELP entitlement_denials_total Count of entitlement denials by feature and plan
+# TYPE entitlement_denials_total counter
+# HELP entitlement_warnings_total Count of entitlement warning events emitted for a plan
+# TYPE entitlement_warnings_total counter
+# HELP enterprise_overage_total Count of enterprise overage detections per plan
+# TYPE enterprise_overage_total counter
+# HELP decision_latency_ms Time spent deciding fees in milliseconds

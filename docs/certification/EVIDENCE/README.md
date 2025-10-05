@@ -16,7 +16,9 @@ This directory stores artefacts captured while validating Milestones 4 (Security
 | `security_smoke.txt` | Output from `make security-smoke`. |
 | `billing_smoke.txt` | Output from `make billing-smoke` (shows PASS or `⚠ SKIP: billing_unconfigured`). |
 | _`newman_billing.txt`_ | _(Optional)_ Newman execution log for the Billing folder. Capture manually when Stripe credentials are configured; the file remains ignored by git by default. |
-| `metrics_dump.txt` | Filtered `/metrics` snapshot highlighting fee, security, rate-limit, and billing counters. |
+| `metrics_dump.txt` | Filtered `/metrics` snapshot highlighting fee, security, rate-limit, billing and webhook counters (atualizado via CI). |
+| `webhooks_smoke.txt` | Resultado da execução `python backend/smoke_test.py --webhooks-only` (gerado automaticamente no CI). |
+| `newman_webhooks.md` | Resumo do `newman run ... --folder Webhooks` (artefato ≤512 KB). |
 
 ### Screenshots (`screens/`)
 
@@ -31,6 +33,7 @@ All evidence files are refreshed via the standard validation sequence:
 make up
 make migrate
 make analytics-smoke reports-smoke security-smoke billing-smoke
+# Webhooks: automatizado no CI (`python backend/smoke_test.py --webhooks-only` + `newman run ... --folder Webhooks`)
 curl -s http://localhost:8000/metrics > docs/certification/EVIDENCE/metrics_dump.txt
 ```
 
