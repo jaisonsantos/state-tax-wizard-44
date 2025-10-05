@@ -14,6 +14,7 @@ const directionMap: Record<FadeDirection, string> = {
 export interface FadeInProps extends HTMLAttributes<HTMLElement> {
   as?: ElementType;
   delay?: number;
+  duration?: number;
   from?: FadeDirection;
 }
 
@@ -21,6 +22,7 @@ export function FadeIn({
   as: Component = "div",
   delay = 0,
   from = "up",
+  duration = 0.5,
   className,
   style,
   children,
@@ -33,6 +35,8 @@ export function FadeIn({
       className={cn(directionClass, className)}
       style={{
         animationDelay: delay ? `${delay}s` : undefined,
+        animationDuration: `${duration}s`,
+        animationTimingFunction: "cubic-bezier(0.33, 1, 0.68, 1)",
         animationFillMode: "forwards",
         ...style,
       }}

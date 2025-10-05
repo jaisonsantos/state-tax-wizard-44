@@ -35,6 +35,8 @@ interface ReportHistoryRow {
   mimeType?: string;
 }
 
+const HISTORY_PAGE_SIZE = 10;
+
 export default function Reports() {
   const [startDate, setStartDate] = useState("2024-07-01");
   const [endDate, setEndDate] = useState("2024-09-30");
@@ -65,7 +67,7 @@ export default function Reports() {
       setHistoryError(null);
 
       try {
-        const response = await apiClient.getAuditLogs(storeId, 1, 25, "report_export");
+        const response = await apiClient.getAuditLogs(storeId, 1, HISTORY_PAGE_SIZE, "report_export");
         if (!active) return;
 
         const rows: ReportHistoryRow[] = response.items
@@ -128,7 +130,7 @@ export default function Reports() {
     if (!storeId || !nextCursor) return;
     setLoadingMore(true);
     try {
-      const response = await apiClient.getAuditLogs(storeId, 1, 25, "report_export", nextCursor);
+      const response = await apiClient.getAuditLogs(storeId, 1, HISTORY_PAGE_SIZE, "report_export", nextCursor);
       const rows: ReportHistoryRow[] = response.items
         .filter((item) => item.action === "report_export")
         .map((item) => {

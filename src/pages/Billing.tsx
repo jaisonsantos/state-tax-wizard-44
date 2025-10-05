@@ -70,23 +70,25 @@ const computeAnnualSavings = (plan: PricingPlan): number | null => {
 
 const limitLabel = (plan: PricingPlan): string => {
   if (plan.commitDeliveries) {
-    return `Compromisso de ${plan.commitDeliveries.toLocaleString()} entregas/mês`;
+    return `Committed ${plan.commitDeliveries.toLocaleString()} deliveries/month`;
   }
   if (plan.deliveriesIncluded === 0) {
-    return "Sem limite de entregas";
+    return "Unlimited deliveries";
   }
   if (plan.deliveriesIncluded) {
-    return `Até ${plan.deliveriesIncluded.toLocaleString()} entregas/mês`;
+    return `Up to ${plan.deliveriesIncluded.toLocaleString()} deliveries/month`;
   }
-  return "Limite conforme contrato";
+  return "Limit defined by contract";
 };
 
 const formatOverage = (overage: BillingEnterpriseOverage | null | undefined): string | null => {
   if (!overage) {
     return null;
   }
-  const fee = overage.overage_fee ? `${currencyFormatter.format(overage.overage_fee)}/entrega` : "consumo registrado";
-  return `${overage.overage_units} entregas acima do commit de ${overage.commit_deliveries.toLocaleString()} (${fee}).`;
+  const fee = overage.overage_fee
+    ? `${currencyFormatter.format(overage.overage_fee)}/delivery`
+    : "usage recorded";
+  return `${overage.overage_units.toLocaleString()} deliveries above the commitment of ${overage.commit_deliveries.toLocaleString()} (${fee}).`;
 };
 
 export default function Billing() {
@@ -167,8 +169,8 @@ export default function Billing() {
   const initiateCheckout = async (plan: PricingPlan) => {
     if (!storeId) {
       toast({
-        title: "Erro",
-        description: "Selecione uma loja antes de continuar",
+        title: "Select a store",
+        description: "Choose a store before continuing.",
         variant: "destructive",
       });
       return;
@@ -187,21 +189,21 @@ export default function Billing() {
       if (response.url) {
         window.open(response.url, "_blank");
         toast({
-          title: "Checkout aberto",
-          description: "Conclua a assinatura na nova aba",
+          title: "Checkout opened",
+          description: "Complete the subscription in the new tab.",
         });
       }
     } catch (err) {
       if (err instanceof ApiError && err.code === "billing_unconfigured") {
         toast({
-          title: "Billing indisponível",
-          description: "Stripe não configurado. Fale com o suporte.",
+          title: "Billing unavailable",
+          description: "Stripe is not configured. Contact support.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Erro",
-          description: err instanceof Error ? err.message : "Não foi possível criar a sessão de checkout",
+          title: "Checkout failed",
+          description: err instanceof Error ? err.message : "Could not create the checkout session",
           variant: "destructive",
         });
       }
@@ -222,8 +224,8 @@ export default function Billing() {
   const handleManageSubscription = async () => {
     if (!storeId) {
       toast({
-        title: "Erro",
-        description: "Selecione uma loja antes de continuar",
+        title: "Select a store",
+        description: "Choose a store before continuing.",
         variant: "destructive",
       });
       return;
@@ -237,21 +239,21 @@ export default function Billing() {
       if (response.portal_url) {
         window.open(response.portal_url, "_blank");
         toast({
-          title: "Portal aberto",
-          description: "Gerencie sua assinatura na nova aba",
+          title: "Portal opened",
+          description: "Manage your subscription in the new tab.",
         });
       }
     } catch (err) {
       if (err instanceof ApiError && err.code === "billing_unconfigured") {
         toast({
-          title: "Billing indisponível",
-          description: "Stripe não configurado. Fale com o suporte.",
+          title: "Billing unavailable",
+          description: "Stripe is not configured. Contact support.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Erro",
-          description: err instanceof Error ? err.message : "Não foi possível abrir o portal",
+          title: "Portal unavailable",
+          description: err instanceof Error ? err.message : "Could not open the portal",
           variant: "destructive",
         });
       }
@@ -262,7 +264,7 @@ export default function Billing() {
 
   const getPlanBadge = (planKey: string) => {
     if (entitlements && planKey === entitlements.plan) {
-      return <Badge className="bg-success text-success-foreground">Atual</Badge>;
+      return <Badge className="bg-success text-success-foreground">Current</Badge>;
     }
     return null;
   };
@@ -272,7 +274,7 @@ export default function Billing() {
       <div className="max-w-6xl space-y-8">
         <FadeIn className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">Billing & Plans</h1>
-          <p className="text-sm text-muted-foreground">Carregando informações de billing...</p>
+          <p className="text-sm text-muted-foreground">Loading billing information...</p>
         </FadeIn>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -299,8 +301,8 @@ export default function Billing() {
         <h1 className="text-3xl font-semibold tracking-tight">Billing & Plans</h1>
         <p className="text-sm text-muted-foreground">
           {storeId
-            ? "Gerencie assinaturas, limites e upgrades do State Tax Wizard."
-            : "Selecione uma loja para visualizar detalhes de billing."}
+            ? "Manage subscriptions, limits, and upgrades for State Tax Wizard."
+            : "Select a store to view billing details."}
         </p>
       </FadeIn>
 
@@ -308,7 +310,7 @@ export default function Billing() {
         <FadeIn variant="fade">
           <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Erro</AlertTitle>
+            <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         </FadeIn>
@@ -321,7 +323,7 @@ export default function Billing() {
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-5 w-5 text-warning" />
                 <p className="text-sm text-muted-foreground">
-                  Escolha uma loja no seletor acima para carregar as informações de billing.
+                  Choose a store from the selector above to load billing information.
                 </p>
               </div>
             </CardContent>
@@ -337,14 +339,14 @@ export default function Billing() {
                 <div className="flex items-center gap-3">
                   <Calendar className="h-6 w-6 text-primary" />
                   <div className="space-y-1">
-                    <h3 className="text-base font-semibold text-foreground">Período de trial ativo</h3>
+                    <h3 className="text-base font-semibold text-foreground">Active trial period</h3>
                     <p className="text-sm text-muted-foreground">
-                      Restam {trialDaysLeft} dias. Ative um plano para liberar recursos de produção.
+                      {trialDaysLeft} days remaining. Activate a plan to unlock production features.
                     </p>
                   </div>
                 </div>
                 <Button className="w-full sm:w-auto hover-lift" onClick={() => handlePlanAction(currentPlan)}>
-                  Escolher plano
+                  Choose plan
                 </Button>
               </div>
             </CardContent>
@@ -355,11 +357,11 @@ export default function Billing() {
       {storeId && entitlements && (
         <FadeIn>
           <Card className="relative border-none bg-background shadow-sm">
-            {portalLoading && <LoadingOverlay message="Abrindo portal" transparent className="rounded-2xl" />}
+            {portalLoading && <LoadingOverlay message="Opening portal" transparent className="rounded-2xl" />}
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                 <CreditCard className="h-5 w-5 text-primary" />
-                Assinatura atual
+                Current subscription
               </CardTitle>
             </CardHeader>
 
@@ -368,7 +370,7 @@ export default function Billing() {
                 <div className="space-y-2">
                   <h3 className="text-xl font-semibold">{currentPlan.displayName}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Faturado via {entitlements.provider === "shopify" ? "Shopify" : "Stripe"}
+                    Billed via {entitlements.provider === "shopify" ? "Shopify" : "Stripe"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {limitLabel({
@@ -380,7 +382,7 @@ export default function Billing() {
                 </div>
                 <div className="space-y-2 text-right">
                   <div className="text-3xl font-semibold text-foreground">
-                    {currentPlan.monthlyPrice > 0 ? `${formatCurrency(currentPlan.monthlyPrice)}/mês` : "Gratuito"}
+                    {currentPlan.monthlyPrice > 0 ? `${formatCurrency(currentPlan.monthlyPrice)}/mo` : "Free"}
                   </div>
                   <Badge
                     className={
@@ -390,7 +392,7 @@ export default function Billing() {
                     }
                   >
                     <CheckCircle className="mr-1 h-3 w-3" />
-                    {isTrialing ? "Trial" : entitlements.status || "Ativo"}
+                    {isTrialing ? "Trial" : entitlements.status || "Active"}
                   </Badge>
                 </div>
               </div>
@@ -400,12 +402,12 @@ export default function Billing() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <h4 className="text-sm font-medium">Uso no período atual</h4>
+                      <h4 className="text-sm font-medium">Usage in the current period</h4>
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {usage.unlimited
-                        ? `${usage.transactions_used} entregas (sem limite)`
-                        : `${usage.transactions_used} / ${usage.transactions_limit} entregas`}
+                        ? `${usage.transactions_used} deliveries (unlimited)`
+                        : `${usage.transactions_used} / ${usage.transactions_limit} deliveries`}
                     </span>
                   </div>
                   {!usage.unlimited && (
@@ -431,7 +433,7 @@ export default function Billing() {
                   )}
                   {!showUsageWarning && !enterpriseOverageMessage && (
                     <p className="text-xs text-muted-foreground">
-                      Alerta programado para {warnThreshold}% do limite mensal.
+                      Alert triggers at {warnThreshold}% of the monthly limit.
                     </p>
                   )}
                 </div>
@@ -440,18 +442,18 @@ export default function Billing() {
               <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Forma de cobrança</h4>
+                    <h4 className="text-sm font-medium">Billing method</h4>
                     <p className="text-sm text-muted-foreground">
                       {entitlements.provider === "shopify"
-                        ? "Cobrança consolidada na fatura mensal da Shopify."
-                        : "Billing seguro via Stripe com suporte a VAT."}
+                        ? "Charges consolidated on the monthly Shopify invoice."
+                        : "Secure billing via Stripe with VAT support."}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Próxima renovação</h4>
+                    <h4 className="text-sm font-medium">Next renewal</h4>
                     <p className="text-sm text-muted-foreground">
                       {isTrialing && entitlements.trial_ends_at
-                        ? `Trial encerra em ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
+                        ? `Trial ends on ${new Date(entitlements.trial_ends_at).toLocaleDateString()}`
                         : entitlements.current_period_end
                         ? new Date(entitlements.current_period_end).toLocaleDateString()
                         : "N/A"}
@@ -470,12 +472,12 @@ export default function Billing() {
                   {portalLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Abrindo portal...
+                      Opening portal...
                     </>
                   ) : (
                     <>
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      Gerenciar assinatura
+                      Manage subscription
                     </>
                   )}
                 </Button>
@@ -488,9 +490,9 @@ export default function Billing() {
       <FadeIn>
         <Card className="border-none bg-background shadow-sm">
           <CardHeader>
-            <CardTitle>Planos principais</CardTitle>
+            <CardTitle>Core plans</CardTitle>
             <CardDescription>
-              Escolha o plano que melhor se encaixa na sua operação. Todos oferecem trial de 14 dias.
+              Choose the plan that fits your operation best. Every plan includes a 14-day trial.
             </CardDescription>
           </CardHeader>
 
@@ -501,10 +503,10 @@ export default function Billing() {
                 const isCurrent = entitlements?.plan === plan.key;
                 const isDisabled = !storeId || isCurrent || checkoutLoading === plan.key;
                 const buttonLabel = isCurrent
-                  ? "Plano atual"
+                  ? "Current plan"
                   : plan.monthlyPrice === 0
-                  ? "Ativar"
-                  : "Selecionar plano";
+                  ? "Activate"
+                  : "Select plan";
 
                 return (
                   <FadeIn key={plan.key} delay={index * 0.05} className="h-full">
@@ -517,7 +519,7 @@ export default function Billing() {
                     >
                       {plan.highlight && (
                         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 animate-pulse bg-primary text-primary-foreground">
-                          Mais popular
+                          Most popular
                         </Badge>
                       )}
 
@@ -529,13 +531,13 @@ export default function Billing() {
                         <p className="text-sm text-muted-foreground">{plan.description}</p>
                         <div className="mt-3 flex items-baseline justify-center gap-1">
                           <span className="text-3xl font-bold">
-                            {plan.monthlyPrice > 0 ? formatCurrency(plan.monthlyPrice) : "Grátis"}
+                            {plan.monthlyPrice > 0 ? formatCurrency(plan.monthlyPrice) : "Free"}
                           </span>
-                          {plan.monthlyPrice > 0 && <span className="text-sm text-muted-foreground">/mês</span>}
+                          {plan.monthlyPrice > 0 && <span className="text-sm text-muted-foreground">/mo</span>}
                         </div>
                         {plan.annualPrice > 0 && savings !== null && (
                           <p className="text-xs text-muted-foreground">
-                            {formatCurrency(plan.annualPrice)}/ano (economize {savings}% no anual)
+                            {formatCurrency(plan.annualPrice)}/year (save {savings}% annually)
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">{limitLabel(plan)}</p>
@@ -559,7 +561,7 @@ export default function Billing() {
                         {checkoutLoading === plan.key ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processando...
+                            Processing...
                           </>
                         ) : (
                           buttonLabel
@@ -577,9 +579,9 @@ export default function Billing() {
       <FadeIn>
         <Card className="border-none bg-background shadow-sm">
           <CardHeader>
-            <CardTitle>Planos Enterprise</CardTitle>
+            <CardTitle>Enterprise plans</CardTitle>
             <CardDescription>
-              Compromissos sob contrato com overage monitorado. Configure direto via Stripe ou fale com vendas.
+              Contract commitments with monitored overage. Configure directly in Stripe or talk to sales.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -589,10 +591,10 @@ export default function Billing() {
                 const isCurrent = entitlements?.plan === plan.key;
                 const configured = isPlanConfigured(plan.key);
                 const buttonLabel = isCurrent
-                  ? "Plano atual"
+                  ? "Current plan"
                   : configured
-                  ? "Configurar"
-                  : "Fale com vendas";
+                  ? "Configure"
+                  : "Contact sales";
                 const isDisabled = !storeId || isCurrent || checkoutLoading === plan.key;
 
                 return (
@@ -606,16 +608,15 @@ export default function Billing() {
                         <p className="text-sm text-muted-foreground">{plan.description}</p>
                         <div className="mt-3 flex items-baseline justify-center gap-1">
                           <span className="text-3xl font-bold">{formatCurrency(plan.monthlyPrice)}</span>
-                          <span className="text-sm text-muted-foreground">/mês</span>
+                          <span className="text-sm text-muted-foreground">/mo</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {formatCurrency(plan.annualPrice)}/ano{" "}
-                          {savings !== null && `(economize ${savings}%)`}
+                          {formatCurrency(plan.annualPrice)}/year {savings !== null && `(save ${savings}%)`}
                         </p>
                         <p className="text-xs text-muted-foreground">{limitLabel(plan)}</p>
                         {plan.overageFee && (
                           <p className="text-xs text-muted-foreground">
-                            Overage registrado a {formatCurrency(plan.overageFee)} por entrega
+                            Overage billed at {formatCurrency(plan.overageFee)} per delivery
                           </p>
                         )}
                       </div>
@@ -638,7 +639,7 @@ export default function Billing() {
                         {checkoutLoading === plan.key ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processando...
+                            Processing...
                           </>
                         ) : (
                           buttonLabel
@@ -647,7 +648,7 @@ export default function Billing() {
 
                       {!configured && !isCurrent && (
                         <p className="text-center text-xs text-muted-foreground">
-                          Configure preços STRIPE_PRICE_ID_* para habilitar checkout automático.
+                          Configure STRIPE_PRICE_ID_* prices to enable automatic checkout.
                         </p>
                       )}
                     </div>
@@ -670,33 +671,32 @@ export default function Billing() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Fale com vendas</DialogTitle>
+            <DialogTitle>Contact sales</DialogTitle>
             <DialogDescription>
-              Vamos montar o contrato enterprise de {contactPlan?.displayName} para sua operação.
+              We'll prepare the enterprise contract for {contactPlan?.displayName} for your operation.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Envie um e-mail para <span className="font-medium">sales@statetaxwizard.example</span> informando o volume mensal
-              ({contactPlan?.commitDeliveries?.toLocaleString()} entregas) e o responsável pelo faturamento.
+              Email <span className="font-medium">sales@statetaxwizard.example</span> with your monthly volume
+              ({contactPlan?.commitDeliveries?.toLocaleString()} deliveries) and the billing owner.
             </p>
             <p>
-              Nossa equipe configura o commit no Stripe e devolve o checkout pronto para assinatura em até 1 dia útil.
+              Our team configures the commitment in Stripe and returns a ready-to-sign checkout within one business day.
             </p>
             <p>
-              Enquanto isso o uso acima do commit será monitorado em <code className="font-mono">enterprise_overage_total</code> no
-              dashboard de métricas.
+              In the meantime, usage above the commitment is tracked in <code className="font-mono">enterprise_overage_total</code> on the metrics dashboard.
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setContactOpen(false)}>
-              Fechar
+              Close
             </Button>
             <Button onClick={() => {
               window.location.href = "mailto:sales@statetaxwizard.example";
               setContactOpen(false);
             }}>
-              Enviar e-mail
+              Send email
             </Button>
           </DialogFooter>
         </DialogContent>

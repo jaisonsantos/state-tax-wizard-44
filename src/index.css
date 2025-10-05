@@ -65,7 +65,11 @@
     --radius: 0.5rem;
 
     /* Professional gradients and effects */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-hover)));
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(var(--primary) / 0.16),
+      hsl(var(--primary-hover) / 0.08)
+    );
     --gradient-minnesota: linear-gradient(135deg, hsl(var(--minnesota)), hsl(220 100% 50%));
     --gradient-colorado: linear-gradient(135deg, hsl(var(--colorado)), hsl(175 60% 50%));
     
@@ -229,6 +233,7 @@
   .surface-gradient {
     /* usa o gradiente primário definido em :root para evitar dependência de cores do theme */
     background-image: var(--gradient-primary);
+    color: hsl(var(--foreground));
   }
 
   .surface-muted {
