@@ -66,7 +66,7 @@ integrations-smoke: ## Smoke test integrations endpoints (feature flags)
 	@echo "==> Testing integration readiness..."
 	docker-compose exec -T api python smoke_test.py --integrations-only
 
-webhooks-smoke: ## Smoke test Stripe webhook ingestion
+webhooks-smoke: ## Valida entregas e replays dos webhooks outbound da Taxo
 	@echo "==> Testing webhook ingestion..."
 	docker-compose exec -T api python smoke_test.py --webhooks-only
 
