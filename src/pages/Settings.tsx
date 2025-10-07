@@ -133,10 +133,21 @@ export default function Settings() {
   };
 
   const integrationDocsLink = (provider: IntegrationProviderStatus): string => {
-    if (provider.docs_url && provider.docs_url.startsWith("http")) {
-      return provider.docs_url;
+    const docsUrl = provider.docs_url?.trim();
+
+    if (!docsUrl) {
+      return "/api/files/docs/integrations/README.md";
     }
-    return provider.docs_url || "/api/files/docs/integrations/README.md";
+
+    if (docsUrl.startsWith("http")) {
+      return docsUrl;
+    }
+
+    if (docsUrl.startsWith("/")) {
+      return docsUrl;
+    }
+
+    return `/api/files/${docsUrl.replace(/^\/+/, "")}`;
   };
 
   const handleInstallIntegration = async (provider: IntegrationProviderStatus) => {

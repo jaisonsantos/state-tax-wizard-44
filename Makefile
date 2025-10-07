@@ -209,8 +209,7 @@ stripe-listen: ## Start Stripe CLI webhook forwarder (keep this running while te
 # --- GO/LIVE helpers --------------------------------------------------------
 
 .PHONY: e2e-dry-run
-e2e-dry-run: down clean build up migrate seed \
-            smoke analytics-smoke reports-smoke security-smoke webhooks-smoke
+e2e-dry-run: down clean build up migrate seed smoke analytics-smoke reports-smoke security-smoke webhooks-smoke
 	@echo "[E2E] Dump metrics & evidence"
 	@$(MAKE) metrics > docs/certification/EVIDENCE/metrics_dump.txt
 	@$(MAKE) evidence-scan
