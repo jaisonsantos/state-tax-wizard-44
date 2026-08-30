@@ -1,213 +1,197 @@
 # State Tax Wizard
 
-State Tax Wizard is a full-stack demo application that showcases a configurable fee engine for U.S. state taxes. It combines a FastAPI backend with a React frontend to simulate fee calculations, audit logging, and observability for demo stores.
+State Tax Wizard is a full-stack demo application for configurable U.S. state fee rules, auditability, billing, webhooks, and operational controls.
 
-## Features
+The project combines a FastAPI backend with a React/TypeScript frontend and models fee calculation as a production-style workflow with persistence, replay protection, observability, and integration boundaries.
 
-- **FastAPI backend** with JWT authentication, seeded demo data, idempotent fee application, and replay-protected HMAC signing on `/v1/fees/apply`.
-- **Fee rules for Minnesota and Colorado** that persist `OrderFee` records and structured `AuditLog` entries.
-- **Observability** via Prometheus metrics (`/metrics`) and JSON logs enriched with request, store, and security context.
-- **Billing & pricing tiers** cobrindo Free/Starter/Pro/Plus, commits Enterprise com overage monitorado e alertas de uso (80%).
-- **React frontend** with a fee playground, audit log viewer, CSV export powered by a shared API client, and a persistent header menu for store switching and logout.
-- **Continuous integration** workflows that run backend migrations/tests and frontend typechecking/builds.
-- **Taxo webhooks outbound** entregam eventos `fee.applied`, `fee.skipped`, `report.ready`, `hmac.rotated` com assinatura `X-Taxo-*`, retentativas 1m→24h, DLQ/replay administrativo (`/v1/webhooks/events/{id}/replay`) e métricas `webhooks_delivery_total`/`webhooks_delivery_seconds`.
-- **Integration connectors** for WooCommerce and Shopify guarded by feature flags, a shared TypeScript SDK, and Prometheus counters (`integrations_requests_total`, `integrations_errors_total`).
+## Why this project
+
+Rules-heavy domains are rarely just about calculating a number. They also need versioned rules, audit trails, idempotency, security, reporting, and safe integrations. State Tax Wizard explores those concerns in one compact system.
+
+## Engineering highlights
+
+- **FastAPI backend** with JWT authentication and Alembic migrations.
+- **Configurable fee rules** for Minnesota and Colorado.
+- **Idempotent fee application** with persisted `OrderFee` records.
+- **Structured audit logging** for rule decisions and operational events.
+- **HMAC request signing** with replay protection on sensitive endpoints.
+- **Prometheus metrics** and JSON logs enriched with request, store, and security context.
+- **Outbound webhooks** with signatures, retries, dead-letter handling, and administrative replay.
+- **Stripe billing flows** with multiple pricing tiers and graceful degradation when billing is not configured.
+- **WooCommerce and Shopify integration connectors** guarded by feature flags.
+- **Shared TypeScript SDK** for integration consumers.
+- **React/Vite frontend** with fee playground, logs, CSV export, and store switching.
+- **GitHub Actions CI** for backend migrations/tests and frontend typechecking/builds.
+
+## Architecture
+
+```text
+                   ┌──────────────────┐
+                   │ React / Vite UI  │
+                   └────────┬─────────┘
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │    FastAPI    │
+                    ├───────────────┤
+                    │ auth / fees   │
+                    │ audit / HMAC  │
+                    │ billing       │
+                    │ webhooks      │
+                    │ integrations  │
+                    └───────┬───────┘
+                            │
+            ┌───────────────┼────────────────┐
+            ▼               ▼                ▼
+       PostgreSQL        Prometheus        Stripe
+            │
+            ├── OrderFee
+            ├── AuditLog
+            ├── billing state
+            └── webhook state
+```
+
+## Core capabilities
+
+- State-specific rule evaluation.
+- Idempotent fee application.
+- Audit trail and CSV export.
+- HMAC signing and replay prevention.
+- Billing tiers and usage monitoring.
+- Signed outbound webhook delivery.
+- Retry, DLQ, and replay flows.
+- WooCommerce and Shopify connector boundaries.
+- Prometheus metrics and structured logging.
+
+## Tech stack
+
+- **Backend:** FastAPI, Python, Alembic
+- **Frontend:** React, TypeScript, Vite, Tailwind
+- **Database:** PostgreSQL; SQLite support for tests
+- **Cache / rate limiting:** Redis
+- **Billing:** Stripe
+- **Observability:** Prometheus, JSON logs
+- **Testing:** Pytest, smoke tests, Playwright
+- **CI:** GitHub Actions
 
 ## Project structure
 
+```text
+backend/                FastAPI app, migrations, tests, seed scripts
+src/                    React frontend
+.github/workflows/      CI pipelines
+docs/                   API, security, observability and product docs
+docker-compose.yml      Local development stack
 ```
-backend/                # FastAPI application, Alembic migrations, tests, and seed script
-src/                    # React frontend (Vite + TypeScript + Tailwind)
-docker-compose.yml      # Local development stack (API, Postgres, frontend, Prometheus)
-.github/workflows/      # GitHub Actions pipelines for backend and frontend
+
+## Quick start
+
+```bash
+make dev
+make migrate
+make seed
 ```
 
-## Prerequisites
+Frontend: `http://localhost:5173`
 
-- Python 3.11+
-- Node.js 18+ and npm
-- Docker & Docker Compose (for the recommended local stack)
+API: `http://localhost:8000`
 
-## Getting started (Docker Compose)
+API docs: `http://localhost:8000/api/docs`
 
-1. Copy `.env.example` to `.env` if you need to override defaults.
-2. Start the stack:
+Stop the stack with:
 
-   ```sh
-   make dev
-   ```
-   This launches the API, frontend, and supporting services. The frontend is available at <http://localhost:5173>, and the API at <http://localhost:8000>.
-3. Apply database migrations and seed demo data (the login flow will also ensure the seed store exists):
+```bash
+make down
+```
 
-   ```sh
-   make migrate
-   make seed
-   ```
-4. Stop the stack when you are done:
+## Local backend development
 
-   ```sh
-   make down
-   ```
-
-## Backend development
-
-1. Create and activate a virtual environment.
-2. Install dependencies:
-
-   ```sh
-   pip install -r backend/requirements.txt
-   ```
-3. Set `DATABASE_URL` (defaults to PostgreSQL when running via Docker; SQLite is supported for tests):
-
-   ```sh
-   export DATABASE_URL=sqlite:///./dev.db
-   ```
-4. Run migrations and seed data:
-
-   ```sh
-   alembic upgrade head
-   python backend/seed_data.py
-   ```
-5. Start the FastAPI server:
-
-   ```sh
-   uvicorn backend.app.main:app --reload
-   ```
-
-### Prometheus metrics & logs
-
-- Prometheus metrics are exposed at `/metrics`.
-- Application logs are JSON-formatted and include fields such as `request_id`, `store_id`, `jurisdiction`, and `reason_codes`.
-
-### Environment variables
-
-- `DATABASE_URL`, `APP_ENV`, `JWT_SECRET`, and `SMOKE_HMAC_SECRET` retain their previous behaviour. The security smoke defaults to `demo-hmac-secret` but you should override it once secrets are rotated.
-- `REDIS_URL` (optional) configures the distributed rate limiter. When running via Docker Compose the API service automatically connects to the bundled Redis container; set `REDIS_URL=redis://redis:6379/0` if you provision Redis yourself.
-- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` enable live billing flows; when unset the API returns `503` with `code="billing_unconfigured"`. If a store lacks Stripe metadata the portal endpoint responds with `400` (`code="stripe_customer_missing"`). Smokes/Newman exit gracefully in both cases.
-- `STRIPE_PRICE_ID_STARTER`, `STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_PLUS`, `STRIPE_PRICE_ID_E10K`, `STRIPE_PRICE_ID_E25K` e `STRIPE_PRICE_ID_E50K` mapeiam tiers aos price IDs do Stripe. Ausência → `503 billing_unconfigured` nos endpoints de checkout/portal e o frontend mostra modal “Fale com vendas”.
-- `SMOKE_BILLING_PLAN` selects which plan tier the billing smoke exercises (defaults to `pro`).
-- `HMAC_MAX_SKEW_SECONDS` and `HMAC_REPLAY_TTL_SECONDS` remain tunable via `.env`.
+```bash
+pip install -r backend/requirements.txt
+export DATABASE_URL=sqlite:///./dev.db
+alembic upgrade head
+python backend/seed_data.py
+uvicorn backend.app.main:app --reload
+```
 
 ## Frontend development
 
-1. Install dependencies:
+```bash
+npm install
+npm run dev
+```
 
-   ```sh
-   npm install
-   ```
-2. Start the development server:
+The frontend reads the API location from `VITE_API_URL`.
 
-   ```sh
-   npm run dev
-   ```
-3. The React app consumes the backend API at `VITE_API_URL` (configure via `.env` or defaults to `/api`).
+## Security model
+
+Sensitive fee requests can be protected with HMAC signing. The implementation includes configurable clock-skew tolerance and replay TTLs so the same signed request cannot be reused indefinitely.
+
+Relevant settings include:
+
+```env
+JWT_SECRET=<application-secret>
+SMOKE_HMAC_SECRET=<test-only-secret>
+HMAC_MAX_SKEW_SECONDS=<seconds>
+HMAC_REPLAY_TTL_SECONDS=<seconds>
+```
+
+Real credentials should be supplied through local environment files or deployment secrets rather than committed source files.
+
+## Billing
+
+Stripe integration is optional and fails explicitly when it is not configured.
+
+```env
+STRIPE_SECRET_KEY=<your-stripe-secret-key>
+STRIPE_WEBHOOK_SECRET=<your-webhook-signing-secret>
+STRIPE_PRICE_ID_STARTER=<price-id>
+STRIPE_PRICE_ID_PRO=<price-id>
+STRIPE_PRICE_ID_PLUS=<price-id>
+```
+
+The project also models plan limits, usage thresholds, and enterprise tiers.
+
+## Webhooks
+
+Outbound Taxo webhooks cover events such as fee application, skipped fees, report readiness, and HMAC rotation. Delivery includes signing, retry scheduling, metrics, dead-letter handling, and administrative replay.
 
 ## Testing
 
-- Backend tests:
+```bash
+pytest -q
+npm run typecheck
+npm run build
+make reports-smoke
+make security-smoke
+make billing-smoke
+make webhooks-smoke
+make integrations-smoke
+make woocommerce-test
+make shopify-test
+make sdk-test
+```
 
-  ```sh
-  pytest -q
-  ```
-  Ensure `APP_ENV=dev` (default) so SQLite-based tests auto-create tables, or
-  pre-create the schema when running against another environment.
-- Frontend type-check:
+Optional Playwright report-download flow:
 
-  ```sh
-  npm run typecheck
-  ```
-- Frontend build:
+```bash
+ENABLE_REPORT_DOWNLOAD_TEST=1 npm run test:e2e
+```
 
-  ```sh
-  npm run build
-  ```
-- Report export smoke (requires Docker services running):
+## CI
 
-  ```sh
-  make reports-smoke
-  ```
-  Set `SMOKE_METRICS_URL` when the Prometheus endpoint is exposed on a separate
-  host; otherwise the smoke test derives `/metrics` from `SMOKE_API_BASE_URL`.
-- Security smoke (validates HMAC signing and replay protection):
+GitHub Actions includes separate backend and frontend workflows. Backend CI applies migrations and runs tests against PostgreSQL; frontend CI performs TypeScript checks and production builds.
 
-  ```sh
-  make security-smoke
-  ```
-  Run against any API instance (Docker Compose or local `uvicorn`) with migrations/seeds applied; SQLite and PostgreSQL are both supported after the GUID shim. Configure `SMOKE_HMAC_SECRET` if you rotate the seed secret; defaults to `demo-hmac-secret`.
-- Billing smoke (Stripe checkout/portal & graceful degradation):
+## Documentation
 
-  ```sh
-  make billing-smoke
-  ```
-  Exibe resumo do plano (limites, threshold, warnings) e CTAs de checkout/portal. Se `STRIPE_SECRET_KEY` estiver ausente o alvo responde `⚠ SKIP: STRIPE_SECRET_KEY not set`; stores sem metadata retornam `400 code="stripe_customer_missing"`.
-- Webhooks smoke (outbound delivery + replay):
+Useful references:
 
-  ```sh
-  make webhooks-smoke
-  ```
-  Requer Docker Compose; executa `python backend/smoke_test.py --webhooks-only` dentro do contêiner, configura endpoint local de captura e valida métricas `webhooks_delivery_*`. Em ambientes sem Docker, rode o script manualmente (ver `docs/AGENTE.md`).
+- [`docs/postman/README.md`](docs/postman/README.md)
+- [`docs/observability.md`](docs/observability.md)
+- [`docs/security/hmac.md`](docs/security/hmac.md)
+- [`docs/backlog/README.md`](docs/backlog/README.md)
+- [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md)
 
-- Integrations smoke (feature flag + observability):
+## Scope
 
-  ```sh
-  make integrations-smoke
-  ```
-
-  This calls `/v1/integrations/status`, validates provider metadata, and asserts `/metrics` exposes the new `integration_*` counters. The command returns `503 integration_disabled` when feature flags remain off.
-- Newman billing folder (optional, requires Postman env JSON with Stripe keys):
-
-  ```sh
-  make newman-billing
-  ```
-  Skips automatically when `docs/postman/local.postman_environment.json` is absent or Stripe credentials are not configured.
-- WooCommerce plugin tests / package:
-
-  ```sh
-  make woocommerce-test
-  make woocommerce-build
-  ```
-
-- Shopify app tests / build:
-
-  ```sh
-  make shopify-test
-  make shopify-build
-  ```
-
-- TypeScript SDK tests:
-
-  ```sh
-  make sdk-test
-  ```
-- Playwright download smoke (opt-in; requires frontend + API running and Chromium dependencies):
-
-  ```sh
-  ENABLE_REPORT_DOWNLOAD_TEST=1 npm run test:e2e
-  ```
-
-The Playwright script is disabled by default so CI pipelines can opt in once headless downloads are stable. When the environment variable is not set the command exits early after printing a skip message.
-
-## Continuous integration
-
-GitHub Actions workflows are provided under `.github/workflows/`:
-- `backend.yml` spins up PostgreSQL with Docker Compose, installs backend dependencies, applies migrations, and runs `pytest`.
-- `frontend.yml` installs Node dependencies, runs the TypeScript type-check, and builds the production bundle.
-
-## Additional resources
-
-- API reference: visit <http://localhost:8000/api/docs> for the automatically generated Swagger UI (the legacy `/docs` path now redirects here).
-- Seed script: running `python backend/seed_data.py` guarantees the presence of the demo store and rule versions for Minnesota and Colorado.
-- Audit logs: accessible through the `/v1/audit` endpoint and the frontend Logs page.
-- Postman collection: follow [`docs/postman/README.md`](docs/postman/README.md) for setup, execution order, and Newman automation tips when importing `docs/postman/state-tax-wizard.postman_collection.json`.
-- Pricing grid & estratégia: consulte [`docs/market/PRICING_MODEL.md`](docs/market/PRICING_MODEL.md) e [`docs/market/PRICING_GRID.csv`](docs/market/PRICING_GRID.csv).
-- Backlog overview: explore [`docs/backlog/README.md`](docs/backlog/README.md) for milestone context, dependencies, and iteration checklists.
-- Colorado DR 1786 CSV dictionary: see [`docs/reports/co_dr1786.md`](docs/reports/co_dr1786.md) for column definitions and reversal handling.
-- Postman collection: import `docs/postman/state-tax-wizard.postman_collection.json` (schema v2.1) e execute uma request de login para preencher automaticamente `token`, `store_id` e configure `hmac_secret` antes de testar as rotas assinadas. Finalize com **Auth / Logout** para revogar a sessão e limpar as variáveis antes do próximo ciclo.
-- Observability playbook: consulte [`docs/observability.md`](docs/observability.md) para dashboards, alertas e política de retenção de `processed_webhooks`.
-- Guia de segurança HMAC: [`docs/security/hmac.md`](docs/security/hmac.md) detalha o algoritmo de assinatura, exemplos de código e estratégias de rotação.
-- Guia de interface: consulte [`docs/security/ui-guide.md`](docs/security/ui-guide.md) para entender estados de carregamento/erro na tela de reports e recomendações de acessibilidade.
-
-## Roadmap status
-
-- **Current stage**: Milestone 7 — Webhooks outbound certificados (eventos Taxo, DLQ/replay, UI/Admin, docs e testes).
-- **Next focus**: Milestone 8 — Launch Readiness (ensaio de deploy/rollback, governança de suporte, owners dos alertas). Consulte `docs/backlog/18_milestone_08_launch.md` para o plano detalhado.
+State Tax Wizard is a demo/portfolio system rather than tax advice or a production tax engine. Its purpose is to demonstrate backend architecture for a rules-heavy domain with persistence, auditability, integrations, billing, observability, and security controls.
